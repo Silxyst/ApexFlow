@@ -974,7 +974,27 @@ local function drawGitHubUpdateSection(sim, cfg)
   cfg.githubUpdate = cfg.githubUpdate or {}
 
   ui.text("GitHub Update Checker")
-  helpMarker("Verifica releases no GitHub via API (requer CSP 0.2.7+ com ac.webRequest).")
+  helpMarker("Verifica releases no GitHub via API (requer CSP com ac.webRequest).")
+
+  -- Graceful degradation: this CSP build has no ac.webRequest, so in-app
+  -- checks can never work. Show guidance instead of a red error + dead toggles.
+  if ac.webRequest == nil then
+    ui.newLine(2)
+    if rgbm then ui.textColored("ℹ Verificação automática indisponível", C.accent())
+    else ui.text("Verificação automática indisponível") end
+    ui.textWrapped("Esta build do CSP não expõe ac.webRequest, então o app não consegue consultar a API do GitHub sozinho. Isso é esperado e não é um defeito do RaceFlow.")
+    ui.newLine(2)
+    ui.text("Repositório: " .. (cfg.githubUpdate.repo or "Silxyst/RaceFlow-V2"))
+    ui.text("Versão instalada: v" .. (SCRIPT_VERSION or _G.RACEFLOW_VERSION or "?"))
+    ui.newLine(2)
+    ui.textWrapped("Para atualizar: baixe a última release e substitua a pasta apps/lua/RaceFlow.")
+    if ac.openWebLink then
+      if ui.button("🌐 Abrir página de Releases", vec2(230, 30)) then
+        pcall(ac.openWebLink, "https://github.com/" .. (cfg.githubUpdate.repo or "Silxyst/RaceFlow-V2") .. "/releases")
+      end
+    end
+    return
+  end
 
   local gState = _G.RARE2_API.githubGetState and _G.RARE2_API.githubGetState() or {}
 
@@ -1294,6 +1314,129 @@ local function drawCautionSection(sim, cfg)
   end
   ui.sameLine()
   helpMarker("Força um FCY para testar se o sistema segura as IAs. Clique de novo para encerrar.")
+end
+
+
+-- ==========================================================
+-- TAB: Track Limits (port of Mavil core) - v0.7.0
+-- ==========================================================
+local function drawTrackLimitsSection(sim, cfg)
+  cfg.tracklimits = cfg.tracklimits or {}
+  local t = cfg.tracklimits
+
+  ui.text("Limites de pista (port do Mavil TLM)")
+  helpMarker("Detecção por rodas fora (wheelsOutside). Avisos → punição de tempo cumprida no box com freio pressionado. IA opcional. Desligado por padrão.")
+
+  local st = _G.RARE2_API.getTrackLimitsState and _G.RARE2_API.getTrackLimitsState() or {}
+
+  -- Player status
+  ui.newLine(2)
+  if st.penaltyActive and (st.timeLeft or 0) > 0 then
+    if rgbm then ui.textColored(string.format("🛑 SUA PUNIÇÃO: %.1fs%s", st.timeLeft, st.serving and " (cumprindo)" or ""), C.danger())
+    else ui.text(string.format("SUA PUNIÇÃO: %.1fs", st.timeLeft)) end
+    if not st.serving then ui.textDisabled("Pare no box e segure o FREIO.") end
+  elseif (st.warn or 0) > 0 then
+    ui.text(string.format("Suas advertências: %d / %d", st.warn, st.maxWarn or 4))
+  else
+    ui.textDisabled("⚪ Sem advertências.")
+  end
+  if st.lastEvent and st.lastEvent ~= "" then ui.textDisabled("Último: " .. st.lastEvent) end
+  if (st.aiWithPenalties or 0) > 0 or (st.aiWithWarnings or 0) > 0 then
+    ui.textDisabled(string.format("IA: %d com punição, %d com advertência", st.aiWithPenalties or 0, st.aiWithWarnings or 0))
+  end
+
+  ui.newLine(3)
+  ui.separator()
+
+  local tlEnabled = (t.enabled == true)
+  if ui.checkbox("Ativar Track Limits", tlEnabled) then
+    t.enabled = not tlEnabled
+    notifyChange()
+  end
+
+  if t.enabled then
+    ui.indent(12)
+
+    t.maxWarnings = t.maxWarnings or 4
+    ui.setNextItemWidth(ui.windowWidth() - 60)
+    local newW = ui.slider("Advertências até punir", t.maxWarnings, 1, 10, "%.0f")
+    if newW ~= nil then
+      local val = math.floor(clamp(newW, 1, 10) + 0.5)
+      if val ~= t.maxWarnings then t.maxWarnings = val; notifyChange() end
+    end
+
+    t.penaltyTime = t.penaltyTime or 5
+    ui.setNextItemWidth(ui.windowWidth() - 60)
+    local newP = ui.slider("Tempo da punição (s)", t.penaltyTime, 1, 30, "%.0f s")
+    if newP ~= nil then
+      local val = math.floor(clamp(newP, 1, 30) + 0.5)
+      if val ~= t.penaltyTime then t.penaltyTime = val; notifyChange() end
+    end
+
+    t.wheels = t.wheels or 4
+    ui.setNextItemWidth(ui.windowWidth() - 60)
+    local newWh = ui.slider("Rodas fora p/ contar", t.wheels, 2, 4, "%.0f")
+    if newWh ~= nil then
+      local val = math.floor(clamp(newWh, 2, 4) + 0.5)
+      if val ~= t.wheels then t.wheels = val; notifyChange() end
+    end
+    helpMarker("2 = rigoroso, 4 = só corte total (padrão Mavil).")
+
+    t.cooldown = t.cooldown or 7
+    ui.setNextItemWidth(ui.windowWidth() - 60)
+    local newCd = ui.slider("Cooldown entre avisos (s)", t.cooldown, 0, 20, "%.0f s")
+    if newCd ~= nil then
+      local val = math.floor(clamp(newCd, 0, 20) + 0.5)
+      if val ~= t.cooldown then t.cooldown = val; notifyChange() end
+    end
+
+    t.waitTime = t.waitTime or 1.9
+    ui.setNextItemWidth(ui.windowWidth() - 60)
+    local newWt = ui.slider("Espera no box antes de cumprir (s)", t.waitTime, 0, 15, "%.1f s")
+    if newWt ~= nil then
+      local val = math.floor(clamp(newWt * 10, 0, 150) + 0.5) / 10
+      if val ~= t.waitTime then t.waitTime = val; notifyChange() end
+    end
+
+    t.trackLimitsEnabled = (t.trackLimitsEnabled ~= false)
+    if ui.checkbox("Fiscalizar limites de pista", t.trackLimitsEnabled) then
+      t.trackLimitsEnabled = not t.trackLimitsEnabled; notifyChange()
+    end
+
+    t.penaltiesEnabled = (t.penaltiesEnabled ~= false)
+    if ui.checkbox("Aplicar punições de tempo", t.penaltiesEnabled) then
+      t.penaltiesEnabled = not t.penaltiesEnabled; notifyChange()
+    end
+
+    t.strictPit = (t.strictPit == true)
+    if ui.checkbox("Box estrito (exige isInPit)", t.strictPit) then
+      t.strictPit = not t.strictPit; notifyChange()
+    end
+
+    t.aiEnabled = (t.aiEnabled ~= false)
+    if ui.checkbox("IA também recebe punições", t.aiEnabled) then
+      t.aiEnabled = not t.aiEnabled; notifyChange()
+    end
+
+    if t.aiEnabled then
+      t.aiServe = (t.aiServe == true)
+      if ui.checkbox("IA cumpre no box durante a corrida", t.aiServe) then
+        t.aiServe = not t.aiServe; notifyChange()
+      end
+    end
+
+    t.qualiReset = (t.qualiReset ~= false)
+    if ui.checkbox("Reset p/ boxes na quali (requer physics)", t.qualiReset) then
+      t.qualiReset = not t.qualiReset; notifyChange()
+    end
+
+    t.finishAdd = (t.finishAdd ~= false)
+    if ui.checkbox("Somar não-cumprida no resultado final", t.finishAdd) then
+      t.finishAdd = not t.finishAdd; notifyChange()
+    end
+
+    ui.unindent(12)
+  end
 end
 
 
