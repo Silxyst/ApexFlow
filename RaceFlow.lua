@@ -1,6 +1,6 @@
 SCRIPT_NAME = "RaceFlow"
-SCRIPT_VERSION = "0.11.0"
-_G.RACEFLOW_VERSION = "0.11.0"
+SCRIPT_VERSION = "0.11.1"
+_G.RACEFLOW_VERSION = "0.11.1"
 
 -- Per-module load status, shown in the fallback window so a future
 -- require() failure identifies the exact module (no more guessing).
@@ -426,6 +426,7 @@ _G.RARE2_API = {
       t.qualiReset = true
       t.finishAdd = true
       t.gamePenaltyCompat = true
+      t.syncWithCMRT = true
       t.minOffTime = 0.25
       t.pitSpeedEnabled = true
       t.pitLimitKmh = 80
@@ -600,7 +601,8 @@ function script.update(dt)
   end
 
   if ai and ai.update then
-    ai.update(dt, sim, RARE2_CFG)
+    local okA, errA = pcall(ai.update, dt, sim, RARE2_CFG)
+    if not okA then ac.log("[RaceFlow] ai.update: " .. tostring(errA)) end
   end
 
   -- Caution so its AI speed caps win over pace/strategy caps.
@@ -609,6 +611,39 @@ function script.update(dt)
   if not rollingActive and caution and caution.update then
     local okC, errC = pcall(caution.update, dt, sim, RARE2_CFG)
     if not okC then ac.log("[RaceFlow] caution.update: " .. tostring(errC)) end
+  end
+
+  -- v0.11.1: Force AI to overtake a stopped/slow/off-track PLAYER
+  -- instead of forming a queue. Runs after AI+Caution so it can
+  -- override any cap (including FCY) when the player is clearly not
+  -- racing (off track or crawling). Minimal, pcall-guarded.
+  do
+    local ok, pcar = pcall(ac.getCar, 0)
+    if ok and pcar and not pcar.isInPitlane and not pcar.isInPit then
+      local pSpd = tonumber(pcar.speedKmh) or 99
+      local pOff = (tonumber(pcar.wheelsOutside) or 0) >= 2 or pcar.isLapValid == false
+      local isBlocking = (pSpd < 5) or (pSpd < 12 and pOff)
+      if isBlocking then
+        local pPos = pcar.splinePosition
+        local L = tonumber(sim.trackLengthM) or 0
+        if pPos ~= nil and L > 0 then
+          for i = 1, (sim.carsCount or 0) - 1 do
+            local ok2, car = pcall(ac.getCar, i)
+            if ok2 and car and car.isAIControlled and not car.isInPitlane and not car.isInPit then
+              local aPos = car.splinePosition
+              if aPos ~= nil then
+                local gapFwd = (tonumber(pPos) - tonumber(aPos)) % 1
+                if gapFwd > 0.002 and gapFwd < 0.03 then -- ~8-120m behind
+                  pcall(physics.setAITopSpeed, i, 320)
+                  pcall(physics.setAIThrottleLimit, i, 1.0)
+                  if physics.setAIAggression then pcall(physics.setAIAggression, i, 1.0) end
+                end
+              end
+            end
+          end
+        end
+      end
+    end
   end
 
   -- Track limits AFTER caution (uses pit/brake checks + teleport +

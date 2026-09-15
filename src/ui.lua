@@ -1539,6 +1539,12 @@ local function drawTrackLimitsSection(sim, cfg)
       if val ~= t.penaltyTime then t.penaltyTime = val; notifyChange() end
     end
 
+    t.syncWithCMRT = (t.syncWithCMRT ~= false)
+    if ui.checkbox("Sincronizar com CMRT (recomendado)", t.syncWithCMRT) then
+      t.syncWithCMRT = not t.syncWithCMRT; notifyChange()
+    end
+    helpMarker("Leigo: ON = usa o mesmo limite de rodas que o CMRT/ servidor (sim.allowedTyresOut).\nTécnico: wheelsOff > allowed gera corte; OFF usa Rodas fora abaixo.")
+
     t.wheels = t.wheels or 4
     local newWh = sliderBlock("Rodas fora p/ contar corte", "tl_wheels", t.wheels, 2, 4, "%.0f",
       "Leigo: 2 = rigoroso (encostou, contou), 4 = só corte total.\nTécnico: lê car.wheelsOutside; padrão 4 igual ao Mavil.")

@@ -46,6 +46,25 @@ local function ensureConfig(cfg)
   t.pitSpeedEnabled = (t.pitSpeedEnabled ~= false)
   t.pitLimitKmh = tonumber(t.pitLimitKmh or 80) or 80
   t.pitGraceSec = tonumber(t.pitGraceSec or 1.0) or 1.0
+  -- v0.11.1: CMRT sync — use server's allowedTyresOut when available.
+  t.syncWithCMRT = (t.syncWithCMRT ~= false)
+end
+
+local function getAllowedTyresOut(sim)
+  -- Mirrors CMRT's get_allowed_tyres_out: server limit or -1 = no limit.
+  if _G.Limits_ManualOverride then
+    local v = math.floor(tonumber(_G.Limits_AllowedTyresOut) or 2)
+    if v < 0 then v = 0 end
+    if v > 4 then v = 4 end
+    return v
+  end
+  local ok, v = pcall(function() return sim and sim.allowedTyresOut end)
+  v = tonumber(v)
+  if v == nil or v < 0 then return -1 end
+  v = math.floor(v + 0.5)
+  if v < 0 then v = 0 end
+  if v > 4 then v = 4 end
+  return v
 end
 
 -- Best-effort read of AC's native slow-down penalty (seconds remaining).
@@ -303,11 +322,15 @@ local function updateCar(i, car, dt, sim, cfg, isPlayer)
     -- skip NEW warnings so the same cut is not punished twice.
     s.gamePen = gamePenaltyTime(car)
     local compatHold = t.gamePenaltyCompat and s.gamePen > 0.5
+    local allowed = getAllowedTyresOut(sim)
+    local useSync = t.syncWithCMRT and allowed >= 0 and allowed < 4
     local wheelsOut = car.wheelsOutside or 0
-    local off = wheelsOut >= (t.wheels or 4)
+    local off = useSync and (wheelsOut > allowed) or (wheelsOut >= (t.wheels or 4))
     -- v0.10.0 precision: count only SUSTAINED off-track (debounce brief kerb touches).
+    -- v0.11.1: CMRT uses 0.2s confirm (2 samples at 10 Hz) — match when synced.
+    local needSustain = useSync and 0.2 or (t.minOffTime or 0)
     if off then s.offTime = (s.offTime or 0) + dt else s.offTime = 0 end
-    local sustained = s.offTime >= (t.minOffTime or 0)
+    local sustained = s.offTime >= needSustain
     if t.trackLimitsEnabled and off and sustained and not s.offPrev and not s.mustReset
         and (now - s.lastWarn) > (t.cooldown or 7) and not s.awaitingReset then
       s.lastWarn = now
