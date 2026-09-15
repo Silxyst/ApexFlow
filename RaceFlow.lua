@@ -1,5 +1,6 @@
 SCRIPT_NAME = "RaceFlow"
-SCRIPT_VERSION = "0.4.6"
+SCRIPT_VERSION = "0.4.9"
+_G.RACEFLOW_VERSION = "0.4.9"
 
 local function safeRequire(name)
   local ok, mod = pcall(require, name)
@@ -51,6 +52,8 @@ local RARE2_CFG = {
     minDuration = 10,        -- minimum VSC duration (seconds)
     triggerThreshold = 2.5,  -- seconds stopped to trigger
     cooldown = 30,           -- cooldown between VSC activations
+    requireYellowClear = true,
+    showPlayerDelta = true,
   },
 
   -- NEW: GitHub update checker
@@ -70,6 +73,10 @@ local RARE2_CFG = {
 
   packs = { pace = true, ers = true, traffic = true, hud = true },
 }
+
+-- Expose config globally for src/* modules (they run in same Lua state
+-- but RARE2_CFG is local here). This fixes M.getState() returning nil config.
+_G.RARE2_CFG = RARE2_CFG
 
 -- ----------------------------------------------------------
 -- Learning / safety defaults (can be overridden by config/UI)
@@ -334,10 +341,12 @@ _G.RARE2_API = {
       RARE2_CFG.vsc.minDuration = 10
       RARE2_CFG.vsc.triggerThreshold = 2.5
       RARE2_CFG.vsc.cooldown = 30
+      RARE2_CFG.vsc.requireYellowClear = true
+      RARE2_CFG.vsc.showPlayerDelta = true
     end
     if RARE2_CFG.githubUpdate then
       RARE2_CFG.githubUpdate.enabled = true
-      RARE2_CFG.githubUpdate.repo = "RaceFlow/RaceFlow"
+      RARE2_CFG.githubUpdate.repo = "Silxyst/RaceFlow-V2"
       RARE2_CFG.githubUpdate.checkIntervalHours = 24
       RARE2_CFG.githubUpdate.notifyOnStartup = true
     end
@@ -382,7 +391,7 @@ local function githubCheckUpdates(cfg, force)
   githubState.error = nil
   githubState.lastCheck = now
 
-  local url = string.format("https://api.github.com/repos/%s/releases/latest", cfg.githubUpdate.repo or "RaceFlow/RaceFlow")
+  local url = string.format("https://api.github.com/repos/%s/releases/latest", cfg.githubUpdate.repo or "Silxyst/RaceFlow-V2")
   ac.log("[RaceFlow GitHub] Checking for updates: " .. url)
 
   ac.webRequest({
@@ -591,20 +600,22 @@ function script.update(dt)
     memoryLoaded = true
   end
 
-  -- GitHub update check on startup
-  if not githubStartupChecked and cfg and cfg.githubUpdate and cfg.githubUpdate.notifyOnStartup then
-    githubStartupChecked = true
-    githubCheckUpdates(cfg, true) -- force check on startup
+  -- GitHub update check on startup + periodic (self-throttled inside)
+  if RARE2_CFG.githubUpdate and RARE2_CFG.githubUpdate.enabled then
+    if not githubStartupChecked and RARE2_CFG.githubUpdate.notifyOnStartup then
+      githubStartupChecked = true
+      githubCheckUpdates(RARE2_CFG, true) -- force check on startup
+    else
+      githubCheckUpdates(RARE2_CFG, false) -- interval check
+    end
   end
 
   if sim.isOnlineRace then return end
   if not sim.isSessionStarted then return end
   if not RARE2_CFG.enabled then return end
 
-  -- VSC (pure delta time) - runs always during session
-  if vsc and vscUpdate then
-    vscUpdate(dt, sim, RARE2_CFG)
-  end
+  -- VSC (pure delta time) - LOCAL single-source implementation
+  vscUpdate(dt, sim, RARE2_CFG)
 
   -- Web UI (remote file-based polling)
   if webui and webui.update then
@@ -648,11 +659,40 @@ end
 
 -- ==========================================================
 -- EXPORTS for UI / other modules
+-- Single source of truth = LOCAL state/functions below (not the
+-- standalone src/vsc + src/github_update modules, kept for reference).
+-- This fixes the "tab always empty/inactive" bug caused by dual state.
 -- ==========================================================
-_G.RARE2_API.getVSCState = function() return vsc and vsc.getState and vsc.getState() or {} end
-_G.RARE2_API.vscManualTrigger = function(sim, cfg) return vsc and vsc.manualTrigger and vsc.manualTrigger(sim, cfg) end
-_G.RARE2_API.githubCheckUpdates = function(cfg, force) return github and github.checkUpdates and github.checkUpdates(cfg, force) end
-_G.RARE2_API.githubGetState = function() return github and github.getState and github.getState() or {} end
+_G.RARE2_API.getVSCState = function()
+  return {
+    active = vscState.active,
+    timer = vscState.timer,
+    reason = vscState.reason,
+    cooldown = vscState.cooldown,
+    deltaKmh = RARE2_CFG.vsc and RARE2_CFG.vsc.deltaKmh or 80,
+  }
+end
+_G.RARE2_API.vscManualTrigger = function(sim, cfg)
+  vscManualTrigger(sim or ac.getSim(), cfg or RARE2_CFG)
+end
+_G.RARE2_API.githubCheckUpdates = function(cfg, force)
+  githubCheckUpdates(cfg or RARE2_CFG, force)
+end
+_G.RARE2_API.githubGetState = function()
+  return {
+    checking = githubState.checking,
+    lastCheck = githubState.lastCheck,
+    latestVersion = githubState.latestVersion,
+    currentVersion = SCRIPT_VERSION,
+    hasUpdate = githubState.hasUpdate,
+    changelog = githubState.changelog,
+    error = githubState.error,
+    tagName = githubState.tagName,
+    publishedAt = githubState.publishedAt,
+    htmlUrl = githubState.htmlUrl,
+    repo = RARE2_CFG.githubUpdate and RARE2_CFG.githubUpdate.repo or "Silxyst/RaceFlow-V2",
+  }
+end
 _G.RARE2_API.webuiGetState = function() return webui and webui.getState and webui.getState() or {} end
 
 -- ==========================================================

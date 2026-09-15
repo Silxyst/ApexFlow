@@ -154,13 +154,14 @@ function M.manualTrigger(sim, cfg)
   end
 end
 
--- Get state for UI
-function M.getState()
+-- Get state for UI (cfg passed by caller; falls back to _G config or defaults)
+function M.getState(cfg)
+  cfg = cfg or (_G.RARE2_CFG or {})
   return {
     active = state.active,
     timer = state.timer,
     reason = state.reason,
-    deltaKmh = RARE2_CFG and RARE2_CFG.vsc and RARE2_CFG.vsc.deltaKmh or 80,
+    deltaKmh = (cfg.vsc and cfg.vsc.deltaKmh) or 80,
     cooldown = state.cooldown,
   }
 end

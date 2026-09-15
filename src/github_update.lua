@@ -49,7 +49,7 @@ function M.checkUpdates(cfg, force)
   state.error = nil
   state.lastCheck = now
 
-  local repo = cfg.githubUpdate.repo or "RaceFlow/RaceFlow"
+  local repo = cfg.githubUpdate.repo or "Silxyst/RaceFlow-V2"
   local url = string.format("https://api.github.com/repos/%s/releases/latest", repo)
   ac.log("[RaceFlow GitHub] Checking updates: " .. url)
 
@@ -103,7 +103,8 @@ function M.checkUpdates(cfg, force)
   return true, "started"
 end
 
-function M.getState()
+function M.getState(cfg)
+  cfg = cfg or (_G.RARE2_CFG or {})
   return {
     checking = state.checking,
     lastCheck = state.lastCheck,
@@ -115,7 +116,7 @@ function M.getState()
     tagName = state.tagName,
     publishedAt = state.publishedAt,
     htmlUrl = state.htmlUrl,
-    repo = RARE2_CFG and RARE2_CFG.githubUpdate and RARE2_CFG.githubUpdate.repo or "RaceFlow/RaceFlow",
+    repo = (cfg.githubUpdate and cfg.githubUpdate.repo) or "Silxyst/RaceFlow-V2",
   }
 end
 

@@ -34,31 +34,44 @@ local function notifyChange()
   end
 end
 
+-- RaceFlow v0.4.9 theme: deep-navy + cyan accent, high contrast
+local C = {
+  bg       = function() return rgbm(0.05, 0.07, 0.11, 0.97) end,
+  card     = function() return rgbm(0.09, 0.12, 0.18, 0.95) end,
+  accent   = function() return rgbm(0.22, 0.88, 1.00, 1.00) end,
+  accentDim= function() return rgbm(0.22, 0.55, 0.70, 1.00) end,
+  ok       = function() return rgbm(0.25, 0.95, 0.45, 1.00) end,
+  warn     = function() return rgbm(1.00, 0.78, 0.20, 1.00) end,
+  danger   = function() return rgbm(1.00, 0.35, 0.35, 1.00) end,
+  text     = function() return rgbm(0.93, 0.96, 1.00, 1.00) end,
+  dim      = function() return rgbm(0.60, 0.68, 0.78, 1.00) end,
+}
+
 local function pushDarkTheme()
   if not ui.pushStyleColor or not rgbm then return end
   pcall(function()
-    ui.pushStyleColor(ui.StyleColor.WindowBg, rgbm(0.08, 0.10, 0.13, 0.96))
-    ui.pushStyleColor(ui.StyleColor.ChildBg, rgbm(0.12, 0.14, 0.18, 0.85))
-    ui.pushStyleColor(ui.StyleColor.FrameBg, rgbm(0.15, 0.18, 0.23, 0.90))
-    ui.pushStyleColor(ui.StyleColor.FrameBgHovered, rgbm(0.22, 0.28, 0.36, 0.95))
-    ui.pushStyleColor(ui.StyleColor.FrameBgActive, rgbm(0.28, 0.36, 0.48, 1.0))
-    ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.16, 0.32, 0.54, 0.85))
-    ui.pushStyleColor(ui.StyleColor.ButtonHovered, rgbm(0.24, 0.44, 0.76, 0.95))
-    ui.pushStyleColor(ui.StyleColor.ButtonActive, rgbm(0.30, 0.54, 0.92, 1.0))
-    ui.pushStyleColor(ui.StyleColor.CheckMark, rgbm(0.30, 0.78, 1.0, 1.0))
-    ui.pushStyleColor(ui.StyleColor.SliderGrab, rgbm(0.25, 0.65, 0.95, 1.0))
-    ui.pushStyleColor(ui.StyleColor.SliderGrabActive, rgbm(0.40, 0.82, 1.0, 1.0))
-    ui.pushStyleColor(ui.StyleColor.Header, rgbm(0.18, 0.28, 0.42, 0.80))
-    ui.pushStyleColor(ui.StyleColor.HeaderHovered, rgbm(0.26, 0.38, 0.56, 0.90))
-    ui.pushStyleColor(ui.StyleColor.HeaderActive, rgbm(0.32, 0.46, 0.68, 1.0))
-    ui.pushStyleColor(ui.StyleColor.Separator, rgbm(0.24, 0.29, 0.38, 0.70))
-    ui.pushStyleColor(ui.StyleColor.Text, rgbm(0.92, 0.95, 0.98, 1.0))
-    ui.pushStyleColor(ui.StyleColor.TextDisabled, rgbm(0.55, 0.62, 0.72, 1.0))
+    ui.pushStyleColor(ui.StyleColor.WindowBg, rgbm(0.05, 0.07, 0.11, 0.97))
+    ui.pushStyleColor(ui.StyleColor.ChildBg, rgbm(0.09, 0.12, 0.18, 0.95))
+    ui.pushStyleColor(ui.StyleColor.FrameBg, rgbm(0.13, 0.17, 0.24, 0.95))
+    ui.pushStyleColor(ui.StyleColor.FrameBgHovered, rgbm(0.18, 0.25, 0.35, 1.00))
+    ui.pushStyleColor(ui.StyleColor.FrameBgActive, rgbm(0.22, 0.32, 0.45, 1.00))
+    ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.12, 0.20, 0.30, 0.95))
+    ui.pushStyleColor(ui.StyleColor.ButtonHovered, rgbm(0.16, 0.35, 0.52, 1.00))
+    ui.pushStyleColor(ui.StyleColor.ButtonActive, rgbm(0.22, 0.55, 0.75, 1.00))
+    ui.pushStyleColor(ui.StyleColor.CheckMark, rgbm(0.22, 0.88, 1.00, 1.00))
+    ui.pushStyleColor(ui.StyleColor.SliderGrab, rgbm(0.22, 0.88, 1.00, 1.00))
+    ui.pushStyleColor(ui.StyleColor.SliderGrabActive, rgbm(0.45, 0.95, 1.00, 1.00))
+    ui.pushStyleColor(ui.StyleColor.Header, rgbm(0.13, 0.22, 0.34, 0.95))
+    ui.pushStyleColor(ui.StyleColor.HeaderHovered, rgbm(0.18, 0.30, 0.45, 1.00))
+    ui.pushStyleColor(ui.StyleColor.HeaderActive, rgbm(0.24, 0.40, 0.58, 1.00))
+    ui.pushStyleColor(ui.StyleColor.Separator, rgbm(0.22, 0.88, 1.00, 0.25))
+    ui.pushStyleColor(ui.StyleColor.Text, rgbm(0.93, 0.96, 1.00, 1.00))
+    ui.pushStyleColor(ui.StyleColor.TextDisabled, rgbm(0.60, 0.68, 0.78, 1.00))
   end)
   pcall(function()
-    ui.pushStyleVar(ui.StyleVar.FrameRounding, 5)
-    ui.pushStyleVar(ui.StyleVar.GrabRounding, 5)
-    ui.pushStyleVar(ui.StyleVar.WindowRounding, 8)
+    ui.pushStyleVar(ui.StyleVar.FrameRounding, 6)
+    ui.pushStyleVar(ui.StyleVar.GrabRounding, 6)
+    ui.pushStyleVar(ui.StyleVar.WindowRounding, 10)
   end)
 end
 
@@ -66,6 +79,40 @@ local function popDarkTheme()
   if not ui.popStyleColor then return end
   pcall(function() ui.popStyleVar(3) end)
   pcall(function() ui.popStyleColor(17) end)
+end
+
+-- Card header: big colored title + dim subtitle
+local function cardTitle(title, subtitle)
+  ui.pushFont(ui.Font.Title)
+  if rgbm then ui.textColored(title, C.accent()) else ui.text(title) end
+  ui.popFont()
+  if subtitle then ui.textDisabled(subtitle) end
+  ui.separator()
+  ui.newLine(2)
+end
+
+-- Status pill line (colored dot + text)
+local function statusLine(active, activeText, idleText)
+  if active then
+    if rgbm then ui.textColored("● " .. activeText, C.ok())
+    else ui.text("● " .. activeText) end
+  else
+    ui.textDisabled("○ " .. idleText)
+  end
+end
+
+-- Safe tab renderer: never leaves the window blank on runtime error
+local function safeTab(label, fn, sim, cfg)
+  local ok, err = pcall(fn, sim, cfg)
+  if not ok then
+    ui.newLine(4)
+    if rgbm then ui.textColored("❌ Erro ao desenhar a aba " .. label, C.danger())
+    else ui.text("Erro ao desenhar a aba " .. label) end
+    ui.textWrapped("Detalhe: " .. tostring(err))
+    ui.newLine(2)
+    ui.textDisabled("O restante do app continua funcionando. Envie esse texto ao suporte.")
+    ac.log("[RaceFlow UI] tab '" .. tostring(label) .. "' draw failed: " .. tostring(err))
+  end
 end
 
 local function sliderRow(label, id, value, minV, maxV, fmt, labelWidth)
@@ -919,8 +966,8 @@ local function drawMultiClassTab(sim, cfg, aiCtl)
   cfg._multiclassClassForIndex = cfg._manualClassForIndex
 end
 
-  local function drawAboutSection(sim, cfg)
-  ui.text("RaceFlow v" .. (SCRIPT_VERSION or "?"))
+local function drawAboutSection(sim, cfg)
+  ui.text("RaceFlow v" .. (SCRIPT_VERSION or _G.RACEFLOW_VERSION or "?"))
   ui.separator()
   ui.newLine(4)
 
@@ -1135,7 +1182,7 @@ local function drawGitHubUpdateSection(sim, cfg)
   if cfg.githubUpdate.enabled then
     ui.indent(12)
 
-    cfg.githubUpdate.repo = cfg.githubUpdate.repo or "RaceFlow/RaceFlow"
+    cfg.githubUpdate.repo = cfg.githubUpdate.repo or "Silxyst/RaceFlow-V2"
     ui.text("Repositório: " .. cfg.githubUpdate.repo)
 
     cfg.githubUpdate.checkIntervalHours = cfg.githubUpdate.checkIntervalHours or 24
@@ -1246,11 +1293,15 @@ local function drawWebUISection(sim, cfg)
 
     cfg.webui.authToken = cfg.webui.authToken or ""
     ui.text("Bearer Token (opcional):")
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newToken = ui.inputText("##webui_token", cfg.webui.authToken)
-    if newToken ~= nil and newToken ~= cfg.webui.authToken then
-      cfg.webui.authToken = newToken
-      notifyChange()
+    if ui.inputText then
+      ui.setNextItemWidth(ui.windowWidth() - 60)
+      local newToken = ui.inputText("##webui_token", cfg.webui.authToken)
+      if newToken ~= nil and newToken ~= cfg.webui.authToken then
+        cfg.webui.authToken = newToken
+        notifyChange()
+      end
+    else
+      ui.textDisabled("Edição de texto indisponível nesta build do CSP.")
     end
     helpMarker("Deixe vazio para desativar autenticação. Ferramenta externa deve enviar header 'Authorization: Bearer <token>'.")
 
@@ -1337,88 +1388,143 @@ local function drawAboutSection(sim, cfg)
 end
 
 
+local TABS_ROW1 = {
+  { id = "aggr",       label = "🏁 Core" },
+  { id = "multiclass", label = "🏎 Multiclass" },
+  { id = "strategy",   label = "⛽ Estratégia" },
+  { id = "vsc",        label = "🟡 VSC" },
+}
+local TABS_ROW2 = {
+  { id = "github",     label = "☁ Updates" },
+  { id = "webui",      label = "🌐 Web UI" },
+  { id = "about",      label = "ℹ Sobre" },
+}
+
+local function tabButton(label, active, w)
+  if active and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.16, 0.45, 0.62, 1.00)) end
+  local clicked = ui.button(label, vec2(w, 30))
+  if active and rgbm then ui.popStyleColor() end
+  return clicked
+end
+
+local function drawTabBar(cfg)
+  local avail = ui.windowWidth() - 20
+  local w1 = (avail - 3 * 8) / 4
+  for i, t in ipairs(TABS_ROW1) do
+    if i > 1 then ui.sameLine(0, 8) end
+    if tabButton(t.label, cfg.uiTab == t.id, w1) then cfg.uiTab = t.id end
+  end
+  local w2 = (avail - 2 * 8) / 3
+  for i, t in ipairs(TABS_ROW2) do
+    if i > 1 then ui.sameLine(0, 8) end
+    if tabButton(t.label, cfg.uiTab == t.id, w2) then cfg.uiTab = t.id end
+  end
+end
+
 function M.draw(sim, cfg)
   pushDarkTheme()
 
+  -- ===== Header: brand + version + master switch =====
+  ui.pushFont(ui.Font.Title)
+  if rgbm then ui.textColored("RACEFLOW", C.accent()) else ui.text("RACEFLOW") end
+  ui.popFont()
+  ui.sameLine(0, 10)
+  ui.textDisabled("v" .. (SCRIPT_VERSION or _G.RACEFLOW_VERSION or "?"))
+  ui.sameLine(0, 12)
   local enabled = cfg.enabled
-  if ui.checkbox("Ativar RaceFlow", enabled) then
+  if ui.checkbox("Ativo", enabled) then
     cfg.enabled = not enabled
     notifyChange()
   end
 
-  ui.sameLine(0, 15)
-  if rgbm then
-    ui.textColored("● Tema Dark", rgbm(0.25, 0.75, 1.0, 1.0))
+  -- Session / status line (works in setup AND in race)
+  local sessName = ""
+  local trackName = ""
+  local carsN = 0
+  local inSession = sim and sim.isSessionStarted
+  if sim then
+    if ac.getSessionName then
+      local ok, n = pcall(ac.getSessionName, sim.currentSessionIndex)
+      if ok and n then sessName = tostring(n) end
+    end
+    if ac.getTrackName then
+      local ok, t = pcall(ac.getTrackName)
+      if ok and t then trackName = tostring(t) end
+    end
+    carsN = tonumber(sim.carsCount) or 0
+  end
+  if inSession then
+    local info = sessName
+    if trackName ~= "" then info = info .. "  •  " .. trackName end
+    if carsN > 0 then info = info .. string.format("  •  %d carros", carsN) end
+    ui.textDisabled(info ~= "" and info or "Em sessão")
+    local vs = _G.RARE2_API and _G.RARE2_API.getVSCState and _G.RARE2_API.getVSCState() or {}
+    if vs.active then
+      if rgbm then ui.textColored(string.format("🟡 VSC ATIVO — máx %d km/h (%s)", vs.deltaKmh or 80, vs.reason or ""), C.warn())
+      else ui.text("VSC ATIVO") end
+    else
+      statusLine(cfg.enabled, "Sistema pronto", "Sistema pausado")
+    end
+    local gs = _G.RARE2_API and _G.RARE2_API.githubGetState and _G.RARE2_API.githubGetState() or {}
+    if gs.hasUpdate then
+      if rgbm then ui.textColored("☁ Atualização disponível: v" .. tostring(gs.latestVersion or "?"), C.ok())
+      else ui.text("Atualização disponível") end
+    end
   else
-    ui.text("● Tema Dark")
+    ui.textDisabled("Modo setup — ajustes liberados; dados ao vivo aparecem em pista.")
   end
 
-  ui.newLine(1)
+  ui.newLine(2)
+  ui.separator()
 
   if not cfg.enabled then
-    ui.text("RaceFlow está desativado.")
+    ui.newLine(4)
+    ui.textDisabled("RaceFlow está desativado. Marque “Ativo” acima para configurar.")
     popDarkTheme()
     return
   end
 
   cfg.uiTab = cfg.uiTab or "aggr"
-
-  if ui.radioButton("RaceFlow Core", cfg.uiTab == "aggr") then
-    cfg.uiTab = "aggr"
-  end
-  ui.sameLine()
-  if ui.radioButton("Multi Class", cfg.uiTab == "multiclass") then
-    cfg.uiTab = "multiclass"
-  end
-  ui.sameLine()
-  if ui.radioButton("Estratégia & Endurance", cfg.uiTab == "strategy") then
-    cfg.uiTab = "strategy"
-  end
-  ui.sameLine()
-  if ui.radioButton("VSC", cfg.uiTab == "vsc") then
-    cfg.uiTab = "vsc"
-  end
-  ui.sameLine()
-  if ui.radioButton("GitHub Updates", cfg.uiTab == "github") then
-    cfg.uiTab = "github"
-  end
-  ui.sameLine()
-  if ui.radioButton("Web UI", cfg.uiTab == "webui") then
-    cfg.uiTab = "webui"
-  end
-  ui.sameLine()
-  if ui.radioButton("Sobre", cfg.uiTab == "about") then
-    cfg.uiTab = "about"
-  end
-  ui.newLine(1)
+  drawTabBar(cfg)
+  ui.newLine(2)
   ui.separator()
+  ui.newLine(2)
 
   if cfg.uiTab == "aggr" then
-    drawDifficultyBoostSection(sim, cfg)
-    drawPhysicsIntensitySection(sim, cfg)
-    drawAggressionSection(sim, cfg)
-    drawPaceSection(sim, cfg)
-    drawLowDownforceAISection(sim, cfg)
-    drawLearningModuleSection(sim, cfg)
-    drawRollingStartSection(sim, cfg)
+    cardTitle("🏁 RaceFlow Core", "Personalidade da IA • ritmo • largada • aprendizado")
+    safeTab("Core", function(s, c)
+      drawDifficultyBoostSection(s, c)
+      drawPhysicsIntensitySection(s, c)
+      drawAggressionSection(s, c)
+      drawPaceSection(s, c)
+      drawLowDownforceAISection(s, c)
+      drawLearningModuleSection(s, c)
+      drawRollingStartSection(s, c)
+    end, sim, cfg)
 
   elseif cfg.uiTab == "strategy" then
-    drawFuelStrategySection(sim, cfg)
+    cardTitle("⛽ Estratégia & Endurance", "Voltas • pit-stops • pneus • telemetria")
+    safeTab("Estratégia", drawFuelStrategySection, sim, cfg)
 
   elseif cfg.uiTab == "multiclass" then
-    drawMultiClassTab(sim, cfg, aiController)
+    cardTitle("🏎 Multiclass", "Classe 1 = mais rápida • yield / push automático")
+    safeTab("Multiclass", function(s, c) drawMultiClassTab(s, c, aiController) end, sim, cfg)
 
   elseif cfg.uiTab == "vsc" then
-    drawVSCSection(sim, cfg)
+    cardTitle("🟡 Virtual Safety Car", "Delta-time puro • sem modelo 3D • leve")
+    safeTab("VSC", drawVSCSection, sim, cfg)
 
   elseif cfg.uiTab == "github" then
-    drawGitHubUpdateSection(sim, cfg)
+    cardTitle("☁ Atualizações GitHub", "Release channel • semver • changelog")
+    safeTab("GitHub", drawGitHubUpdateSection, sim, cfg)
 
   elseif cfg.uiTab == "webui" then
-    drawWebUISection(sim, cfg)
+    cardTitle("🌐 Web UI Remota", "Polling por arquivos • comandos externos")
+    safeTab("Web UI", drawWebUISection, sim, cfg)
 
   elseif cfg.uiTab == "about" then
-    drawAboutSection(sim, cfg)
+    cardTitle("ℹ Sobre o RaceFlow", "O que cada módulo faz")
+    safeTab("Sobre", drawAboutSection, sim, cfg)
 
   end
 
