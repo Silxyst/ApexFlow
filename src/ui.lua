@@ -505,6 +505,7 @@ local function drawFuelStrategySection(sim, cfg)
       end
     end
   end
+end
 
 local function drawPaceSection(sim, cfg)
   ui.separator()
