@@ -1,8 +1,8 @@
 -- ApexFlow — Independent race suite for Assetto Corsa (v0.13.0)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.13.0"
-_G.RACEFLOW_VERSION = "0.13.0"
-_G.APEXFLOW_VERSION = "0.13.0"
+SCRIPT_VERSION = "0.13.1"
+_G.RACEFLOW_VERSION = "0.13.1"
+_G.APEXFLOW_VERSION = "0.13.1"
 
 -- Per-module load status, shown in the fallback window so a future
 -- require() failure identifies the exact module (no more guessing).
@@ -281,6 +281,7 @@ if origSetMessage then
     return ok
   end
 end
+_G.RARE2_API = _G.RARE2_API or {}
 _G.RARE2_API.getRaceMessages = function() return raceMsgLog end
 
 ---------------------------------------------------------------------
@@ -406,16 +407,16 @@ local function loadMemoryFromFile()
   ac.log("[RaceFlow] Memory loaded from " .. MEMORY_FILE)
 end
 
-_G.RARE2_API = {
-  saveConfig = saveConfigToFile,
-  loadConfig = loadConfigFromFile,
-  saveMemory = saveMemoryToFile,
-  loadMemory = loadMemoryFromFile,
-  getMemory  = function() return RARE2_MEMORY end,
-  markConfigDirty = function()
-    if _G.RARE2_API then _G.RARE2_API._configDirty = true end
-  end,
-  resetToDefaults = function()
+_G.RARE2_API = _G.RARE2_API or {}
+_G.RARE2_API.saveConfig = saveConfigToFile
+_G.RARE2_API.loadConfig = loadConfigFromFile
+_G.RARE2_API.saveMemory = saveMemoryToFile
+_G.RARE2_API.loadMemory = loadMemoryFromFile
+_G.RARE2_API.getMemory  = function() return RARE2_MEMORY end
+_G.RARE2_API.markConfigDirty = function()
+  if _G.RARE2_API then _G.RARE2_API._configDirty = true end
+end
+_G.RARE2_API.resetToDefaults = function()
     RARE2_CFG.aggression = 50
     RARE2_CFG.difficultyBoost = 100
     RARE2_CFG.paceStrength = 65
@@ -509,8 +510,7 @@ _G.RARE2_API = {
     end
     saveConfigToFile()
     return true
-  end,
-}
+  end
 
 -- ==========================================================
 -- GITHUB UPDATE CHECKER (async, uses ac.webRequest)
