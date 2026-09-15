@@ -1,6 +1,6 @@
 SCRIPT_NAME = "RaceFlow"
-SCRIPT_VERSION = "0.11.1"
-_G.RACEFLOW_VERSION = "0.11.1"
+SCRIPT_VERSION = "0.12.0"
+_G.RACEFLOW_VERSION = "0.12.0"
 
 -- Per-module load status, shown in the fallback window so a future
 -- require() failure identifies the exact module (no more guessing).
@@ -99,6 +99,20 @@ local RARE2_CFG = {
     repo = "Silxyst/RaceFlow-V2",    -- GitHub repo (owner/repo)
     checkIntervalHours = 24,         -- auto-check interval
     notifyOnStartup = true,          -- check on app load
+  },
+
+  -- v0.12.0: Race Events HUD — fully customizable (see About -> HUD).
+  hudEvents = {
+    showCaution = true,
+    showTrackLimits = true,
+    showStrategy = true,
+    showPosition = true,
+    showSession = true,
+    showLearning = false,
+    compact = false,
+    progressBars = true,
+    blink = true,
+    scale = 1.0,
   },
 
   -- NEW: Web UI remote
@@ -432,6 +446,19 @@ _G.RARE2_API = {
       t.pitLimitKmh = 80
       t.pitGraceSec = 1.0
     end
+    if RARE2_CFG.hudEvents then
+      local h = RARE2_CFG.hudEvents
+      h.showCaution = (h.showCaution ~= false)
+      h.showTrackLimits = (h.showTrackLimits ~= false)
+      h.showStrategy = (h.showStrategy ~= false)
+      h.showPosition = (h.showPosition ~= false)
+      h.showSession = (h.showSession ~= false)
+      h.showLearning = (h.showLearning == true)
+      h.compact = (h.compact == true)
+      h.progressBars = (h.progressBars ~= false)
+      h.blink = (h.blink ~= false)
+      h.scale = clamp(tonumber(h.scale) or 1.0, 0.7, 1.5)
+    end
     if RARE2_CFG.githubUpdate then
       RARE2_CFG.githubUpdate.enabled = true
       RARE2_CFG.githubUpdate.repo = "Silxyst/RaceFlow-V2"
@@ -751,15 +778,16 @@ end
 -- EXTRA HUD: live race events (caution + track limits) - v0.7.0
 -- Small overlay window; every read is guarded so it never crashes.
 ---------------------------------------------------------------------
--- v0.9.0 animated events HUD: pulse/blink via os.clock + progress bars.
--- All data reads are guarded; visuals degrade gracefully.
+-- v0.12.0: Full-featured, customizable Race Events HUD.
+-- Each section honors RARE2_CFG.hudEvents toggles; visuals degrade gracefully.
 local function hudPulse(speed, lo, hi)
   local t = (os.clock() or 0) * (speed or 4)
   local s = (math.sin(t) + 1) / 2
   return lo + (hi - lo) * s
 end
 
-local function hudBar(frac)
+local function hudBar(frac, hudCfg)
+  if hudCfg and hudCfg.progressBars == false then return end
   frac = math.max(0, math.min(1, tonumber(frac) or 0))
   if ui.progressBar then
     pcall(ui.progressBar, frac, vec2(-1, 10))
@@ -769,61 +797,173 @@ local function hudBar(frac)
   end
 end
 
-local function hudBlinkText(text, color)
-  -- Blink by skipping frames on a time gate (cheap, no rect math).
-  if math.floor((os.clock() or 0) * 2.5) % 2 == 0 then
-    if color then ui.textColored(text, color) else ui.text(text) end
-  else
+local function hudBlinkText(text, color, hudCfg, forceStatic)
+  local doBlink = hudCfg and hudCfg.blink ~= false and not forceStatic
+  if doBlink and math.floor((os.clock() or 0) * 2.5) % 2 == 1 then
     ui.textDisabled(text)
+  else
+    if color then ui.textColored(text, color) else ui.text(text) end
   end
 end
 
 local function drawRaceEventsBody()
     local sim = ac.getSim()
     local inSession = sim and sim.isSessionStarted
-    local amber = rgbm and rgbm(1.0, 0.78, 0.20, hudPulse(4, 0.75, 1.0)) or nil
-    local red = rgbm and rgbm(1.0, 0.35, 0.35, hudPulse(5, 0.7, 1.0)) or nil
+    local hudCfg = (RARE2_CFG and RARE2_CFG.hudEvents) or {}
+    local showCaution = hudCfg.showCaution ~= false
+    local showLimits  = hudCfg.showTrackLimits ~= false
+    local showStrategy= hudCfg.showStrategy ~= false
+    local showPos     = hudCfg.showPosition ~= false
+    local showSess    = hudCfg.showSession ~= false
+    local showLearn   = hudCfg.showLearning == true
+    local compact     = hudCfg.compact == true
+    local amber = rgbm and rgbm(1.0, 0.78, 0.20, hudCfg.blink == false and 1.0 or hudPulse(4, 0.75, 1.0)) or nil
+    local red   = rgbm and rgbm(1.0, 0.35, 0.35, hudCfg.blink == false and 1.0 or hudPulse(5, 0.7, 1.0)) or nil
+    local cyan  = rgbm and rgbm(0.22, 0.88, 1.00, 1.0) or nil
+
+    -- Header: version + live status dot
+    do
+      local v = _G.RACEFLOW_VERSION or SCRIPT_VERSION or "?"
+      ui.textDisabled("RaceFlow v" .. tostring(v) .. (inSession and " • LIVE" or " • SETUP"))
+      if not compact then ui.separator() end
+    end
+
+    -- Session info (when enabled)
+    if showSess then
+      local track = ac.getTrackName and pcall(ac.getTrackName) and ac.getTrackName() or ""
+      local sessName = ""
+      if sim and ac.getSessionName then
+        local ok, n = pcall(ac.getSessionName, sim.currentSessionIndex)
+        if ok and n then sessName = tostring(n) end
+      end
+      if sessName ~= "" or track ~= "" then
+        local line = ""
+        if sessName ~= "" then line = sessName end
+        if track ~= "" then line = line .. (line ~= "" and " • " or "") .. track end
+        if not compact then
+          ui.textDisabled(line)
+          if sim and sim.sessionTimeLeft and sim.sessionTimeLeft > 0 then
+            local mins = math.floor(sim.sessionTimeLeft / 60000)
+            local secs = math.floor((sim.sessionTimeLeft % 60000)/1000)
+            ui.textDisabled(string.format("⏱ %02d:%02d restante", mins, secs))
+          end
+        else
+          ui.textDisabled(line)
+        end
+      end
+      if not compact then ui.separator() end
+    end
+
+    -- Position / lap (when enabled and in session)
+    if showPos and inSession then
+      local ok, pcar = pcall(ac.getCar, 0)
+      if ok and pcar then
+        local pos = pcar.racePosition or 0
+        local lap = pcar.lapCount or 0
+        local spd = math.floor(pcar.speedKmh or 0)
+        local gear = pcar.gear or 0
+        ui.text(string.format("🏁 P%d • L%d • %d km/h • G%d", pos, lap+1, spd, gear))
+        if not compact then
+          local fuel = pcar.fuel or 0
+          local maxF = pcar.maxFuel or 100
+          local pct = maxF > 0 and (fuel/maxF*100) or 0
+          ui.textDisabled(string.format("⛽ %.1f L (%d%%) • Voltas: %d", fuel, math.floor(pct), lap+1))
+        end
+      end
+      if not compact then ui.separator() end
+    end
 
     -- Caution status
-    local cs = _G.RARE2_API and _G.RARE2_API.getCautionState and _G.RARE2_API.getCautionState() or {}
-    if cs.active then
-      if cs.mode == "FCY" then
-        hudBlinkText(string.format("🟡 FCY %.0fs / %.0fs", cs.timer or 0, cs.duration or 0), amber)
+    if showCaution then
+      local cs = _G.RARE2_API and _G.RARE2_API.getCautionState and _G.RARE2_API.getCautionState() or {}
+      if cs.active then
+        if cs.mode == "FCY" then
+          hudBlinkText(string.format("🟡 FCY %.0fs / %.0fs", cs.timer or 0, cs.duration or 0), amber, hudCfg)
+        else
+          hudBlinkText(string.format("🟡 YELLOW S%s %.0fs", tostring(cs.sector), cs.timer or 0), amber, hudCfg)
+        end
+        if (cs.duration or 0) > 0 then hudBar((cs.timer or 0) / cs.duration, hudCfg) end
+        if cs.reason and cs.reason ~= "" then ui.textDisabled("→ " .. tostring(cs.reason)) end
+        if cs.overtake then
+          hudBlinkText(string.format("⛔ Devolva p/ %s: %.0fs",
+            tostring(cs.overtake.name), cs.overtake.timer or 0), red, hudCfg)
+          if (cs.overtake.total or 0) > 0 then hudBar((cs.overtake.timer or 0) / cs.overtake.total, hudCfg) end
+        end
       else
-        hudBlinkText(string.format("🟡 YELLOW S%s %.0fs", tostring(cs.sector), cs.timer or 0), amber)
+        ui.textDisabled("🟢 Track green")
+        if not compact and cs.cooldown and cs.cooldown > 0 then
+          ui.textDisabled(string.format("Cooldown: %.0fs", cs.cooldown))
+        end
       end
-      if (cs.duration or 0) > 0 then hudBar((cs.timer or 0) / cs.duration) end
-      if cs.reason and cs.reason ~= "" then ui.textDisabled(tostring(cs.reason)) end
-      if cs.overtake then
-        hudBlinkText(string.format("⛔ Devolva p/ %s: %.0fs",
-          tostring(cs.overtake.name), cs.overtake.timer or 0), red)
-        if (cs.overtake.total or 0) > 0 then hudBar((cs.overtake.timer or 0) / cs.overtake.total) end
-      end
-    else
-      ui.textDisabled("🟢 Track green")
+      if not compact then ui.separator() end
     end
-
-    ui.separator()
 
     -- Track limits status (player)
-    local ts = _G.RARE2_API and _G.RARE2_API.getTrackLimitsState and _G.RARE2_API.getTrackLimitsState() or {}
-    if ts.penaltyActive and (ts.timeLeft or 0) > 0 then
-      hudBlinkText(string.format("🛑 Penalty: %.1fs%s", ts.timeLeft, ts.serving and " (serving)" or ""), red)
-      if (ts.origTime or 0) > 0 then hudBar((ts.timeLeft or 0) / ts.origTime) end
-      if not ts.serving then ui.textDisabled("Stop in pit + hold brake") end
-    elseif (ts.warn or 0) > 0 then
-      ui.text(string.format("⚠ Warnings: %d/%d", ts.warn, ts.maxWarn or 4))
-    else
-      ui.textDisabled("⚖ No warnings")
+    if showLimits then
+      local ts = _G.RARE2_API and _G.RARE2_API.getTrackLimitsState and _G.RARE2_API.getTrackLimitsState() or {}
+      if ts.penaltyActive and (ts.timeLeft or 0) > 0 then
+        hudBlinkText(string.format("🛑 Penalty: %.1fs%s", ts.timeLeft, ts.serving and " (serving)" or ""), red, hudCfg)
+        if (ts.origTime or 0) > 0 then hudBar((ts.timeLeft or 0) / ts.origTime, hudCfg) end
+        if not ts.serving then ui.textDisabled("⏸ Stop in pit + hold brake") end
+      elseif (ts.warn or 0) > 0 then
+        ui.text(string.format("⚠ Warnings: %d/%d", ts.warn, ts.maxWarn or 4))
+        if ts.lastEvent and ts.lastEvent ~= "" and not compact then
+          ui.textDisabled("↳ " .. tostring(ts.lastEvent))
+        end
+      else
+        ui.textDisabled("⚖ No warnings")
+      end
+      if ts.pitAlert then
+        hudBlinkText("🚧 PIT SPEED: reduza!", red, hudCfg)
+      end
+      if (ts.gamePenApi and (ts.gamePen or 0) > 0.5) then
+        ui.textDisabled(string.format("🎮 Game penalty: %.1fs", ts.gamePen))
+      end
+      if (ts.aiWithPenalties or 0) > 0 then
+        ui.textDisabled(string.format("🤖 AI penalized: %d", ts.aiWithPenalties))
+      elseif not compact and (ts.aiWithWarnings or 0) > 0 then
+        ui.textDisabled(string.format("🤖 AI warnings: %d", ts.aiWithWarnings))
+      end
+      if not compact then ui.separator() end
     end
-    if ts.pitAlert then
-      hudBlinkText("🚧 PIT SPEED: reduza!", red)
+
+    -- Strategy (next pit)
+    if showStrategy and inSession then
+      local st = _G.RARE2_API and _G.RARE2_API.getStrategyState and _G.RARE2_API.getStrategyState(RARE2_CFG) or {}
+      if st and st.cars and #st.cars > 0 then
+        -- Find player's next pit or nearest AI
+        local nextPit = nil
+        for _, c in ipairs(st.cars) do
+          if c.index == 0 then nextPit = c.nextPit; break end
+        end
+        if nextPit then
+          ui.textDisabled(string.format("⛽ Próximo pit: volta %d", nextPit))
+        else
+          ui.textDisabled("⛽ Sem pit agendado")
+        end
+        if not compact and st.totalLaps then
+          ui.textDisabled(string.format("Total: %d voltas", st.totalLaps))
+        end
+      else
+        ui.textDisabled("⛽ Estratégia: aguardando dados")
+      end
+      if not compact then ui.separator() end
     end
-    if (ts.gamePenApi and (ts.gamePen or 0) > 0.5) then
-      ui.textDisabled(string.format("🎮 Game penalty: %.1fs", ts.gamePen))
-    end
-    if (ts.aiWithPenalties or 0) > 0 then
-      ui.textDisabled(string.format("AI penalized: %d", ts.aiWithPenalties))
+
+    -- Learning (when enabled)
+    if showLearn then
+      local mem = _G.RARE2_API and _G.RARE2_API.getMemory and _G.RARE2_API.getMemory() or nil
+      if mem and mem.tracks then
+        local cnt = 0
+        for _ in pairs(mem.tracks) do cnt = cnt + 1 end
+        ui.textDisabled(string.format("📚 Learning: %d pistas memorizadas", cnt))
+        if not compact then
+          local trackId = ac.getTrackID and pcall(ac.getTrackID) and ac.getTrackID() or (sim and sim.trackName or "")
+          ui.textDisabled("Pista atual: " .. tostring(trackId))
+        end
+      else
+        ui.textDisabled("📚 Learning: sem dados")
+      end
     end
 
     if not inSession then

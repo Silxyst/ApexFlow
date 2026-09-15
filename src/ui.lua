@@ -1776,7 +1776,85 @@ local function drawAboutSection(sim, cfg)
   ui.newLine(2)
   ui.textWrapped("Port of the Mavil Track Limit Manager core: warnings for wheels off track, then a time penalty served stopped in the pit box holding the brake. Works for the player and optionally for AI, with quali reset, extra time for early pit exit and unserved time added to the final result.")
 
+  ui.newLine(6)
+  ui.text("Race Events HUD")
+  ui.separator()
+  ui.newLine(2)
+  ui.textWrapped("Overlay window with live caution, warnings and penalties. Enable it in Content Manager → Apps → RaceFlow Events. Fully customizable in the HUD tab.")
+
   ui.newLine(8)
+end
+
+-- ==========================================================
+-- TAB: HUD Events (personalização) - v0.12.0
+-- ==========================================================
+local function drawHudEventsSettings(sim, cfg)
+  cfg.hudEvents = cfg.hudEvents or {}
+  local h = cfg.hudEvents
+  if h.showCaution == nil then h.showCaution = true end
+  if h.showTrackLimits == nil then h.showTrackLimits = true end
+  if h.showStrategy == nil then h.showStrategy = true end
+  if h.showPosition == nil then h.showPosition = true end
+  if h.showSession == nil then h.showSession = true end
+  if h.showLearning == nil then h.showLearning = false end
+  if h.compact == nil then h.compact = false end
+  if h.progressBars == nil then h.progressBars = true end
+  if h.blink == nil then h.blink = true end
+  h.scale = tonumber(h.scale) or 1.0
+  h.scale = clamp(h.scale, 0.7, 1.5)
+
+  ui.text("Race Events HUD — Personalização")
+  helpMarker("Leigo: escolha o que aparece no overlay RaceFlow Events.\nTécnico: cada seção lê o estado do seu módulo; desligar esconde só o visual.")
+
+  ui.newLine(2)
+  ui.textDisabled("Marque o que quer ver no overlay:")
+  if ui.checkbox("Caution (FCY / Yellow + devolução)", h.showCaution) then
+    h.showCaution = not h.showCaution; notifyChange()
+  end
+  if ui.checkbox("Track Limits (avisos / punição / pit speed)", h.showTrackLimits) then
+    h.showTrackLimits = not h.showTrackLimits; notifyChange()
+  end
+  if ui.checkbox("Estratégia (próximo pit / combustível)", h.showStrategy) then
+    h.showStrategy = not h.showStrategy; notifyChange()
+  end
+  if ui.checkbox("Posição / volta / velocidade", h.showPosition) then
+    h.showPosition = not h.showPosition; notifyChange()
+  end
+  if ui.checkbox("Sessão (pista / tempo restante)", h.showSession) then
+    h.showSession = not h.showSession; notifyChange()
+  end
+  if ui.checkbox("Learning (pistas memorizadas)", h.showLearning) then
+    h.showLearning = not h.showLearning; notifyChange()
+  end
+
+  ui.newLine(2)
+  ui.separator()
+  ui.text("Estilo")
+  if ui.checkbox("Modo compacto (menos espaçamento)", h.compact) then
+    h.compact = not h.compact; notifyChange()
+  end
+  helpMarker("Leigo: deixa o HUD menor e mais denso.\nTécnico: pula separadores e textos secundários.")
+  if ui.checkbox("Barras de progresso", h.progressBars) then
+    h.progressBars = not h.progressBars; notifyChange()
+  end
+  if ui.checkbox("Piscar alertas críticos", h.blink) then
+    h.blink = not h.blink; notifyChange()
+  end
+
+  ui.newLine(2)
+  local newScale = sliderBlock("Escala do HUD", "hud_scale", h.scale, 0.7, 1.5, "%.2f",
+    "Leigo: aumenta/diminui o tamanho do texto do overlay.\nTécnico: fator aplicado ao HUD, não à janela.")
+  if newScale ~= nil then
+    local v = clamp(newScale, 0.7, 1.5)
+    if math.abs(v - h.scale) > 0.001 then h.scale = v; notifyChange() end
+  end
+
+  ui.newLine(2)
+  if ui.button("📺 Abrir RaceFlow Events", vec2(220, 28)) then
+    ac.setWindowOpen("events", true)
+  end
+  ui.sameLine()
+  helpMarker("Abre a janela overlay. Arraste para reposicionar; redimensione pelas bordas.")
 end
 
 
@@ -1789,6 +1867,7 @@ local TABS_ROW1 = {
 }
 local TABS_ROW2 = {
   { id = "tracklimits", label = "⚖ Limits" },
+  { id = "hud",         label = "📊 HUD" },
   { id = "github",     label = "☁ Updates" },
   { id = "webui",      label = "🌐 Web UI" },
   { id = "about",      label = "ℹ Sobre" },
@@ -1806,12 +1885,12 @@ end
 
 local function drawTabBar(cfg)
   local avail = ui.windowWidth() - 20
-  local w1 = (avail - 3 * 8) / 4
+  local w1 = (avail - (#TABS_ROW1 - 1) * 8) / #TABS_ROW1
   for i, t in ipairs(TABS_ROW1) do
     if i > 1 then ui.sameLine(0, 8) end
     if tabButton(t.label, cfg.uiTab == t.id, w1) then cfg.uiTab = t.id end
   end
-  local w2 = (avail - 3 * 8) / 4
+  local w2 = (avail - (#TABS_ROW2 - 1) * 8) / #TABS_ROW2
   for i, t in ipairs(TABS_ROW2) do
     if i > 1 then ui.sameLine(0, 8) end
     if tabButton(t.label, cfg.uiTab == t.id, w2) then cfg.uiTab = t.id end
@@ -1887,7 +1966,7 @@ function M.draw(sim, cfg)
   cfg.uiTab = cfg.uiTab or "aggr"
   -- Migrate stale tabs from older versions (e.g. "vsc", "rules", "updates")
   do
-    local known = { aggr = true, multiclass = true, strategy = true, caution = true, tracklimits = true, github = true, webui = true, about = true }
+    local known = { aggr = true, multiclass = true, strategy = true, caution = true, tracklimits = true, hud = true, github = true, webui = true, about = true }
     if not known[cfg.uiTab] then cfg.uiTab = "aggr" end
   end
   drawTabBar(cfg)
@@ -1923,6 +2002,10 @@ function M.draw(sim, cfg)
   elseif cfg.uiTab == "tracklimits" then
     cardTitle("⚖ Track Limits", "Avisos → punição de tempo → cumpra no box")
     safeTab("Track Limits", drawTrackLimitsSection, sim, cfg)
+
+  elseif cfg.uiTab == "hud" then
+    cardTitle("📊 HUD Race Events", "Overlay ao vivo • marque o que quer ver")
+    safeTab("HUD", drawHudEventsSettings, sim, cfg)
 
   elseif cfg.uiTab == "github" then
     cardTitle("☁ Atualizações GitHub", "Release channel • semver • changelog")
