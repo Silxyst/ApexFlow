@@ -56,10 +56,6 @@ local function getState(i)
   return s
 end
 
-local function resetCar(i)
-  cars[i] = nil
-end
-
 local function sessionName(sim)
   local ok, n = pcall(ac.getSessionName, sim.currentSessionIndex)
   if ok and n then return tostring(n) end
@@ -241,9 +237,9 @@ local function updateCar(i, car, dt, sim, cfg, isPlayer)
   end
 
   if car.isInPitlane or car.isInPit or (car.speedKmh or 0) < 20 then
-    if not isPlayer or true then
-      -- still allow serving logic below; just skip new detections
-    end
+    -- In pits / too slow: no new detections, and re-arm the edge trigger
+    -- (otherwise an off-track exit from pits would never warn again).
+    s.offPrev = false
   else
     local wheelsOut = car.wheelsOutside or 0
     local off = wheelsOut >= (t.wheels or 4)
@@ -275,7 +271,7 @@ local function updateCar(i, car, dt, sim, cfg, isPlayer)
           s.lastEvent = "Practice limits: warnings only"
         else
           if t.penaltiesEnabled then
-            issuePenalty(i, car, cfg, "Too many track limits")
+            issuePenalty(i, car, cfg, "Track limits excedido")
           else
             s.warn = 0
             s.awaitingReset = true

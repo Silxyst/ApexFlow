@@ -130,6 +130,16 @@ local function sliderRow(label, id, value, minV, maxV, fmt, labelWidth)
   return v
 end
 
+-- Full-width slider with the label ABOVE (never clipped by the window edge).
+-- help: tooltip text shown on the (?) marker (layman + technical).
+local function sliderBlock(label, id, value, minV, maxV, fmt, help)
+  ui.alignTextToFramePadding()
+  ui.text(label)
+  if help then helpMarker(help) end
+  ui.setNextItemWidth(math.max(120, ui.windowWidth() - 20))
+  return ui.slider("##" .. id, value, minV, maxV, fmt)
+end
+
 local function safeRequire(mod)
   local ok, res = pcall(require, mod)
   if ok then return res end
@@ -288,8 +298,8 @@ local function drawAggressionSection(sim, cfg)
   helpMarker("Adjust Ratio of profile mix.\n\nChill,Balanced,Attack")
 
   local agg = cfg.aggression or 50
-  ui.setNextItemWidth(ui.windowWidth() - 40)
-  local newAgg = ui.slider("Global aggression", agg, 0, 100, "%.0f")
+  local newAgg = sliderBlock("Agressividade global", "aggr_mix", agg, 0, 100, "%.0f",
+    "Leigo: 0 = grid calmo, 100 = grid brigando por posição.\nTécnico: define o mix Chill/Normal/Attack distribuído por hash do nome.")
   if newAgg ~= nil then
     newAgg = clamp(newAgg, 0, 100)
     if math.abs(newAgg - agg) > 0.001 then
@@ -408,9 +418,9 @@ local function drawFuelStrategySection(sim, cfg)
 
   ui.newLine(2)
 
-  ui.setNextItemWidth(ui.windowWidth() - 40)
   cfg.strategy.manualRaceLaps = cfg.strategy.manualRaceLaps or 20
-  local newLaps = ui.slider("Duração da corrida (voltas)", cfg.strategy.manualRaceLaps, 3, 1000, "%.0f")
+  local newLaps = sliderBlock("Duração da corrida (voltas)", "strat_laps", cfg.strategy.manualRaceLaps, 3, 1000, "%.0f",
+    "Leigo: quantas voltas a IA deve planejar (combustível + pits).\nTécnico: base do cálculo de stint e janela de pit.")
   if newLaps ~= nil then
     local val = math.floor(clamp(newLaps, 3, 1000) + 0.5)
     if val ~= cfg.strategy.manualRaceLaps then
@@ -419,9 +429,9 @@ local function drawFuelStrategySection(sim, cfg)
     end
   end
 
-  ui.setNextItemWidth(ui.windowWidth() - 40)
   cfg.strategy.forcedStops = cfg.strategy.forcedStops or 1
-  local newStops = ui.slider("Paradas obrigatórias nos boxes", cfg.strategy.forcedStops, 0, 50, "%.0f")
+  local newStops = sliderBlock("Paradas obrigatórias nos boxes", "strat_stops", cfg.strategy.forcedStops, 0, 50, "%.0f",
+    "Leigo: quantas vezes cada IA vai parar para reabastecer.\nTécnico: força o tanque virtual por stint para induzir o pit.")
   if newStops ~= nil then
     local val = math.floor(clamp(newStops, 0, 50) + 0.5)
     if val ~= cfg.strategy.forcedStops then
@@ -514,9 +524,9 @@ local function drawPaceSection(sim, cfg)
 
   cfg.paceEnabled = true
 
-  ui.setNextItemWidth(ui.windowWidth() - 40)
   local pace = cfg.paceStrength or 50
-  local newPace = ui.slider("Pace strength", pace, 0, 100, "%.0f")
+  local newPace = sliderBlock("Força do ritmo ( Pace )", "pace_strength", pace, 0, 100, "%.0f",
+    "Leigo: 0 = pelotão colado igual ao jogo base, 100 = diferença máxima entre pilotos.\nTécnico: escala o jitter e o boost de ritmo por perfil.")
   if newPace ~= nil then
     newPace = clamp(newPace, 0, 100)
     if math.abs(newPace - pace) > 0.001 then
@@ -679,8 +689,8 @@ local function drawPhysicsIntensitySection(sim, cfg)
 
   cfg.physicsPush = cfg.physicsPush or {}
   local intensity = cfg.physicsPush.intensity or 50
-  ui.setNextItemWidth(ui.windowWidth() - 40)
-  local newIntensity = ui.slider("Intensity", intensity, 0, 100, "%.0f")
+  local newIntensity = sliderBlock("Intensidade da física", "phys_intensity", intensity, 0, 100, "%.0f",
+    "Leigo: 0 = IA igual ao jogo base, 100 = física RaceFlow total (freadas e tração moldadas).\nTécnico: interpola brakeHint/throttle/topSpeed aplicados por frame.")
   if newIntensity ~= nil then
     newIntensity = clamp(newIntensity, 0, 100)
     if math.abs(newIntensity - intensity) > 0.001 then
@@ -1045,8 +1055,8 @@ local function drawGitHubUpdateSection(sim, cfg)
     ui.text("Repositório: " .. cfg.githubUpdate.repo)
 
     cfg.githubUpdate.checkIntervalHours = cfg.githubUpdate.checkIntervalHours or 24
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newInterval = ui.slider("Intervalo (horas)", cfg.githubUpdate.checkIntervalHours, 1, 168, "%.0f h")
+    local newInterval = sliderBlock("Intervalo entre verificações (horas)", "gh_interval", cfg.githubUpdate.checkIntervalHours, 1, 168, "%.0f h",
+      "Leigo: de quanto em quanto tempo o app checa atualização sozinho.\nTécnico: throttle do ac.webRequest (evita rate-limit da API).")
     if newInterval ~= nil then
       local val = math.floor(clamp(newInterval, 1, 168) + 0.5)
       if val ~= cfg.githubUpdate.checkIntervalHours then cfg.githubUpdate.checkIntervalHours = val; notifyChange() end
@@ -1142,8 +1152,8 @@ local function drawWebUISection(sim, cfg)
     ui.indent(12)
 
     cfg.webui.port = cfg.webui.port or 8080
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newPort = ui.slider("Porta (referência)", cfg.webui.port, 1024, 65535, "%.0f")
+    local newPort = sliderBlock("Porta (referência)", "webui_port", cfg.webui.port, 1024, 65535, "%.0f",
+      "Leigo: só um rótulo — o CSP não tem servidor HTTP, a Web UI usa arquivos.\nTécnico: polling em Documents/Assetto Corsa/RaceFlow_webui_*.json a cada 0.5 s.")
     if newPort ~= nil then
       local val = math.floor(clamp(newPort, 1024, 65535) + 0.5)
       if val ~= cfg.webui.port then cfg.webui.port = val; notifyChange() end
@@ -1251,21 +1261,22 @@ local function drawCautionSection(sim, cfg)
     cfg.caution.enabled = not cEnabled
     notifyChange()
   end
+  helpMarker("Leigo: liga o sistema que reage a batidas (IA parada).\nTécnico: só em corrida offline com physics scripting; desligado por padrão.")
 
   if cfg.caution.enabled then
     ui.indent(12)
 
     cfg.caution.fcySpeedKmh = cfg.caution.fcySpeedKmh or 80
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newFcy = ui.slider("Velocidade no FCY (km/h)", cfg.caution.fcySpeedKmh, 40, 140, "%.0f km/h")
+    local newFcy = sliderBlock("Velocidade máxima no FCY (km/h)", "cau_fcy", cfg.caution.fcySpeedKmh, 40, 140, "%.0f km/h",
+      "Leigo: teto de velocidade das IAs durante bandeira amarela total (padrão FIA: 80).\nTécnico: aplicado via physics.setAITopSpeed a cada frame.")
     if newFcy ~= nil then
       local val = math.floor(clamp(newFcy, 40, 140) + 0.5)
       if val ~= cfg.caution.fcySpeedKmh then cfg.caution.fcySpeedKmh = val; notifyChange() end
     end
 
     cfg.caution.yellowSpeedKmh = cfg.caution.yellowSpeedKmh or 80
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newYel = ui.slider("Velocidade no setor (km/h)", cfg.caution.yellowSpeedKmh, 40, 140, "%.0f km/h")
+    local newYel = sliderBlock("Velocidade no setor neutralizado (km/h)", "cau_yel", cfg.caution.yellowSpeedKmh, 40, 140, "%.0f km/h",
+      "Leigo: teto só para as IAs que estão no setor do incidente; o resto corre livre.\nTécnico: cap por currentSector, demais liberadas a 1e9.")
     if newYel ~= nil then
       local val = math.floor(clamp(newYel, 40, 140) + 0.5)
       if val ~= cfg.caution.yellowSpeedKmh then cfg.caution.yellowSpeedKmh = val; notifyChange() end
@@ -1273,33 +1284,33 @@ local function drawCautionSection(sim, cfg)
 
     cfg.caution.minDuration = cfg.caution.minDuration or 60
     cfg.caution.maxDuration = cfg.caution.maxDuration or 180
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newMin = ui.slider("Duração mínima (s)", cfg.caution.minDuration, 10, 300, "%.0f s")
+    local newMin = sliderBlock("Duração mínima da caution (s)", "cau_min", cfg.caution.minDuration, 10, 300, "%.0f s",
+      "Leigo: tempo mínimo que a bandeira fica ativa antes de poder liberar.\nTécnico: sorteio uniforme entre mínima e máxima por ativação.")
     if newMin ~= nil then
       local val = math.floor(clamp(newMin, 10, 300) + 0.5)
       if val ~= cfg.caution.minDuration then cfg.caution.minDuration = val; notifyChange() end
     end
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newMax = ui.slider("Duração máxima (s)", cfg.caution.maxDuration, 10, 300, "%.0f s")
+    local newMax = sliderBlock("Duração máxima da caution (s)", "cau_max", cfg.caution.maxDuration, 10, 300, "%.0f s",
+      "Leigo: teto do sorteio de duração; nunca passa disso.\nTécnico: se máxima < mínima, é nivelada à mínima.")
     if newMax ~= nil then
       local val = math.floor(clamp(newMax, 10, 300) + 0.5)
       if val ~= cfg.caution.maxDuration then cfg.caution.maxDuration = val; notifyChange() end
     end
 
     cfg.caution.fcyChance = cfg.caution.fcyChance or 0.5
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newCh = ui.slider("Chance de FCY (vs setor)", cfg.caution.fcyChance, 0, 1, "%.2f")
+    local newCh = sliderBlock("Chance de FCY (vs amarela de setor)", "cau_ch", cfg.caution.fcyChance, 0, 1, "%.2f",
+      "Leigo: 0 = sempre só o setor, 1 = sempre pista toda.\nTécnico: probabilidade por sorteio math.random() a cada incidente.")
     if newCh ~= nil then
       local val = clamp(newCh, 0, 1)
       if val ~= cfg.caution.fcyChance then cfg.caution.fcyChance = val; notifyChange() end
     end
-    helpMarker("0 = sempre amarela de setor, 1 = sempre FCY.")
 
     cfg.caution.autoTrigger = (cfg.caution.autoTrigger ~= false)
     if ui.checkbox("Disparo automático por IA parada", cfg.caution.autoTrigger) then
       cfg.caution.autoTrigger = not cfg.caution.autoTrigger
       notifyChange()
     end
+    helpMarker("Leigo: desligue para usar SÓ o botão manual de teste.\nTécnico: varre IAs <1 km/h fora do pit a cada frame.")
 
     ui.unindent(12)
   end
@@ -1358,41 +1369,40 @@ local function drawTrackLimitsSection(sim, cfg)
     ui.indent(12)
 
     t.maxWarnings = t.maxWarnings or 4
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newW = ui.slider("Advertências até punir", t.maxWarnings, 1, 10, "%.0f")
+    local newW = sliderBlock("Advertências até punir", "tl_warn", t.maxWarnings, 1, 10, "%.0f",
+      "Leigo: quantos cortes seguidos antes de virar punição.\nTécnico: contador por carro com cooldown entre registros.")
     if newW ~= nil then
       local val = math.floor(clamp(newW, 1, 10) + 0.5)
       if val ~= t.maxWarnings then t.maxWarnings = val; notifyChange() end
     end
 
     t.penaltyTime = t.penaltyTime or 5
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newP = ui.slider("Tempo da punição (s)", t.penaltyTime, 1, 30, "%.0f s")
+    local newP = sliderBlock("Tempo da punição (s)", "tl_time", t.penaltyTime, 1, 30, "%.0f s",
+      "Leigo: segundos parado no box segurando o freio.\nTécnico: countdown servido com speed ≤1 km/h + brake >0.7.")
     if newP ~= nil then
       local val = math.floor(clamp(newP, 1, 30) + 0.5)
       if val ~= t.penaltyTime then t.penaltyTime = val; notifyChange() end
     end
 
     t.wheels = t.wheels or 4
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newWh = ui.slider("Rodas fora p/ contar", t.wheels, 2, 4, "%.0f")
+    local newWh = sliderBlock("Rodas fora p/ contar corte", "tl_wheels", t.wheels, 2, 4, "%.0f",
+      "Leigo: 2 = rigoroso (encostou, contou), 4 = só corte total.\nTécnico: lê car.wheelsOutside; padrão 4 igual ao Mavil.")
     if newWh ~= nil then
       local val = math.floor(clamp(newWh, 2, 4) + 0.5)
       if val ~= t.wheels then t.wheels = val; notifyChange() end
     end
-    helpMarker("2 = rigoroso, 4 = só corte total (padrão Mavil).")
 
     t.cooldown = t.cooldown or 7
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newCd = ui.slider("Cooldown entre avisos (s)", t.cooldown, 0, 20, "%.0f s")
+    local newCd = sliderBlock("Cooldown entre avisos (s)", "tl_cd", t.cooldown, 0, 20, "%.0f s",
+      "Leigo: tempo mínimo entre um aviso e outro (evita spam numa escapada longa).\nTécnico: janela por os.clock() por carro.")
     if newCd ~= nil then
       local val = math.floor(clamp(newCd, 0, 20) + 0.5)
       if val ~= t.cooldown then t.cooldown = val; notifyChange() end
     end
 
     t.waitTime = t.waitTime or 1.9
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newWt = ui.slider("Espera no box antes de cumprir (s)", t.waitTime, 0, 15, "%.1f s")
+    local newWt = sliderBlock("Espera no box antes de cumprir (s)", "tl_wait", t.waitTime, 0, 15, "%.1f s",
+      "Leigo: simula o tempo do pit crew; 0 = começa a cumprir na hora.\nTécnico: estado 'waiting' antes do countdown de serving.")
     if newWt ~= nil then
       local val = math.floor(clamp(newWt * 10, 0, 150) + 0.5) / 10
       if val ~= t.waitTime then t.waitTime = val; notifyChange() end
@@ -1402,33 +1412,39 @@ local function drawTrackLimitsSection(sim, cfg)
     if ui.checkbox("Fiscalizar limites de pista", t.trackLimitsEnabled) then
       t.trackLimitsEnabled = not t.trackLimitsEnabled; notifyChange()
     end
+    helpMarker("Leigo: desliga só a detecção (serve p/ testar o resto).\nTécnico: pula o bloco de wheelsOutside.")
 
     t.penaltiesEnabled = (t.penaltiesEnabled ~= false)
     if ui.checkbox("Aplicar punições de tempo", t.penaltiesEnabled) then
       t.penaltiesEnabled = not t.penaltiesEnabled; notifyChange()
     end
+    helpMarker("Leigo: desligado = só avisos, sem punição.\nTécnico: warnings acumulam e zeram sem issuePenalty().")
 
     t.strictPit = (t.strictPit == true)
     if ui.checkbox("Box estrito (exige isInPit)", t.strictPit) then
       t.strictPit = not t.strictPit; notifyChange()
     end
+    helpMarker("Leigo: exige estar PARADO na vaga, não só no pitlane.\nTécnico: canServe usa car.isInPit além de isInPitlane.")
 
     t.aiEnabled = (t.aiEnabled ~= false)
     if ui.checkbox("IA também recebe punições", t.aiEnabled) then
       t.aiEnabled = not t.aiEnabled; notifyChange()
     end
+    helpMarker("Leigo: IAs que cortam pista também são punidas.\nTécnico: mesmo ciclo de avisos por carro IA.")
 
     if t.aiEnabled then
       t.aiServe = (t.aiServe == true)
       if ui.checkbox("IA cumpre no box durante a corrida", t.aiServe) then
         t.aiServe = not t.aiServe; notifyChange()
       end
+      helpMarker("Leigo: IA punida para no box até zerar (cuidado: pode causar fila).\nTécnico: throttle 0 + topspeed 0 com carro parado no pitlane.")
     end
 
     t.qualiReset = (t.qualiReset ~= false)
     if ui.checkbox("Reset p/ boxes na quali (requer physics)", t.qualiReset) then
       t.qualiReset = not t.qualiReset; notifyChange()
     end
+    helpMarker("Leigo: estourou avisos na quali = volta invalidada e carro vai p/ boxes.\nTécnico: physics.teleportCarTo com guard physics.allowed().")
 
     t.finishAdd = (t.finishAdd ~= false)
     if ui.checkbox("Somar não-cumprida no resultado final", t.finishAdd) then
@@ -1441,7 +1457,7 @@ end
 
 
 local function drawAboutSection(sim, cfg)
-  ui.text("RaceFlow v" .. (SCRIPT_VERSION or "0.4.5"))
+  ui.text("RaceFlow v" .. (SCRIPT_VERSION or _G.RACEFLOW_VERSION or "?"))
   ui.separator()
   ui.newLine(4)
 

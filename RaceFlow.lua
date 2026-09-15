@@ -1,6 +1,6 @@
 SCRIPT_NAME = "RaceFlow"
-SCRIPT_VERSION = "0.7.1"
-_G.RACEFLOW_VERSION = "0.7.1"
+SCRIPT_VERSION = "0.7.2"
+_G.RACEFLOW_VERSION = "0.7.2"
 
 -- Per-module load status, shown in the fallback window so a future
 -- require() failure identifies the exact module (no more guessing).
@@ -669,14 +669,9 @@ end
 -- EXTRA HUD: live race events (caution + track limits) - v0.7.0
 -- Small overlay window; every read is guarded so it never crashes.
 ---------------------------------------------------------------------
-function script.windowRaceEvents()
-  local ok = pcall(function()
+local function drawRaceEventsBody()
     local sim = ac.getSim()
     local inSession = sim and sim.isSessionStarted
-
-    ui.pushFont(ui.Font.Title)
-    ui.text("RACE EVENTS")
-    ui.popFont()
 
     -- Caution status
     local cs = _G.RARE2_API and _G.RARE2_API.getCautionState and _G.RARE2_API.getCautionState() or {}
@@ -711,7 +706,14 @@ function script.windowRaceEvents()
       ui.newLine(2)
       ui.textDisabled("Live data appears during the session.")
     end
-  end)
+end
+
+function script.windowRaceEvents()
+  -- push/pop always paired; only the data body is protected.
+  ui.pushFont(ui.Font.Title)
+  ui.text("RACE EVENTS")
+  ui.popFont()
+  local ok = pcall(drawRaceEventsBody)
   if not ok then
     ui.textDisabled("Events HUD unavailable.")
   end
