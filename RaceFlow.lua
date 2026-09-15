@@ -1,6 +1,6 @@
 SCRIPT_NAME = "RaceFlow"
-SCRIPT_VERSION = "0.10.0"
-_G.RACEFLOW_VERSION = "0.10.0"
+SCRIPT_VERSION = "0.11.0"
+_G.RACEFLOW_VERSION = "0.11.0"
 
 -- Per-module load status, shown in the fallback window so a future
 -- require() failure identifies the exact module (no more guessing).

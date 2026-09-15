@@ -309,9 +309,17 @@ local function updateCar(i, car, dt, sim, cfg, isPlayer)
     if off then s.offTime = (s.offTime or 0) + dt else s.offTime = 0 end
     local sustained = s.offTime >= (t.minOffTime or 0)
     if t.trackLimitsEnabled and off and sustained and not s.offPrev and not s.mustReset
-        and (now - s.lastWarn) > (t.cooldown or 7) and not s.awaitingReset
-        and not compatHold then
+        and (now - s.lastWarn) > (t.cooldown or 7) and not s.awaitingReset then
       s.lastWarn = now
+      if compatHold then
+        -- v0.11.0: detection stays VISIBLE (synced with what the driver
+        -- did) but adds no warn/penalty — the game is already punishing.
+        s.mustReset = true
+        s.lastEvent = "Corte detectado (jogo punindo)"
+        s.lastEventLap = car.lapCount or 0
+        s.lastEventSector = (car.currentSector or 0) + 1
+        if isPlayer then say("TRACK LIMITS", "Corte detectado — jogo punindo") end
+      else
       s.warn = s.warn + 1
       s.warnsTotal = s.warnsTotal + 1
       s.mustReset = true
@@ -349,6 +357,7 @@ local function updateCar(i, car, dt, sim, cfg, isPlayer)
     end
     if (car.wheelsOutside or 0) == 0 then s.mustReset = false end
     s.offPrev = off
+    end
   end
 
   -- Serving (player needs brake held, AI does not)

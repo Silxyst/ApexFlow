@@ -277,7 +277,21 @@ function M.update(dt, sim, cfg)
     end
   end
 
-  -- Incident scan: stopped AI cars outside the pits
+  -- v0.11.0: player reference for the queue filter below.
+  local playerSlow, playerSp = false, nil
+  do
+    local okP, pcar = pcall(ac.getCar, 0)
+    if okP and pcar and not pcar.isInPitlane and not pcar.isInPit then
+      local pspd = tonumber(pcar.speedKmh) or 99
+      playerSlow = pspd < 15
+      playerSp = pcar.splinePosition
+    end
+  end
+  local trackLen = tonumber(sim.trackLengthM) or 0
+
+  -- Incident scan: stopped AI cars outside the pits.
+  -- v0.11.0 queue filter: AI parked right behind a slow/stopped PLAYER is
+  -- traffic, not a crash — ignore it so no false FCY freezes the field.
   local incidentIdx, incidentSector = nil, nil
   if drivenOk and cfg.caution.autoTrigger then
     for i = 1, carsCount - 1 do
@@ -285,11 +299,20 @@ function M.update(dt, sim, cfg)
       if ok and car and not car.isInPitlane and not car.isInPit then
         local spd = tonumber(car.speedKmh) or 99
         if spd < 1 then
-          state.stoppedCars[i] = (state.stoppedCars[i] or 0) + dt
-          if state.stoppedCars[i] >= 1.0 and incidentIdx == nil then
-            incidentIdx = i
-            local okS, sec = pcall(function() return car.currentSector end)
-            incidentSector = (okS and tonumber(sec)) or 0
+          local queued = false
+          if playerSlow and playerSp ~= nil and car.splinePosition ~= nil and trackLen > 0 then
+            local d = (tonumber(playerSp) - tonumber(car.splinePosition)) % 1 * trackLen
+            if d < 40 then queued = true end
+          end
+          if queued then
+            state.stoppedCars[i] = 0
+          else
+            state.stoppedCars[i] = (state.stoppedCars[i] or 0) + dt
+            if state.stoppedCars[i] >= 1.0 and incidentIdx == nil then
+              incidentIdx = i
+              local okS, sec = pcall(function() return car.currentSector end)
+              incidentSector = (okS and tonumber(sec)) or 0
+            end
           end
         else
           state.stoppedCars[i] = 0
