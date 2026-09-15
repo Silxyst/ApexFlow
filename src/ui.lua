@@ -34,19 +34,18 @@ local function notifyChange()
   end
 end
 
--- RaceFlow theme engine (v0.8.0): accent + background opacity are user
--- configurable (About tab -> Appearance). THEME is refreshed in M.draw.
+-- ApexFlow theme engine (v0.13.0): independent palette, warm default.
 local ACCENTS = {
+  orange = { 1.00, 0.55, 0.15, "Laranja Apex" },
   cyan   = { 0.22, 0.88, 1.00, "Ciano" },
   green  = { 0.25, 0.95, 0.45, "Verde" },
-  orange = { 1.00, 0.65, 0.20, "Laranja" },
   purple = { 0.70, 0.50, 1.00, "Roxo" },
   red    = { 1.00, 0.35, 0.35, "Vermelho" },
   teal   = { 0.20, 0.90, 0.80, "Turquesa" },
   pink   = { 1.00, 0.40, 0.70, "Rosa" },
 }
-local ACCENT_ORDER = { "cyan", "green", "orange", "purple", "red", "teal", "pink" }
-local THEME = { accent = "cyan", bgAlpha = 1.0, corner = 6, compactHeaders = false }
+local ACCENT_ORDER = { "orange", "cyan", "green", "purple", "red", "teal", "pink" }
+local THEME = { accent = "orange", bgAlpha = 1.0, corner = 8, compactHeaders = false }
 
 local function accentRgb(a)
   local t = ACCENTS[THEME.accent] or ACCENTS.cyan
@@ -1730,9 +1729,10 @@ local function drawAboutSection(sim, cfg)
   ui.newLine(4)
   ui.separator()
   ui.newLine(4)
-  ui.text("RaceFlow v" .. (SCRIPT_VERSION or _G.RACEFLOW_VERSION or "?"))
+  ui.text("ApexFlow v" .. (SCRIPT_VERSION or _G.RACEFLOW_VERSION or _G.APEXFLOW_VERSION or "?"))
+  ui.textDisabled("Independent race suite for Assetto Corsa — offline AI, strategy & race control.")
 
-  ui.textWrapped("RaceFlow sets out to fix the weak spots in Assetto Corsa's base AI by making drivers think, react, and race more like humans. It does this by adding personality, improving racecraft, and adapting behavior in real time.")
+  ui.textWrapped("ApexFlow enhances offline single-player by giving AI personality, racecraft and memory. Every driver has a class and learns corners; the field spreads naturally with hunt, hot laps and clean-air logic.")
 
   ui.newLine(6)
   ui.text("The Core")
@@ -1903,18 +1903,18 @@ function M.draw(sim, cfg)
   local acc = cfg.ui.accent
   local accOk = false
   for _, k in ipairs(ACCENT_ORDER) do if k == acc then accOk = true break end end
-  THEME.accent = accOk and acc or "cyan"
+  THEME.accent = accOk and acc or "orange"
   THEME.bgAlpha = clamp(tonumber(cfg.ui.bgAlpha) or 1.0, 0.4, 1.0)
-  THEME.corner = math.floor(clamp(tonumber(cfg.ui.corner) or 6, 0, 12) + 0.5)
+  THEME.corner = math.floor(clamp(tonumber(cfg.ui.corner) or 8, 0, 12) + 0.5)
   THEME.compactHeaders = (cfg.ui.compactHeaders == true)
   pushDarkTheme()
 
   -- ===== Header: brand + version + master switch =====
   ui.pushFont(ui.Font.Title)
-  if rgbm then ui.textColored("RACEFLOW", C.accent()) else ui.text("RACEFLOW") end
+  if rgbm then ui.textColored("APEXFLOW", C.accent()) else ui.text("APEXFLOW") end
   ui.popFont()
   ui.sameLine(0, 10)
-  ui.textDisabled("v" .. (SCRIPT_VERSION or _G.RACEFLOW_VERSION or "?"))
+  ui.textDisabled("v" .. (SCRIPT_VERSION or _G.RACEFLOW_VERSION or _G.APEXFLOW_VERSION or "?"))
   ui.sameLine(0, 12)
   local enabled = cfg.enabled
   if ui.checkbox("Ativo", enabled) then

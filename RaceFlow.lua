@@ -1,9 +1,8 @@
--- RaceFlow-V2 — Enhanced fork of RaceFlow (https://www.overtake.gg/downloads/raceflow-ai-enhancement-beta.83987/)
--- Original RaceFlow by its author on Overtake.gg; enhancements by Silxyst.
--- See README.md "Credits & Attribution" and LICENSE for details.
-SCRIPT_NAME = "RaceFlow"
-SCRIPT_VERSION = "0.12.1"
-_G.RACEFLOW_VERSION = "0.12.1"
+-- ApexFlow — Independent race suite for Assetto Corsa (v0.13.0)
+SCRIPT_NAME = "ApexFlow"
+SCRIPT_VERSION = "0.13.0"
+_G.RACEFLOW_VERSION = "0.13.0"
+_G.APEXFLOW_VERSION = "0.13.0"
 
 -- Per-module load status, shown in the fallback window so a future
 -- require() failure identifies the exact module (no more guessing).
@@ -104,7 +103,7 @@ local RARE2_CFG = {
     notifyOnStartup = true,          -- check on app load
   },
 
-  -- v0.12.0: Race Events HUD — fully customizable (see About -> HUD).
+  -- v0.13.0: Race Events HUD — fully customizable.
   hudEvents = {
     showCaution = true,
     showTrackLimits = true,
@@ -112,6 +111,7 @@ local RARE2_CFG = {
     showPosition = true,
     showSession = true,
     showLearning = false,
+    showMessages = true,
     compact = false,
     progressBars = true,
     blink = true,
@@ -254,6 +254,34 @@ local RARE2_MEMORY = {
   tracks = {},
   drivers = {},
 }
+
+---------------------------------------------------------------------
+-- RACE CONTROL MESSAGE MIRROR (for Events HUD)
+-- Intercepts ac.setMessage so the overlay can replay every
+-- "Largada em movimento" / "Race Control" / "Caution" banner.
+---------------------------------------------------------------------
+local raceMsgLog = {}
+local MAX_MSG_LOG = 12
+local origSetMessage = ac and ac.setMessage or nil
+if origSetMessage then
+  ac.setMessage = function(title, text)
+    local ok, err = pcall(origSetMessage, title, text)
+    -- Mirror to HUD log (guarded, never breaks the caller)
+    pcall(function()
+      table.insert(raceMsgLog, 1, {
+        t = os.clock() or 0,
+        title = tostring(title or ""),
+        text = tostring(text or ""),
+      })
+      if #raceMsgLog > MAX_MSG_LOG then table.remove(raceMsgLog) end
+    end)
+    if not ok and ac and ac.log then
+      ac.log("[RaceFlow] setMessage failed: " .. tostring(err))
+    end
+    return ok
+  end
+end
+_G.RARE2_API.getRaceMessages = function() return raceMsgLog end
 
 ---------------------------------------------------------------------
 -- CONFIG SAVE / LOAD
@@ -829,6 +857,32 @@ local function drawRaceEventsBody()
       local v = _G.RACEFLOW_VERSION or SCRIPT_VERSION or "?"
       ui.textDisabled("RaceFlow v" .. tostring(v) .. (inSession and " • LIVE" or " • SETUP"))
       if not compact then ui.separator() end
+    end
+
+    -- Race Control message mirror (v0.13.0): last ac.setMessage banners
+    if hudCfg.showMessages ~= false then
+      local msgs = _G.RARE2_API and _G.RARE2_API.getRaceMessages and _G.RARE2_API.getRaceMessages() or {}
+      if #msgs > 0 then
+        if not compact then ui.textDisabled("📢 Race Control:") end
+        for i = 1, math.min(3, #msgs) do
+          local m = msgs[i]
+          local age = (os.clock() or 0) - (m.t or 0)
+          -- Fade out old messages after 8s
+          if age < 12 then
+            local line = (m.title ~= "" and m.title .. ": " or "") .. tostring(m.text)
+            if #line > 48 then line = line:sub(1, 45) .. "..." end
+            if i == 1 and hudCfg.blink ~= false and age < 4 then
+              hudBlinkText("▶ " .. line, cyan, hudCfg)
+            else
+              ui.text(line)
+            end
+          end
+        end
+        if not compact then ui.separator() end
+      elseif not compact then
+        ui.textDisabled("📢 No race messages yet")
+        ui.separator()
+      end
     end
 
     -- Session info (when enabled)

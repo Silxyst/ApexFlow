@@ -1,19 +1,19 @@
 <p align="center">
-  <img src="icon.png" alt="RaceFlow Logo" width="180"/>
+  <img src="icon.png" alt="ApexFlow Logo" width="180"/>
 </p>
 
-<h1 align="center">RaceFlow</h1>
+<h1 align="center">ApexFlow</h1>
 
 <p align="center">
-  <strong>AI Enhancement Suite for Assetto Corsa</strong><br/>
-  Profiles • Learning • Rolling Start • Endurance • Multiclass • Caution FCY • Track Limits • Themes
+  <strong>Independent AI & Race Control for Assetto Corsa</strong><br/>
+  Profiles • Learning • Rolling Start • Strategy • Caution FCY • Track Limits • HUD
 </p>
 
 <p align="center">
   <a href="https://github.com/Silxyst/RaceFlow-V2/releases/latest">
-    <img src="https://img.shields.io/github/v/release/Silxyst/RaceFlow-V2?style=for-the-badge&label=Latest%20Release&color=00d4aa" alt="Latest Release"/>
+    <img src="https://img.shields.io/github/v/release/Silxyst/RaceFlow-V2?style=for-the-badge&label=Latest%20Release&color=ff6a15" alt="Latest Release"/>
   </a>
-  <img src="https://img.shields.io/badge/Version-v0.12.0-3b82f6?style=for-the-badge" alt="App Version"/>
+  <img src="https://img.shields.io/badge/Version-v0.13.0-ff6a15?style=for-the-badge" alt="App Version"/>
   <a href="https://github.com/Silxyst/RaceFlow-V2/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/Silxyst/RaceFlow-V2?style=for-the-badge&color=8b5cf6" alt="License"/>
   </a>
@@ -35,7 +35,7 @@
 
 ## 🎯 Overview
 
-**RaceFlow** transforms Assetto Corsa's base AI into competitive, human-like opponents. Every driver has a personality, learns from mistakes, and races with purpose — not just follow a racing line.
+**ApexFlow** transforms Assetto Corsa's base AI into competitive, human-like opponents. Every driver has a personality, learns from mistakes, and races with purpose — not just follow a racing line.
 
 Built for **offline single-player** and **offline championships**. No online dependencies. All systems are **disabled by default** — you turn on only what you want.
 
@@ -315,19 +315,9 @@ See [LICENSE](LICENSE) for details.
 
 ---
 
-## 🙏 Credits & Attribution
+## 🙏 About
 
-This project is an **enhanced fork** of the original **RaceFlow AI Enhancement (Beta)**.
-
-- **Original RaceFlow** — by the author of [RaceFlow on Overtake.gg](https://www.overtake.gg/downloads/raceflow-ai-enhancement-beta.83987/) — all original rights reserved to the original author
-- **RaceFlow-V2 enhancements** — by **Silxyst** (this repository): caution system, track limits port, HUD, themes, Web UI, GitHub updater, CMRT sync, racecraft tuning
-- **AntiGravity AI** — original architecture & learning concepts (base)
-- **Nary (AssettoCorsaRacingCarsMods)** — caution FCY/sector-yellow core
-- **Mavil** — track limit penalty serving flow
-- **FullCourseYellow** — VSC/SC techniques, AI queue logic
-- **CSP Team** — `physics.*` APIs
-
-> **Disclaimer:** RaceFlow-V2 builds upon the original RaceFlow. Original concepts, assets and code remain property of their respective authors. Enhancements in this fork are provided under the MIT License (see `LICENSE`). If you are the original author and wish attribution changed or removed, please open an Issue.
+ApexFlow is an independent race suite by **Silxyst**, built for Assetto Corsa offline racing.
 - **Assetto Corsa Modding Community** — endless inspiration
 
 ---

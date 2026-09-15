@@ -348,7 +348,7 @@ function M.update(dt, sim, cfg)
   local Fgap       = clamp(tonumber(rs.formationGap) or 4.5, 3.5, 10)
   local MaxOffset  = clamp(tonumber(rs.maxOffset) or 0.4, 0.2, 0.8)
   local releaseAt  = clamp((tonumber(rs.releaseAtPct) or 92) / 100, 0.15, 0.98)
-  local singleFileMeters = 400 -- hardcoded: short single-file phase
+  local singleFileMeters = clamp(tonumber(rs.singleFileMeters) or 600, 100, 1500)
   local singleFileAt = clamp(releaseAt - meter * singleFileMeters, 0.05, releaseAt)
 
   local carcount = carsCount - 1
@@ -556,33 +556,33 @@ end
       local mySpeed    = getCarSpeedKmh(i)
       local closing    = mySpeed - frontSpeed  -- + = I'm approaching the car in front
 
-      -- Two-by-two early, single-file before release
-      if leaderSP <= singleFileAt then
-        state.Formation = 1
-        state.LimitSpeed2[i] = math.max(
-          LimitSpeed - 50,
-          math.min(LimitSpeed - ((state.Tgap[i] + 1) * 10), LimitSpeed + 40)
-        )
-      else
-        state.Formation = 2
-        state.LimitSpeed2[i] = math.min(
-          LimitSpeed + (state.Sgap[i] / meter - (Fgap * (state.position[i] or 0))) * 2,
-          LimitSpeed + 40
-        )
-      end
+      -- Two-by-two early, single-file before release (fixed 2026-09: was inverted)
+       if leaderSP <= singleFileAt then
+         state.Formation = 2
+         state.LimitSpeed2[i] = math.min(
+           LimitSpeed + (state.Sgap[i] / meter - (Fgap * (state.position[i] or 0))) * 2,
+           LimitSpeed + 40
+         )
+       else
+         state.Formation = 1
+         state.LimitSpeed2[i] = math.max(
+           LimitSpeed - 50,
+           math.min(LimitSpeed - ((state.Tgap[i] + 1) * 10), LimitSpeed + 40)
+         )
+       end
 
       if not isRolling then
         state.Formation = 2
       end
 
-      -- lane offsets ramp
-      if state.Formation == 2 then
-        state.OffsetL = math.max(MaxOffset * -1, state.OffsetL - dt / 28)
-        state.OffsetR = math.min(MaxOffset,       state.OffsetR + dt / 28)
-      else
-        state.OffsetL = math.min(0, state.OffsetL + dt / 28)
-        state.OffsetR = math.max(0, state.OffsetR - dt / 28)
-      end
+      -- lane offsets ramp (faster: was dt/28 ~13s to reach, now dt/12 ~5s)
+       if state.Formation == 2 then
+         state.OffsetL = math.max(MaxOffset * -1, state.OffsetL - dt / 12)
+         state.OffsetR = math.min(MaxOffset,       state.OffsetR + dt / 12)
+       else
+         state.OffsetL = math.min(0, state.OffsetL + dt / 12)
+         state.OffsetR = math.max(0, state.OffsetR - dt / 12)
+       end
 
       if isRolling then
         -- Keep original intent but use stlSafe so lap-based races don't get odd negatives.
@@ -619,9 +619,12 @@ else
   local lim2 = tonumber(state.LimitSpeed2[i]) or LimitSpeed
   lim2 = math.min(lim2, LimitSpeed)
   lim2 = math.max(lim2, 15) -- never cap below crawl speed
--- Slight catch-up help for deep pack (still respects LimitSpeed)
-if (car.racePosition or 0) > 12 then
-  lim2 = math.min(LimitSpeed, lim2 + 1.5)
+-- Catch-up help for deep pack: farther back = more speed to close the 2x2 gap
+local pos = car.racePosition or 0
+if pos > 12 then
+  lim2 = math.min(LimitSpeed + 8, lim2 + 4 + (pos - 12) * 0.4)
+elseif pos > 6 then
+  lim2 = math.min(LimitSpeed, lim2 + 2.5)
 end
 
   pcall(physics.setAITopSpeed, i, lim2)
