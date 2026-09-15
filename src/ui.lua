@@ -583,6 +583,37 @@ local function drawPaceSection(sim, cfg)
 end
 
 -- ==========================================================
+-- New systems (v0.14.0) — quick toggles
+-- ==========================================================
+local function drawNewSystemsSection(sim, cfg)
+  ui.separator()
+  ui.text("Novidades v0.14")
+  cfg.pitSpeedReal = cfg.pitSpeedReal or {}
+  if cfg.pitSpeedReal.enabled == nil then cfg.pitSpeedReal.enabled = true end
+  if ui.checkbox("Pit Real (auto)##pitreal_core", cfg.pitSpeedReal.enabled) then
+    cfg.pitSpeedReal.enabled = not cfg.pitSpeedReal.enabled; notifyChange()
+  end
+  ui.sameLine(0, 8)
+  cfg.telemetryCSV = cfg.telemetryCSV or {}
+  if cfg.telemetryCSV.enabled == nil then cfg.telemetryCSV.enabled = false end
+  if ui.checkbox("Telemetria CSV##tel_core", cfg.telemetryCSV.enabled) then
+    cfg.telemetryCSV.enabled = not cfg.telemetryCSV.enabled; notifyChange()
+  end
+  ui.sameLine(0, 8)
+  cfg.voice = cfg.voice or {}
+  if cfg.voice.enabled == nil then cfg.voice.enabled = true end
+  if ui.checkbox("Voz (beep)##voice_core", cfg.voice.enabled) then
+    cfg.voice.enabled = not cfg.voice.enabled; notifyChange()
+  end
+  cfg.failures = cfg.failures or {}
+  if cfg.failures.enabled == nil then cfg.failures.enabled = false end
+  if ui.checkbox("Falhas IA##fail_core", cfg.failures.enabled) then
+    cfg.failures.enabled = not cfg.failures.enabled; notifyChange()
+  end
+  helpMarker("Pit Real = limite da pista; Telemetria = CSV por volta em Documents; Voz = beep em avisos; Falhas = IA pode quebrar (0.08/h).")
+end
+
+-- ==========================================================
 -- Low Downforce AI (Core tab)
 -- ==========================================================
 local function drawLowDownforceAISection(sim, cfg)
@@ -1638,6 +1669,17 @@ local function drawTrackLimitsSection(sim, cfg)
         local val = math.floor(clamp(newLim, 30, 120) + 0.5)
         if val ~= t.pitLimitKmh then t.pitLimitKmh = val; notifyChange() end
       end
+      cfg.pitSpeedReal = cfg.pitSpeedReal or {}
+      if cfg.pitSpeedReal.enabled == nil then cfg.pitSpeedReal.enabled = true end
+      if ui.checkbox("Usar limite REAL da pista (auto)", cfg.pitSpeedReal.enabled) then
+        cfg.pitSpeedReal.enabled = not cfg.pitSpeedReal.enabled; notifyChange()
+      end
+      helpMarker("Leigo: ON = pega o limite verdadeiro da pista (60/80/100).\nTécnico: tenta ac.getPitSpeedLimit() etc., senão usa manual.")
+      if cfg.pitSpeedReal.enabled then
+        local real = _G.RARE2_API.getRealPitSpeedLimit and _G.RARE2_API.getRealPitSpeedLimit(ac.getSim()) or nil
+        if real then ui.textDisabled(string.format("Detectado: %d km/h", real))
+        else ui.textDisabled("Detectado: (não disponível, usando manual)") end
+      end
     end
 
     ui.newLine(2)
@@ -1956,6 +1998,30 @@ function M.draw(sim, cfg)
   ui.newLine(2)
   ui.separator()
 
+  -- Category presets (v0.14.0) — one-click for GT3/F1/Endurance etc.
+  do
+    local presets = _G.RARE2_API.getCategoryPresets and _G.RARE2_API.getCategoryPresets() or {}
+    if next(presets) then
+      ui.textDisabled("Presets por categoria (1 clique):")
+      local cur = cfg.categoryPreset or "custom"
+      for key, pr in pairs(presets) do
+        local isCur = cur == key
+        if isCur and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(1.00, 0.55, 0.15, 1.00)) end
+        if ui.button(pr.label .. "##preset_" .. key, vec2(90, 22)) then
+          if _G.RARE2_API.applyCategoryPreset then _G.RARE2_API.applyCategoryPreset(key) end
+        end
+        if isCur and rgbm then ui.popStyleColor() end
+        ui.sameLine(0, 6)
+      end
+      if ui.button("Custom##preset_custom", vec2(90, 22)) then
+        cfg.categoryPreset = "custom"
+        notifyChange()
+      end
+      ui.newLine(2)
+      ui.separator()
+    end
+  end
+
   if not cfg.enabled then
     ui.newLine(4)
     ui.textDisabled("RaceFlow está desativado. Marque “Ativo” acima para configurar.")
@@ -1982,6 +2048,7 @@ function M.draw(sim, cfg)
       drawAggressionSection(s, c)
       drawPaceSection(s, c)
       drawRacecraftSection(s, c)
+      drawNewSystemsSection(s, c)
       drawLowDownforceAISection(s, c)
       drawLearningModuleSection(s, c)
       drawRollingStartSection(s, c)

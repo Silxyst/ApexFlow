@@ -1,7 +1,7 @@
 -- ApexFlow — Independent race suite for Assetto Corsa (v0.13.0)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.14.1"
-_G.RACEFLOW_VERSION = "0.14.1"
+SCRIPT_VERSION = "0.14.2"
+_G.RACEFLOW_VERSION = "0.14.2"
 _G.APEXFLOW_VERSION = "0.13.1"
 
 -- Per-module load status, shown in the fallback window so a future
@@ -88,8 +88,9 @@ local RARE2_CFG = {
     aiServe = false,
     qualiReset = true,
     finishAdd = true,
-    gamePenaltyCompat = true, -- v0.9.0: skip new warnings while game punishes
-    minOffTime = 0.25,        -- v0.10.0: sustained off-track debounce
+    gamePenaltyCompat = false, -- v0.14.2: OFF for independence (was true, caused missed detections)
+    syncWithCMRT = false,     -- v0.14.2: OFF for independence (was true)
+    minOffTime = 0.15,        -- v0.14.2: more sensitive (was 0.25)
     pitSpeedEnabled = true,   -- v0.10.0: punish pit-lane speeding
     pitLimitKmh = 80,
     pitGraceSec = 1.0,
@@ -706,9 +707,9 @@ _G.RARE2_API.resetToDefaults = function()
       t.aiServe = false
       t.qualiReset = true
       t.finishAdd = true
-      t.gamePenaltyCompat = true
-      t.syncWithCMRT = true
-      t.minOffTime = 0.25
+      t.gamePenaltyCompat = false
+      t.syncWithCMRT = false
+      t.minOffTime = 0.15
       t.pitSpeedEnabled = true
       t.pitLimitKmh = 80
       t.pitGraceSec = 1.0

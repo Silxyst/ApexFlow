@@ -47,7 +47,8 @@ local function ensureConfig(cfg)
   t.pitLimitKmh = tonumber(t.pitLimitKmh or 80) or 80
   t.pitGraceSec = tonumber(t.pitGraceSec or 1.0) or 1.0
   -- v0.11.1: CMRT sync — use server's allowedTyresOut when available.
-  t.syncWithCMRT = (t.syncWithCMRT ~= false)
+  -- v0.14.2: default OFF for true independence from game/CMRT.
+  t.syncWithCMRT = (t.syncWithCMRT == true)
 end
 
 local function getAllowedTyresOut(sim)
