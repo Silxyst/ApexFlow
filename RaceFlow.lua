@@ -1,7 +1,7 @@
 -- ApexFlow — Independent race suite for Assetto Corsa (v0.13.0)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.14.0"
-_G.RACEFLOW_VERSION = "0.14.0"
+SCRIPT_VERSION = "0.14.1"
+_G.RACEFLOW_VERSION = "0.14.1"
 _G.APEXFLOW_VERSION = "0.13.1"
 
 -- Per-module load status, shown in the fallback window so a future
@@ -202,6 +202,7 @@ local function applyCategoryPreset(catKey)
   ac.log("[RaceFlow] Category preset applied: " .. tostring(p.label))
   return true
 end
+_G.RARE2_API = _G.RARE2_API or {}
 _G.RARE2_API.applyCategoryPreset = applyCategoryPreset
 _G.RARE2_API.getCategoryPresets = function() return CATEGORY_PRESETS end
 
@@ -225,6 +226,7 @@ local function getRealPitSpeedLimit(sim)
   -- keep it simple: return nil to signal "use manual".
   return nil
 end
+_G.RARE2_API = _G.RARE2_API or {}
 _G.RARE2_API.getRealPitSpeedLimit = getRealPitSpeedLimit
 
 -- ----------------------------------------------------------
@@ -265,6 +267,7 @@ local function loadPerTrackConfig(trackId)
   ac.log("[RaceFlow] Per-track config loaded: " .. path)
   return true
 end
+_G.RARE2_API = _G.RARE2_API or {}
 _G.RARE2_API.savePerTrackConfig = savePerTrackConfig
 _G.RARE2_API.loadPerTrackConfig = loadPerTrackConfig
 
@@ -334,6 +337,7 @@ local function playVoiceWarning(kind)
     if ok and mp and mp.play then mp:play() end
   end)
 end
+_G.RARE2_API = _G.RARE2_API or {}
 _G.RARE2_API.playVoiceWarning = playVoiceWarning
 
 -- ----------------------------------------------------------
