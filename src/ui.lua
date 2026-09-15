@@ -1340,6 +1340,12 @@ local function drawAboutSection(sim, cfg)
   ui.newLine(2)
   ui.textWrapped("When an AI car stops on track outside the pits, RaceFlow draws FCY (whole field slows) or a sector yellow (only that sector slows) for a configurable duration, then releases to green. Player gets HUD messages only. Needs physics scripting enabled.")
 
+  ui.newLine(6)
+  ui.text("Track Limits")
+  ui.separator()
+  ui.newLine(2)
+  ui.textWrapped("Port of the Mavil Track Limit Manager core: warnings for wheels off track, then a time penalty served stopped in the pit box holding the brake. Works for the player and optionally for AI, with quali reset, extra time for early pit exit and unserved time added to the final result.")
+
   ui.newLine(8)
 end
 
@@ -1352,6 +1358,7 @@ local TABS_ROW1 = {
   { id = "caution",    label = "🟡 Caution" },
 }
 local TABS_ROW2 = {
+  { id = "tracklimits", label = "⚖ Limits" },
   { id = "github",     label = "☁ Updates" },
   { id = "webui",      label = "🌐 Web UI" },
   { id = "about",      label = "ℹ Sobre" },
@@ -1371,7 +1378,7 @@ local function drawTabBar(cfg)
     if i > 1 then ui.sameLine(0, 8) end
     if tabButton(t.label, cfg.uiTab == t.id, w1) then cfg.uiTab = t.id end
   end
-  local w2 = (avail - 2 * 8) / 3
+  local w2 = (avail - 3 * 8) / 4
   for i, t in ipairs(TABS_ROW2) do
     if i > 1 then ui.sameLine(0, 8) end
     if tabButton(t.label, cfg.uiTab == t.id, w2) then cfg.uiTab = t.id end
@@ -1438,7 +1445,7 @@ function M.draw(sim, cfg)
   cfg.uiTab = cfg.uiTab or "aggr"
   -- Migrate stale tabs from older versions (e.g. "vsc", "rules", "updates")
   do
-    local known = { aggr = true, multiclass = true, strategy = true, caution = true, github = true, webui = true, about = true }
+    local known = { aggr = true, multiclass = true, strategy = true, caution = true, tracklimits = true, github = true, webui = true, about = true }
     if not known[cfg.uiTab] then cfg.uiTab = "aggr" end
   end
   drawTabBar(cfg)
@@ -1469,6 +1476,10 @@ function M.draw(sim, cfg)
   elseif cfg.uiTab == "caution" then
     cardTitle("🟡 Caution — FCY + Sector Yellow", "Incidentes com IA parada • leve, sem modelo 3D")
     safeTab("Caution", drawCautionSection, sim, cfg)
+
+  elseif cfg.uiTab == "tracklimits" then
+    cardTitle("⚖ Track Limits", "Avisos → punição de tempo → cumpra no box")
+    safeTab("Track Limits", drawTrackLimitsSection, sim, cfg)
 
   elseif cfg.uiTab == "github" then
     cardTitle("☁ Atualizações GitHub", "Release channel • semver • changelog")

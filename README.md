@@ -76,6 +76,14 @@ Built for **offline single-player** and **offline championships**. No online dep
 > source of instability (dual-state bugs, log spam, setup-screen interference).
 > It may return in a future release as an isolated optional module. See CHANGELOG.
 
+### ⚖️ **Track Limits (v0.7.0, port of Mavil TLM core)**
+- **Warnings** for wheels off track (configurable 2–4 wheels, cooldown)
+- **Time penalty** served stopped in the pit box holding the brake
+- **Quali reset** (guarded teleport), **extra time** for early pit exit
+- **Unserved time** added to the final result (guarded API)
+- **Optional AI** warnings + pit serving
+- **Extra HUD window**: live race events (caution + warnings/penalties)
+
 ### 🔄 **GitHub Update Checker**
 - **Auto-checks** releases on startup + configurable interval
 - **Semantic version compare** — knows when update exists
@@ -234,5 +242,5 @@ See [LICENSE](LICENSE) for details.
 
 <p align="center">
   <sub>Built with ❤️ for the Assetto Corsa community</sub><br/>
-  <sub>RaceFlow v0.5.0 — stability release (VSC removed)</sub>
+  <sub>RaceFlow v0.7.0 — track limits port + race events HUD</sub>
 </p>

@@ -1,6 +1,6 @@
 SCRIPT_NAME = "RaceFlow"
-SCRIPT_VERSION = "0.6.0"
-_G.RACEFLOW_VERSION = "0.6.0"
+SCRIPT_VERSION = "0.7.0"
+_G.RACEFLOW_VERSION = "0.7.0"
 
 -- Per-module load status, shown in the fallback window so a future
 -- require() failure identifies the exact module (no more guessing).
@@ -21,6 +21,7 @@ local ai           = safeRequire("src.ai_controller")
 local rolling      = safeRequire("src.rolling_start")
 local strategy     = safeRequire("src.race_strategy")
 local caution      = safeRequire("src.caution")       -- v0.6.0: FCY + sector yellow
+local tracklimits  = safeRequire("src.tracklimits")   -- v0.7.0: warnings -> time penalty
 local webui        = safeRequire("src.webui")         -- Remote Web UI (file polling)
 -- NOTE v0.5.0+: src/vsc + src/github_update modules are DEPRECATED and no
 -- longer required. GitHub check lives in this file (single source of truth)
@@ -64,6 +65,24 @@ local RARE2_CFG = {
     autoTrigger = true,
     minDrivenKm = 0.5,
     cooldown = 10,
+  },
+
+  -- v0.7.0: Track Limits (port of Mavil core). Disabled by default.
+  tracklimits = {
+    enabled = false,
+    trackLimitsEnabled = true,
+    penaltiesEnabled = true,
+    maxWarnings = 4,
+    penaltyTime = 5,
+    cooldown = 7,
+    extraTime = 10,
+    strictPit = false,
+    waitTime = 1.9,
+    wheels = 4,
+    aiEnabled = true,
+    aiServe = false,
+    qualiReset = true,
+    finishAdd = true,
   },
 
   -- NEW: GitHub update checker
@@ -358,6 +377,23 @@ _G.RARE2_API = {
       c.minDrivenKm = 0.5
       c.cooldown = 10
     end
+    if RARE2_CFG.tracklimits then
+      local t = RARE2_CFG.tracklimits
+      t.enabled = false
+      t.trackLimitsEnabled = true
+      t.penaltiesEnabled = true
+      t.maxWarnings = 4
+      t.penaltyTime = 5
+      t.cooldown = 7
+      t.extraTime = 10
+      t.strictPit = false
+      t.waitTime = 1.9
+      t.wheels = 4
+      t.aiEnabled = true
+      t.aiServe = false
+      t.qualiReset = true
+      t.finishAdd = true
+    end
     if RARE2_CFG.githubUpdate then
       RARE2_CFG.githubUpdate.enabled = true
       RARE2_CFG.githubUpdate.repo = "Silxyst/RaceFlow-V2"
@@ -524,10 +560,16 @@ function script.update(dt)
     ai.update(dt, sim, RARE2_CFG)
   end
 
-  -- Caution LAST so its AI speed caps win over pace/strategy caps.
+  -- Caution so its AI speed caps win over pace/strategy caps.
   -- Skipped during rolling start (formation has its own control).
   if not rollingActive and caution and caution.update then
     caution.update(dt, sim, RARE2_CFG)
+  end
+
+  -- Track limits AFTER caution (uses pit/brake checks + teleport +
+  -- result APIs, no fight over AI top speed except penalized AI slowdown).
+  if not rollingActive and tracklimits and tracklimits.update then
+    tracklimits.update(dt, sim, RARE2_CFG)
   end
 
   memorySaveCooldown = math.max(0.0, memorySaveCooldown - dt)
@@ -557,6 +599,7 @@ end
 -- ==========================================================
 _G.RARE2_API.getCautionState = function() return caution and caution.getState and caution.getState() or {} end
 _G.RARE2_API.cautionManualTrigger = function(sim, cfg) return caution and caution.manualTrigger and caution.manualTrigger(sim or ac.getSim(), cfg or RARE2_CFG) end
+_G.RARE2_API.getTrackLimitsState = function() return tracklimits and tracklimits.getState and tracklimits.getState() or {} end
 _G.RARE2_API.githubCheckUpdates = function(cfg, force)
   githubCheckUpdates(cfg or RARE2_CFG, force)
 end
@@ -589,7 +632,7 @@ local function drawFallbackIfMissingModules()
   ui.newLine(4)
   ui.separator()
   ui.text("Module status:")
-  local names = {"src.ui", "src.ai_controller", "src.rolling_start", "src.race_strategy", "src.caution", "src.webui"}
+  local names = {"src.ui", "src.ai_controller", "src.rolling_start", "src.race_strategy", "src.caution", "src.tracklimits", "src.webui"}
   for _, n in ipairs(names) do
     ui.text((modStatus[n] == "OK" and "✓ " or "✗ ") .. n .. ": " .. tostring(modStatus[n] or "not attempted"))
   end
@@ -619,5 +662,57 @@ end
 function script.windowMainSettings()
   if ui.checkbox("Show window in setup", ac.isWindowOpen("main_setup")) then
     ac.setWindowOpen("main_setup", not ac.isWindowOpen("main_setup"))
+  end
+end
+
+---------------------------------------------------------------------
+-- EXTRA HUD: live race events (caution + track limits) - v0.7.0
+-- Small overlay window; every read is guarded so it never crashes.
+---------------------------------------------------------------------
+function script.windowRaceEvents()
+  local ok = pcall(function()
+    local sim = ac.getSim()
+    local inSession = sim and sim.isSessionStarted
+
+    ui.pushFont(ui.Font.Title)
+    ui.text("RACE EVENTS")
+    ui.popFont()
+
+    -- Caution status
+    local cs = _G.RARE2_API and _G.RARE2_API.getCautionState and _G.RARE2_API.getCautionState() or {}
+    if cs.active then
+      if cs.mode == "FCY" then
+        ui.text(string.format("🟡 FCY %.0fs/%.0fs", cs.timer or 0, cs.duration or 0))
+      else
+        ui.text(string.format("🟡 YELLOW S%s %.0fs", tostring(cs.sector), cs.timer or 0))
+      end
+      if cs.reason and cs.reason ~= "" then ui.textDisabled(tostring(cs.reason)) end
+    else
+      ui.textDisabled("🟢 Track green")
+    end
+
+    ui.separator()
+
+    -- Track limits status (player)
+    local ts = _G.RARE2_API and _G.RARE2_API.getTrackLimitsState and _G.RARE2_API.getTrackLimitsState() or {}
+    if ts.penaltyActive and (ts.timeLeft or 0) > 0 then
+      ui.text(string.format("🛑 Penalty: %.1fs%s", ts.timeLeft, ts.serving and " (serving)" or ""))
+      if not ts.serving then ui.textDisabled("Stop in pit + hold brake") end
+    elseif (ts.warn or 0) > 0 then
+      ui.text(string.format("⚠ Warnings: %d/%d", ts.warn, ts.maxWarn or 4))
+    else
+      ui.textDisabled("⚖ No warnings")
+    end
+    if (ts.aiWithPenalties or 0) > 0 then
+      ui.textDisabled(string.format("AI penalized: %d", ts.aiWithPenalties))
+    end
+
+    if not inSession then
+      ui.newLine(2)
+      ui.textDisabled("Live data appears during the session.")
+    end
+  end)
+  if not ok then
+    ui.textDisabled("Events HUD unavailable.")
   end
 end
