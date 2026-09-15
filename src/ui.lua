@@ -42,9 +42,11 @@ local ACCENTS = {
   orange = { 1.00, 0.65, 0.20, "Laranja" },
   purple = { 0.70, 0.50, 1.00, "Roxo" },
   red    = { 1.00, 0.35, 0.35, "Vermelho" },
+  teal   = { 0.20, 0.90, 0.80, "Turquesa" },
+  pink   = { 1.00, 0.40, 0.70, "Rosa" },
 }
-local ACCENT_ORDER = { "cyan", "green", "orange", "purple", "red" }
-local THEME = { accent = "cyan", bgAlpha = 1.0 }
+local ACCENT_ORDER = { "cyan", "green", "orange", "purple", "red", "teal", "pink" }
+local THEME = { accent = "cyan", bgAlpha = 1.0, corner = 6, compactHeaders = false }
 
 local function accentRgb(a)
   local t = ACCENTS[THEME.accent] or ACCENTS.cyan
@@ -87,10 +89,11 @@ local function pushDarkTheme()
     ui.pushStyleColor(ui.StyleColor.Text, rgbm(0.93, 0.96, 1.00, 1.00))
     ui.pushStyleColor(ui.StyleColor.TextDisabled, rgbm(0.60, 0.68, 0.78, 1.00))
   end)
+  local cr = tonumber(THEME.corner) or 6
   pcall(function()
-    ui.pushStyleVar(ui.StyleVar.FrameRounding, 6)
-    ui.pushStyleVar(ui.StyleVar.GrabRounding, 6)
-    ui.pushStyleVar(ui.StyleVar.WindowRounding, 10)
+    ui.pushStyleVar(ui.StyleVar.FrameRounding, cr)
+    ui.pushStyleVar(ui.StyleVar.GrabRounding, cr)
+    ui.pushStyleVar(ui.StyleVar.WindowRounding, cr + 4)
   end)
 end
 
@@ -100,12 +103,12 @@ local function popDarkTheme()
   pcall(function() ui.popStyleColor(17) end)
 end
 
--- Card header: big colored title + dim subtitle
+-- Card header: big colored title + dim subtitle (skipped in compact mode)
 local function cardTitle(title, subtitle)
   ui.pushFont(ui.Font.Title)
   if rgbm then ui.textColored(title, C.accent()) else ui.text(title) end
   ui.popFont()
-  if subtitle then ui.textDisabled(subtitle) end
+  if subtitle and not THEME.compactHeaders then ui.textDisabled(subtitle) end
   ui.separator()
   ui.newLine(2)
 end
@@ -1503,6 +1506,35 @@ local function drawTrackLimitsSection(sim, cfg)
     if ui.checkbox("Somar não-cumprida no resultado final", t.finishAdd) then
       t.finishAdd = not t.finishAdd; notifyChange()
     end
+    helpMarker("Leigo: terminou devendo = tempo somado no resultado.\nTécnico: ac.addPenaltyTime com guard de existência.")
+
+    ui.newLine(2)
+    ui.separator()
+    ui.text("Compatibilidade com o jogo")
+
+    t.gamePenaltyCompat = (t.gamePenaltyCompat ~= false)
+    if ui.checkbox("Não punir 2x (punição nativa do jogo)", t.gamePenaltyCompat) then
+      t.gamePenaltyCompat = not t.gamePenaltyCompat; notifyChange()
+    end
+    helpMarker("Leigo: o jogo já pune corte (5–10 s desacelerando)? O app pausa os avisos enquanto isso.\nTécnico: sonda car.penaltyTime com pcall; sem o campo, não faz nada.")
+
+    ui.textDisabled("Dica: Content Manager → Drive → Race Weekend → Rules → Penalties OFF evita punição dupla.")
+    ui.newLine(2)
+
+    -- Live game-penalty indicator (player)
+    do
+      local st = _G.RARE2_API.getTrackLimitsState and _G.RARE2_API.getTrackLimitsState() or {}
+      if st.gamePenApi then
+        if (st.gamePen or 0) > 0.5 then
+          if rgbm then ui.textColored(string.format("🎮 JOGO punindo: %.1fs (avisos pausados)", st.gamePen), C.warn())
+          else ui.text(string.format("JOGO punindo: %.1fs", st.gamePen)) end
+        else
+          ui.textDisabled("🎮 Sem punição nativa ativa.")
+        end
+      else
+        ui.textDisabled("🎮 Leitura da punição nativa indisponível nesta build (use o modo manual abaixo).")
+      end
+    end
 
     ui.unindent(12)
   end
@@ -1517,16 +1549,16 @@ local function drawAppearanceSection(sim, cfg)
   ui.text("🎨 Aparência")
   helpMarker("Leigo: mude a cor de destaque e a transparência do fundo.\nTécnico: cor de destaque (accent) e alfa do WindowBg/ChildBg.")
 
-  -- Accent swatches
+  -- Accent swatches (wrapped in rows of 4 to never clip)
   cfg.ui.accent = cfg.ui.accent or "cyan"
-  for _, key in ipairs(ACCENT_ORDER) do
+  for idx, key in ipairs(ACCENT_ORDER) do
     local a = ACCENTS[key]
     local label = (cfg.ui.accent == key and "● " or "○ ") .. a[4]
-    if ui.button(label .. "##accent_" .. key, vec2(110, 24)) then
+    if ui.button(label .. "##accent_" .. key, vec2(140, 24)) then
       cfg.ui.accent = key
       notifyChange()
     end
-    ui.sameLine(0, 6)
+    if idx % 4 ~= 0 then ui.sameLine(0, 6) end
   end
   ui.newLine(2)
 
@@ -1540,6 +1572,24 @@ local function drawAppearanceSection(sim, cfg)
       notifyChange()
     end
   end
+
+  cfg.ui.corner = tonumber(cfg.ui.corner) or 6
+  local newC = sliderBlock("Arredondamento dos cantos", "ui_corner", cfg.ui.corner, 0, 12, "%.0f",
+    "Leigo: 0 = cantos retos, 12 = bem arredondado.\nTécnico: FrameRounding/GrabRounding e WindowRounding +4.")
+  if newC ~= nil then
+    local val = math.floor(clamp(newC, 0, 12) + 0.5)
+    if val ~= cfg.ui.corner then
+      cfg.ui.corner = val
+      notifyChange()
+    end
+  end
+
+  cfg.ui.compactHeaders = (cfg.ui.compactHeaders == true)
+  if ui.checkbox("Cabeçalhos compactos (sem subtítulo)", cfg.ui.compactHeaders) then
+    cfg.ui.compactHeaders = not cfg.ui.compactHeaders
+    notifyChange()
+  end
+  helpMarker("Leigo: esconde as linhas de explicação das abas, deixa tudo menor.\nTécnico: pula o subtitle em cardTitle().")
 end
 
 local function drawAboutSection(sim, cfg)
@@ -1643,6 +1693,8 @@ function M.draw(sim, cfg)
   for _, k in ipairs(ACCENT_ORDER) do if k == acc then accOk = true break end end
   THEME.accent = accOk and acc or "cyan"
   THEME.bgAlpha = clamp(tonumber(cfg.ui.bgAlpha) or 1.0, 0.4, 1.0)
+  THEME.corner = math.floor(clamp(tonumber(cfg.ui.corner) or 6, 0, 12) + 0.5)
+  THEME.compactHeaders = (cfg.ui.compactHeaders == true)
   pushDarkTheme()
 
   -- ===== Header: brand + version + master switch =====

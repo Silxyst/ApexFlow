@@ -36,6 +36,26 @@ local function ensureConfig(cfg)
   t.aiServe = (t.aiServe == true)
   t.qualiReset = (t.qualiReset ~= false)             -- teleport reset in quali
   t.finishAdd = (t.finishAdd ~= false)               -- add unserved at finish
+  -- v0.9.0: game-penalty compat. AC's own slow-down penalty cannot be
+  -- disabled from Lua; when it is active we skip NEW warnings so the
+  -- driver is not punished twice for the same cut.
+  t.gamePenaltyCompat = (t.gamePenaltyCompat ~= false)
+end
+
+-- Best-effort read of AC's native slow-down penalty (seconds remaining).
+-- Returns 0 when the field does not exist in this CSP build.
+local gamePenAvailable = nil -- nil = unprobed, true/false cached
+local function gamePenaltyTime(car)
+  if gamePenAvailable == false then return 0 end
+  local ok, v = pcall(function() return car.penaltyTime end)
+  if not ok then
+    gamePenAvailable = false
+    return 0
+  end
+  gamePenAvailable = true
+  v = tonumber(v) or 0
+  if v < 0 then v = 0 end
+  return v
 end
 
 local function getState(i)
@@ -51,6 +71,7 @@ local function getState(i)
     lastPos = nil, wasTeleported = false, wasInPit = false,
     warnsTotal = 0, pensTotal = 0, pensTime = 0,
     lastEvent = "", lastEventLap = -1, lastEventSector = 0,
+    gamePen = 0,
   }
   cars[i] = s
   return s
@@ -240,11 +261,17 @@ local function updateCar(i, car, dt, sim, cfg, isPlayer)
     -- In pits / too slow: no new detections, and re-arm the edge trigger
     -- (otherwise an off-track exit from pits would never warn again).
     s.offPrev = false
+    s.gamePen = gamePenaltyTime(car)
   else
+    -- v0.9.0: game-penalty compat — while AC's own slow-down is active,
+    -- skip NEW warnings so the same cut is not punished twice.
+    s.gamePen = gamePenaltyTime(car)
+    local compatHold = t.gamePenaltyCompat and s.gamePen > 0.5
     local wheelsOut = car.wheelsOutside or 0
     local off = wheelsOut >= (t.wheels or 4)
     if t.trackLimitsEnabled and off and not s.offPrev and not s.mustReset
-        and (now - s.lastWarn) > (t.cooldown or 7) and not s.awaitingReset then
+        and (now - s.lastWarn) > (t.cooldown or 7) and not s.awaitingReset
+        and not compatHold then
       s.lastWarn = now
       s.warn = s.warn + 1
       s.warnsTotal = s.warnsTotal + 1
@@ -377,10 +404,14 @@ function M.getState()
     maxWarn = t.maxWarnings or 4,
     penaltyActive = p.penaltyActive or false,
     timeLeft = p.timeLeft or 0,
+    origTime = p.origTime or 0,
     serving = p.serving or false,
     lastEvent = p.lastEvent or "",
     aiWithWarnings = aiWarn,
     aiWithPenalties = aiPen,
+    gamePen = p.gamePen or 0,               -- AC native slow-down (0 = n/a)
+    gamePenApi = gamePenAvailable == true,  -- field exists in this build?
+    compatHold = (p.gamePen or 0) > 0.5,
   }
 end
 

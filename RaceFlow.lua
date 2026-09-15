@@ -1,6 +1,6 @@
 SCRIPT_NAME = "RaceFlow"
-SCRIPT_VERSION = "0.8.0"
-_G.RACEFLOW_VERSION = "0.8.0"
+SCRIPT_VERSION = "0.9.0"
+_G.RACEFLOW_VERSION = "0.9.0"
 
 -- Per-module load status, shown in the fallback window so a future
 -- require() failure identifies the exact module (no more guessing).
@@ -86,6 +86,7 @@ local RARE2_CFG = {
     aiServe = false,
     qualiReset = true,
     finishAdd = true,
+    gamePenaltyCompat = true, -- v0.9.0: skip new warnings while game punishes
   },
 
   -- NEW: GitHub update checker
@@ -107,8 +108,10 @@ local RARE2_CFG = {
 
   -- v0.8.0: interface theme (About tab -> Appearance).
   ui = {
-    accent = "cyan",   -- cyan | green | orange | purple | red
+    accent = "cyan",   -- cyan|green|orange|purple|red|teal|pink
     bgAlpha = 1.0,     -- 0.4 .. 1.0 background opacity
+    corner = 6,        -- 0 .. 12 corner rounding
+    compactHeaders = false,
   },
 }
 
@@ -405,6 +408,7 @@ _G.RARE2_API = {
       t.aiServe = false
       t.qualiReset = true
       t.finishAdd = true
+      t.gamePenaltyCompat = true
     end
     if RARE2_CFG.githubUpdate then
       RARE2_CFG.githubUpdate.enabled = true
@@ -420,6 +424,8 @@ _G.RARE2_API = {
     if RARE2_CFG.ui then
       RARE2_CFG.ui.accent = "cyan"
       RARE2_CFG.ui.bgAlpha = 1.0
+      RARE2_CFG.ui.corner = 6
+      RARE2_CFG.ui.compactHeaders = false
     end
     saveConfigToFile()
     return true
@@ -688,22 +694,53 @@ end
 -- EXTRA HUD: live race events (caution + track limits) - v0.7.0
 -- Small overlay window; every read is guarded so it never crashes.
 ---------------------------------------------------------------------
+-- v0.9.0 animated events HUD: pulse/blink via os.clock + progress bars.
+-- All data reads are guarded; visuals degrade gracefully.
+local function hudPulse(speed, lo, hi)
+  local t = (os.clock() or 0) * (speed or 4)
+  local s = (math.sin(t) + 1) / 2
+  return lo + (hi - lo) * s
+end
+
+local function hudBar(frac)
+  frac = math.max(0, math.min(1, tonumber(frac) or 0))
+  if ui.progressBar then
+    pcall(ui.progressBar, frac, vec2(-1, 10))
+  else
+    local n = math.floor(frac * 20 + 0.5)
+    ui.textDisabled("[" .. string.rep("█", n) .. string.rep("░", 20 - n) .. "]")
+  end
+end
+
+local function hudBlinkText(text, color)
+  -- Blink by skipping frames on a time gate (cheap, no rect math).
+  if math.floor((os.clock() or 0) * 2.5) % 2 == 0 then
+    if color then ui.textColored(text, color) else ui.text(text) end
+  else
+    ui.textDisabled(text)
+  end
+end
+
 local function drawRaceEventsBody()
     local sim = ac.getSim()
     local inSession = sim and sim.isSessionStarted
+    local amber = rgbm and rgbm(1.0, 0.78, 0.20, hudPulse(4, 0.75, 1.0)) or nil
+    local red = rgbm and rgbm(1.0, 0.35, 0.35, hudPulse(5, 0.7, 1.0)) or nil
 
     -- Caution status
     local cs = _G.RARE2_API and _G.RARE2_API.getCautionState and _G.RARE2_API.getCautionState() or {}
     if cs.active then
       if cs.mode == "FCY" then
-        ui.text(string.format("🟡 FCY %.0fs/%.0fs", cs.timer or 0, cs.duration or 0))
+        hudBlinkText(string.format("🟡 FCY %.0fs / %.0fs", cs.timer or 0, cs.duration or 0), amber)
       else
-        ui.text(string.format("🟡 YELLOW S%s %.0fs", tostring(cs.sector), cs.timer or 0))
+        hudBlinkText(string.format("🟡 YELLOW S%s %.0fs", tostring(cs.sector), cs.timer or 0), amber)
       end
+      if (cs.duration or 0) > 0 then hudBar((cs.timer or 0) / cs.duration) end
       if cs.reason and cs.reason ~= "" then ui.textDisabled(tostring(cs.reason)) end
       if cs.overtake then
-        ui.text(string.format("⛔ Devolva p/ %s: %.0fs",
-          tostring(cs.overtake.name), cs.overtake.timer or 0))
+        hudBlinkText(string.format("⛔ Devolva p/ %s: %.0fs",
+          tostring(cs.overtake.name), cs.overtake.timer or 0), red)
+        if (cs.overtake.total or 0) > 0 then hudBar((cs.overtake.timer or 0) / cs.overtake.total) end
       end
     else
       ui.textDisabled("🟢 Track green")
@@ -714,12 +751,16 @@ local function drawRaceEventsBody()
     -- Track limits status (player)
     local ts = _G.RARE2_API and _G.RARE2_API.getTrackLimitsState and _G.RARE2_API.getTrackLimitsState() or {}
     if ts.penaltyActive and (ts.timeLeft or 0) > 0 then
-      ui.text(string.format("🛑 Penalty: %.1fs%s", ts.timeLeft, ts.serving and " (serving)" or ""))
+      hudBlinkText(string.format("🛑 Penalty: %.1fs%s", ts.timeLeft, ts.serving and " (serving)" or ""), red)
+      if (ts.origTime or 0) > 0 then hudBar((ts.timeLeft or 0) / ts.origTime) end
       if not ts.serving then ui.textDisabled("Stop in pit + hold brake") end
     elseif (ts.warn or 0) > 0 then
       ui.text(string.format("⚠ Warnings: %d/%d", ts.warn, ts.maxWarn or 4))
     else
       ui.textDisabled("⚖ No warnings")
+    end
+    if (ts.gamePenApi and (ts.gamePen or 0) > 0.5) then
+      ui.textDisabled(string.format("🎮 Game penalty: %.1fs", ts.gamePen))
     end
     if (ts.aiWithPenalties or 0) > 0 then
       ui.textDisabled(string.format("AI penalized: %d", ts.aiWithPenalties))
