@@ -2,8 +2,8 @@
 -- Original RaceFlow by its author on Overtake.gg; enhancements by Silxyst.
 -- See README.md "Credits & Attribution" and LICENSE for details.
 SCRIPT_NAME = "RaceFlow"
-SCRIPT_VERSION = "0.12.0"
-_G.RACEFLOW_VERSION = "0.12.0"
+SCRIPT_VERSION = "0.12.1"
+_G.RACEFLOW_VERSION = "0.12.1"
 
 -- Per-module load status, shown in the fallback window so a future
 -- require() failure identifies the exact module (no more guessing).

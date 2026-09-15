@@ -167,12 +167,21 @@ local function overtakeMonitor(dt, sim, cfg, carsCount)
   local L = tonumber(sim.trackLengthM) or 0
 
   -- New pass? (lower racePosition number = further ahead)
+  -- v0.12.1 fix: crashed/stopped cars can be passed freely — they are
+  -- not protected under caution (real FIA rule: wrecks are not
+  -- part of the queue). Check speed/retired before opening give-back.
   if state.lastPlayerPos and myPos < state.lastPlayerPos and not state.ovt then
     local oldPos = state.lastPlayerPos
     for j = 1, carsCount - 1 do
       local okC, cc = pcall(ac.getCar, j)
       if okC and cc and tonumber(cc.racePosition) == oldPos
           and not cc.isInPitlane and not cc.isInPit then
+        local isWreck = cc.isRetired or (tonumber(cc.speedKmh) or 99) < 8
+        if isWreck then
+          ac.log(string.format("[RaceFlow Caution] pass of WRECKED car ignored: player P%d -> P%d (vs %s, %.1f km/h)",
+            oldPos, myPos, tostring(ac.getDriverName(j) or ("Car #" .. j)), tonumber(cc.speedKmh) or 0))
+          break
+        end
         local gap = splineGap(pcar.splinePosition, cc.splinePosition, L)
         if gap == nil or gap < 120 then
           local nm = ac.getDriverName(j) or ("Car #" .. j)
@@ -192,13 +201,16 @@ local function overtakeMonitor(dt, sim, cfg, carsCount)
   local t = state.ovt
   if not t then return end
 
-  -- Returned? (player back at/below base, passed car ahead again, or it pitted)
+  -- Returned? (player back at/below base, passed car ahead again,
+  -- or it pitted / became a wreck). A wreck that was passed never
+  -- requires a give-back.
   local okC, cc = pcall(ac.getCar, t.idx)
   local returned = (myPos >= t.basePos)
   if not returned and okC and cc then
     local cpos = tonumber(cc.racePosition) or 99
     if cpos < myPos then returned = true end
     if cc.isInPitlane or cc.isInPit then returned = true end
+    if cc.isRetired or (tonumber(cc.speedKmh) or 99) < 8 then returned = true end
   elseif not okC or not cc then
     returned = true
   end
