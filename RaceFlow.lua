@@ -56,7 +56,7 @@ local RARE2_CFG = {
   -- NEW: GitHub update checker
   githubUpdate = {
     enabled = true,
-    repo = "RaceFlow/RaceFlow",      -- GitHub repo (owner/repo)
+    repo = "Silxyst/RaceFlow-V2",    -- GitHub repo (owner/repo)
     checkIntervalHours = 24,         -- auto-check interval
     notifyOnStartup = true,          -- check on app load
   },
