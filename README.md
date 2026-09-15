@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>AI Enhancement Suite for Assetto Corsa</strong><br/>
-  Profiles • Learning • Rolling Start • Endurance Strategy • Multiclass • Pure VSC • GitHub Updates • Web UI
+  Profiles • Learning • Rolling Start • Endurance Strategy • Multiclass • GitHub Updates • Web UI
 </p>
 
 <p align="center">
@@ -72,12 +72,9 @@ Built for **offline single-player** and **offline championships**. No online dep
 - **Yield/Push logic** — faster classes push through, slower yield
 - **Class-aware** overtakes and blue flags
 
-### 🟡 **Pure VSC (Virtual Safety Car)**
-- **Zero 3D overhead** — no model, no pit spline, no physics hacks
-- **Delta-time enforcement** via `setAITopSpeed` + `setAIThrottleLimit`
-- **Auto-deploys** on stopped cars (< 8 km/h for 2.5s)
-- **Player HUD** shows real-time delta to VSC target
-- **Test button** in UI for instant validation
+> **NOTE v0.5.0:** the Pure VSC system was **removed** to eliminate a recurring
+> source of instability (dual-state bugs, log spam, setup-screen interference).
+> It may return in a future release as an isolated optional module. See CHANGELOG.
 
 ### 🔄 **GitHub Update Checker**
 - **Auto-checks** releases on startup + configurable interval
@@ -117,7 +114,6 @@ All settings persist in `RaceFlow_config.lua` (auto-saved). UI tabs:
 | **RaceFlow Core** | Aggression mix, Pace strength, Physics intensity, Learning, Rolling Start |
 | **Multi Class** | Class count, manual assignment, auto-fill |
 | **Strategy** | Race laps, forced stops, tire wear threshold |
-| **VSC** | Delta speed, throttle limit, trigger threshold, cooldown |
 | **GitHub Updates** | Repo, check interval, notify on startup |
 | **Web UI** | Enable, port, auth token |
 
@@ -129,8 +125,7 @@ All settings persist in `RaceFlow_config.lua` (auto-saved). UI tabs:
 1. **RaceFlow Core** → set Aggression to 50 (balanced)
 2. **Rolling Start** → enable, pick "GT3 / WEC" preset
 3. **Strategy** → enable, set laps/stops for your race length
-4. **VSC** → enable for safety car periods
-5. **Start race** — watch AI form up behind pace car!
+4. **Start race** — watch AI form up behind pace car!
 
 ### Learning Module
 - **Leave ON** — AI improves every session
@@ -148,10 +143,6 @@ All settings persist in `RaceFlow_config.lua` (auto-saved). UI tabs:
 
 ### API (via `_G.RARE2_API`)
 ```lua
--- VSC
-_G.RARE2_API.getVSCState()          -- {active, timer, deltaKmh, ...}
-_G.RARE2_API.vscManualTrigger(sim, cfg)
-
 -- GitHub
 _G.RARE2_API.githubCheckUpdates(cfg, true)
 _G.RARE2_API.githubGetState()
@@ -175,13 +166,14 @@ def send(action, params=None):
     with open(CMD, "w") as f:
         json.dump({"commands": [{"id": int(time.time()*1000), "action": action, "params": params or {}}]}, f)
 
-# Example: toggle VSC
-send("vsc_toggle")
+# Example: toggle rolling start
+send("rolling_toggle")
 
 # Poll status
 while True:
     with open(STATUS) as f:
-        print(json.load(f)["vsc"]["active"])
+        status = json.load(f)
+    print(f"Cars: {len(status['cars'])}")
     time.sleep(0.5)
 ```
 
@@ -189,9 +181,9 @@ while True:
 
 ## 📸 Screenshots
 
-| Core UI | VSC Test | Learning Module |
+| Core UI | Strategy | Learning Module |
 |---------|----------|-----------------|
-| ![Core](docs/core.png) | ![VSC](docs/vsc.png) | ![Learning](docs/learning.png) |
+| ![Core](docs/core.png) | ![Strategy](docs/strategy.png) | ![Learning](docs/learning.png) |
 
 *(Add screenshots to `docs/` folder)*
 
@@ -200,7 +192,7 @@ while True:
 ## 🗺️ Roadmap
 
 - [ ] **Track Limits System** — warnings, penalties, pit serving, reports
-- [ ] **CrewChief Integration** — voice callouts for VSC, penalties, rolling start
+- [ ] **CrewChief Integration** — voice callouts for penalties, rolling start
 - [ ] **Championship Mode** — points, standings, calendar
 - [ ] **Live Timing Overlay** — OBS-compatible WebSocket feed
 - [ ] **AI Driver Market** — hire/fire, contracts, development
@@ -242,5 +234,5 @@ See [LICENSE](LICENSE) for details.
 
 <p align="center">
   <sub>Built with ❤️ for the Assetto Corsa community</sub><br/>
-  <sub>RaceFlow v0.4.6 — "Pure VSC, GitHub Updates, Web UI"</sub>
+  <sub>RaceFlow v0.5.0 — stability release (VSC removed)</sub>
 </p>

@@ -967,169 +967,7 @@ local function drawMultiClassTab(sim, cfg, aiCtl)
   cfg._multiclassClassForIndex = cfg._manualClassForIndex
 end
 
-local function drawAboutSection(sim, cfg)
-  ui.text("RaceFlow v" .. (SCRIPT_VERSION or _G.RACEFLOW_VERSION or "?"))
-  ui.separator()
-  ui.newLine(4)
 
-  ui.textWrapped("RaceFlow sets out to fix the weak spots in Assetto Corsa's base AI by making drivers think, react, and race more like humans. It does this by adding personality, improving racecraft, and adapting behavior in real time.")
-
-  ui.newLine(6)
-  ui.text("The Core")
-  ui.separator()
-  ui.newLine(2)
-  ui.textWrapped("Every AI driver is assigned a class (Chill, Normal, or Attack) which shapes how they brake, commit to passes, and handle pressure. Pace varies naturally between drivers, spreading the field instead of locking it into a train. Features like hot lap bursts, hunt mode after being passed, and clean air boosts make races feel alive rather than scripted.")
-
-  ui.newLine(6)
-  ui.text("Learning Module")
-  ui.separator()
-  ui.newLine(2)
-  ui.textWrapped("RaceFlow watches every car, every frame. When a car overshoots, spins, or runs off track, it logs a hard event for that corner. Danger builds, braking starts earlier, and speed is capped. As drivers clean up their runs, confidence returns and restrictions ease. Memory persists between sessions, so each track evolves over time. Use the Clear buttons to reset a track or wipe everything if needed.")
-
-  ui.newLine(6)
-  ui.text("Multiclass")
-  ui.separator()
-  ui.newLine(2)
-ui.newLine(8)
-end
-
-
--- ==========================================================
--- TAB: VSC (Virtual Safety Car - Pure Delta Time)
--- ==========================================================
-local function drawVSCSection(sim, cfg)
-  cfg.vsc = cfg.vsc or {}
-
-  ui.text("Virtual Safety Car (Pure Delta Time)")
-  helpMarker("Sistema VSC leve sem modelo 3D. Usa apenas setAITopSpeed + setAIThrottleLimit. Detecta carros parados e ativa automaticamente.")
-
-  local vscState = _G.RARE2_API.getVSCState and _G.RARE2_API.getVSCState() or {}
-
-  -- Status banner
-  ui.newLine(2)
-  if not sim or not sim.isSessionStarted then
-    ui.textDisabled("⚪ Status disponível durante a sessão.")
-  elseif vscState.active then
-    if rgbm then
-      ui.textColored(string.format("⚠ VSC ATIVO – MÁX: %d km/h – %s", vscState.deltaKmh or 80, vscState.reason or ""), rgbm(1.0, 0.85, 0.1, 1.0))
-    else
-      ui.text(string.format("⚠ VSC ATIVO – MÁX %d km/h", vscState.deltaKmh or 80))
-    end
-    ui.text(string.format("Tempo ativo: %.1fs / Mín: %ds", vscState.timer or 0, cfg.vsc.minDuration or 10))
-  else
-    ui.textDisabled("⚪ VSC Inativo (Bandeira Verde)")
-    if vscState.cooldown and vscState.cooldown > 0 then
-      ui.text(string.format("Cooldown: %.1fs", vscState.cooldown))
-    end
-  end
-
-  ui.newLine(3)
-  ui.separator()
-
-  -- Enable toggle
-  local vscEnabled = (cfg.vsc.enabled == true)
-  if ui.checkbox("Ativar VSC Automático", vscEnabled) then
-    cfg.vsc.enabled = not vscEnabled
-    notifyChange()
-  end
-
-  if cfg.vsc.enabled then
-    ui.indent(12)
-
-    cfg.vsc.deltaKmh = cfg.vsc.deltaKmh or 80
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newDelta = ui.slider("Velocidade Máxima VSC (km/h)", cfg.vsc.deltaKmh, 40, 140, "%.0f km/h")
-    if newDelta ~= nil then
-      local val = math.floor(clamp(newDelta, 40, 140) + 0.5)
-      if val ~= cfg.vsc.deltaKmh then cfg.vsc.deltaKmh = val; notifyChange() end
-    end
-
-    cfg.vsc.throttleLimit = cfg.vsc.throttleLimit or 0.55
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newThrottle = ui.slider("Limite Throttle IA", cfg.vsc.throttleLimit, 0.1, 1.0, "%.2f")
-    if newThrottle ~= nil then
-      local val = clamp(newThrottle, 0.1, 1.0)
-      if val ~= cfg.vsc.throttleLimit then cfg.vsc.throttleLimit = val; notifyChange() end
-    end
-
-    cfg.vsc.minDuration = cfg.vsc.minDuration or 10
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newMin = ui.slider("Duração Mínima (s)", cfg.vsc.minDuration, 5, 60, "%.0f s")
-    if newMin ~= nil then
-      local val = math.floor(clamp(newMin, 5, 60) + 0.5)
-      if val ~= cfg.vsc.minDuration then cfg.vsc.minDuration = val; notifyChange() end
-    end
-
-    cfg.vsc.triggerThreshold = cfg.vsc.triggerThreshold or 2.5
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newTrigger = ui.slider("Tempo Parado p/ Ativar (s)", cfg.vsc.triggerThreshold, 1.0, 10.0, "%.1f s")
-    if newTrigger ~= nil then
-      local val = math.floor(clamp(newTrigger * 10, 10, 100) + 0.5) / 10
-      if val ~= cfg.vsc.triggerThreshold then cfg.vsc.triggerThreshold = val; notifyChange() end
-    end
-
-    cfg.vsc.cooldown = cfg.vsc.cooldown or 30
-    ui.setNextItemWidth(ui.windowWidth() - 60)
-    local newCD = ui.slider("Cooldown entre VSCs (s)", cfg.vsc.cooldown, 10, 120, "%.0f s")
-    if newCD ~= nil then
-      local val = math.floor(clamp(newCD, 10, 120) + 0.5)
-      if val ~= cfg.vsc.cooldown then cfg.vsc.cooldown = val; notifyChange() end
-    end
-
-    cfg.vsc.requireYellowClear = (cfg.vsc.requireYellowClear ~= false)
-    if ui.checkbox("Só desativa se bandeira amarela sumir", cfg.vsc.requireYellowClear) then
-      cfg.vsc.requireYellowClear = not cfg.vsc.requireYellowClear
-      notifyChange()
-    end
-
-    cfg.vsc.showPlayerDelta = (cfg.vsc.showPlayerDelta ~= false)
-    if ui.checkbox("Mostrar delta do jogador no HUD", cfg.vsc.showPlayerDelta) then
-      cfg.vsc.showPlayerDelta = not cfg.vsc.showPlayerDelta
-      notifyChange()
-    end
-
-    ui.unindent(12)
-  end
-
-  ui.newLine(3)
-  ui.separator()
-
-  -- Manual trigger button
-  ui.text("Controle Manual:")
-  if ui.button(vscState.active and "🛑 DESATIVAR VSC" or "🚨 ATIVAR VSC (TESTE)", vec2(200, 30)) then
-    if _G.RARE2_API.vscManualTrigger then
-      _G.RARE2_API.vscManualTrigger(sim, cfg)
-    end
-  end
-  ui.sameLine()
-  helpMarker("Força ativação/desativação do VSC para teste. Útil para verificar se o sistema está funcionando.")
-
-  -- Live delta display for player
-  if sim and sim.isSessionStarted and vscState.active then
-    local pcar = ac.getCar(0)
-    if pcar and not pcar.isInPitlane then
-      local targetMs = (cfg.vsc.deltaKmh or 80) / 3.6
-      local currentMs = pcar.speedMs or 0
-      local deltaKmh = (currentMs - targetMs) * 3.6
-      ui.newLine(4)
-      ui.separator()
-      if rgbm then
-        if deltaKmh > 2 then
-          ui.textColored(string.format("Seu Delta: +%.1f km/h (ACELERE MENOS)", deltaKmh), rgbm(1.0, 0.3, 0.3, 1))
-        elseif deltaKmh > 0 then
-          ui.textColored(string.format("Seu Delta: +%.1f km/h", deltaKmh), rgbm(1.0, 0.8, 0.2, 1))
-        else
-          ui.textColored(string.format("Seu Delta: %.1f km/h (OK)", deltaKmh), rgbm(0.3, 1.0, 0.3, 1))
-        end
-      else
-        ui.text(string.format("Seu Delta: %.1f km/h", deltaKmh))
-      end
-    end
-  end
-end
-
-
--- ==========================================================
 -- TAB: GitHub Updates
 -- ==========================================================
 local function drawGitHubUpdateSection(sim, cfg)
@@ -1338,16 +1176,15 @@ def send_command(action, params=None):
 while True:
     with open(STATUS_FILE) as f:
         status = json.load(f)
-    print(f"VSC: {status['vsc']['active']}, Cars: {len(status['cars'])}")
-    
-    # Exemplo: ativar VSC se não ativo
-    # if not status['vsc']['active']:
-    #     send_command("vsc_toggle")
-    
+    print(f"Cars: {len(status['cars'])}, leader: {status['leaderboard'][0]['driver'] if status['leaderboard'] else '-'}")
+
+    # Exemplo: alternar rolling start
+    # send_command("rolling_toggle")
+
     time.sleep(0.5)
 ]])
-  end
 end
+
 local function drawAboutSection(sim, cfg)
   ui.text("RaceFlow v" .. (SCRIPT_VERSION or "0.4.5"))
   ui.separator()
@@ -1389,11 +1226,11 @@ local function drawAboutSection(sim, cfg)
 end
 
 
+-- NOTE v0.5.0: VSC tab removed with the VSC system.
 local TABS_ROW1 = {
   { id = "aggr",       label = "🏁 Core" },
   { id = "multiclass", label = "🏎 Multiclass" },
   { id = "strategy",   label = "⛽ Estratégia" },
-  { id = "vsc",        label = "🟡 VSC" },
 }
 local TABS_ROW2 = {
   { id = "github",     label = "☁ Updates" },
@@ -1410,7 +1247,7 @@ end
 
 local function drawTabBar(cfg)
   local avail = ui.windowWidth() - 20
-  local w1 = (avail - 3 * 8) / 4
+  local w1 = (avail - 2 * 8) / 3
   for i, t in ipairs(TABS_ROW1) do
     if i > 1 then ui.sameLine(0, 8) end
     if tabButton(t.label, cfg.uiTab == t.id, w1) then cfg.uiTab = t.id end
@@ -1459,13 +1296,7 @@ function M.draw(sim, cfg)
     if trackName ~= "" then info = info .. "  •  " .. trackName end
     if carsN > 0 then info = info .. string.format("  •  %d carros", carsN) end
     ui.textDisabled(info ~= "" and info or "Em sessão")
-    local vs = _G.RARE2_API and _G.RARE2_API.getVSCState and _G.RARE2_API.getVSCState() or {}
-    if vs.active then
-      if rgbm then ui.textColored(string.format("🟡 VSC ATIVO — máx %d km/h (%s)", vs.deltaKmh or 80, vs.reason or ""), C.warn())
-      else ui.text("VSC ATIVO") end
-    else
-      statusLine(cfg.enabled, "Sistema pronto", "Sistema pausado")
-    end
+    statusLine(cfg.enabled, "Sistema pronto", "Sistema pausado")
     local gs = _G.RARE2_API and _G.RARE2_API.githubGetState and _G.RARE2_API.githubGetState() or {}
     if gs.hasUpdate then
       if rgbm then ui.textColored("☁ Atualização disponível: v" .. tostring(gs.latestVersion or "?"), C.ok())
@@ -1510,10 +1341,6 @@ function M.draw(sim, cfg)
   elseif cfg.uiTab == "multiclass" then
     cardTitle("🏎 Multiclass", "Classe 1 = mais rápida • yield / push automático")
     safeTab("Multiclass", function(s, c) drawMultiClassTab(s, c, aiController) end, sim, cfg)
-
-  elseif cfg.uiTab == "vsc" then
-    cardTitle("🟡 Virtual Safety Car", "Delta-time puro • sem modelo 3D • leve")
-    safeTab("VSC", drawVSCSection, sim, cfg)
 
   elseif cfg.uiTab == "github" then
     cardTitle("☁ Atualizações GitHub", "Release channel • semver • changelog")

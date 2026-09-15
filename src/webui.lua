@@ -81,7 +81,7 @@ end
 -- Build status payload
 local function buildStatus(sim, cfg)
   local mem = _G.RARE2_API and _G.RARE2_API.getMemory and _G.RARE2_API.getMemory() or {}
-  local vscState = _G.RARE2_API.getVSCState and _G.RARE2_API.getVSCState() or {}
+  -- NOTE v0.5.0: VSC removed; field kept as explicit marker for old clients.
   local githubState = _G.RARE2_API.githubGetState and _G.RARE2_API.githubGetState() or {}
 
   local cars = {}
@@ -142,7 +142,7 @@ local function buildStatus(sim, cfg)
       isFinished = sim.isSessionFinished,
       flagType = sim.raceFlagType or 0,
     },
-    vsc = vscState,
+    vsc = { removed = true },
     github = githubState,
     cars = cars,
     leaderboard = leaderboard,
@@ -154,7 +154,6 @@ local function buildStatus(sim, cfg)
       aggression = cfg.aggression,
       paceStrength = cfg.paceStrength,
       difficultyBoost = cfg.difficultyBoost,
-      vscEnabled = cfg.vsc and cfg.vsc.enabled,
       rollingStartEnabled = cfg.rollingStart and cfg.rollingStart.enabled,
       strategyEnabled = cfg.strategy and cfg.strategy.enabled,
     },
@@ -177,16 +176,10 @@ local function processCommands(sim, cfg)
         local action = cmd.action
         local params = cmd.params or {}
 
-        if action == "vsc_toggle" then
-          if _G.RARE2_API.vscManualTrigger then
-            _G.RARE2_API.vscManualTrigger(sim, cfg)
-          end
-        elseif action == "vsc_enable" then
-          cfg.vsc.enabled = true
-          _G.RARE2_API.markConfigDirty()
-        elseif action == "vsc_disable" then
-          cfg.vsc.enabled = false
-          _G.RARE2_API.markConfigDirty()
+        -- NOTE v0.5.0: vsc_* commands removed with the VSC system.
+        -- Old clients sending them get a log line instead of a crash.
+        if action == "vsc_toggle" or action == "vsc_enable" or action == "vsc_disable" then
+          ac.log("[RaceFlow WebUI] command '" .. tostring(action) .. "' ignored: VSC removed in v0.5.0")
         elseif action == "rolling_toggle" then
           cfg.rollingStart.enabled = not cfg.rollingStart.enabled
           _G.RARE2_API.markConfigDirty()
@@ -272,7 +265,7 @@ end
 
 -- Example external client (Python/Node/JS) would:
 -- 1. Poll statusFile every 500ms
--- 2. Write to commandFile with { commands: [{ id: 1, action: "vsc_toggle", token: "secret" }] }
+-- 2. Write to commandFile with { commands: [{ id: 1, action: "rolling_toggle", token: "secret" }] }
 -- 3. Wait for commandFile to show processed ID
 
 return M

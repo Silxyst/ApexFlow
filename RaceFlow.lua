@@ -1,10 +1,17 @@
 SCRIPT_NAME = "RaceFlow"
-SCRIPT_VERSION = "0.4.9"
-_G.RACEFLOW_VERSION = "0.4.9"
+SCRIPT_VERSION = "0.5.0"
+_G.RACEFLOW_VERSION = "0.5.0"
 
+-- Per-module load status, shown in the fallback window so a future
+-- require() failure identifies the exact module (no more guessing).
+local modStatus = {}
 local function safeRequire(name)
   local ok, mod = pcall(require, name)
-  if ok then return mod end
+  if ok and mod then
+    modStatus[name] = "OK"
+    return mod
+  end
+  modStatus[name] = "FAIL: " .. tostring(mod)
   if ac and ac.log then ac.log(string.format("[RaceFlow] require('%s') failed: %s", tostring(name), tostring(mod))) end
   return nil
 end
@@ -13,9 +20,10 @@ local ui_root      = safeRequire("src.ui")
 local ai           = safeRequire("src.ai_controller")
 local rolling      = safeRequire("src.rolling_start")
 local strategy     = safeRequire("src.race_strategy")
-local vsc          = safeRequire("src.vsc")           -- NEW: Pure VSC (delta time)
-local webui        = safeRequire("src.webui")         -- NEW: Remote Web UI
-local github       = safeRequire("src.github_update") -- NEW: GitHub update checker
+local webui        = safeRequire("src.webui")         -- Remote Web UI (file polling)
+-- NOTE v0.5.0: src/vsc + src/github_update modules are DEPRECATED and no
+-- longer required. VSC logic was removed; GitHub check lives in this file
+-- (single source of truth) to avoid dual-state bugs.
 
 local RARE2_CFG = {
   enabled      = true,
@@ -44,17 +52,7 @@ local RARE2_CFG = {
     singleFileMeters= 600,
   },
 
-  -- NEW: Pure VSC (delta time only, no 3D model)
-  vsc = {
-    enabled = false,
-    deltaKmh = 80,           -- target speed under VSC
-    throttleLimit = 0.55,    -- AI throttle cap
-    minDuration = 10,        -- minimum VSC duration (seconds)
-    triggerThreshold = 2.5,  -- seconds stopped to trigger
-    cooldown = 30,           -- cooldown between VSC activations
-    requireYellowClear = true,
-    showPlayerDelta = true,
-  },
+  -- NOTE v0.5.0: VSC config removed (system deleted, see CHANGELOG).
 
   -- NEW: GitHub update checker
   githubUpdate = {
@@ -82,7 +80,7 @@ _G.RARE2_CFG = RARE2_CFG
 -- Learning / safety defaults (can be overridden by config/UI)
 -- ----------------------------------------------------------
 RARE2_CFG.learningEnabled = true
-RARE2_CFG.disableLearningDuringVSC = true
+-- NOTE v0.5.0: disableLearningDuringVSC removed with the VSC system.
 
 -- Hard-event detection
 RARE2_CFG.offTrackConfirmSec   = 0.8
@@ -334,16 +332,8 @@ _G.RARE2_API = {
       RARE2_CFG.strategy.tireChangeEnabled = true
       RARE2_CFG.strategy.tireFreshnessPct = 50
     end
-    if RARE2_CFG.vsc then
-      RARE2_CFG.vsc.enabled = false
-      RARE2_CFG.vsc.deltaKmh = 80
-      RARE2_CFG.vsc.throttleLimit = 0.55
-      RARE2_CFG.vsc.minDuration = 10
-      RARE2_CFG.vsc.triggerThreshold = 2.5
-      RARE2_CFG.vsc.cooldown = 30
-      RARE2_CFG.vsc.requireYellowClear = true
-      RARE2_CFG.vsc.showPlayerDelta = true
-    end
+    -- NOTE v0.5.0: vsc reset block removed with the VSC system.
+    -- Old saved configs may still contain cfg.vsc; it is ignored.
     if RARE2_CFG.githubUpdate then
       RARE2_CFG.githubUpdate.enabled = true
       RARE2_CFG.githubUpdate.repo = "Silxyst/RaceFlow-V2"
@@ -373,10 +363,18 @@ local githubState = {
   error = nil,
 }
 
+-- Cached availability probe: ac.webRequest does not exist in some CSP
+-- builds (incl. 0.3.0-preview542). Without this guard the check logs
+-- EVERY frame (~400+ lines/session). Probe once, stay silent afterwards.
+local webReqMissingLogged = false
 local function githubCheckUpdates(cfg, force)
   if not cfg.githubUpdate.enabled then return end
   if not ac.webRequest then
-    ac.log("[RaceFlow GitHub] ac.webRequest not available (CSP < 0.2.7)")
+    if not webReqMissingLogged then
+      webReqMissingLogged = true
+      githubState.error = "ac.webRequest indisponível nesta build do CSP (auto-check desativado; use verificação manual se disponível)"
+      ac.log("[RaceFlow GitHub] ac.webRequest not available in this CSP build; automatic checks disabled (logged once)")
+    end
     return
   end
 
@@ -439,143 +437,8 @@ local function githubCheckUpdates(cfg, force)
 end
 
 -- ==========================================================
--- PURE VSC (delta time only, no 3D model)
--- ==========================================================
-local vscState = {
-  active = false,
-  timer = 0,
-  reason = "",
-  cooldown = 0,
-  stoppedCars = {},
-  prevYellow = false,
-}
-
-local function vscUpdate(dt, sim, cfg)
-  if not cfg.vsc.enabled then
-    if vscState.active then
-      vscDeactivate(sim, cfg)
-    end
-    return
-  end
-
-  vscState.cooldown = math.max(0, vscState.cooldown - dt)
-
-  local carsCount = sim.carsCount or 0
-  local yellowNow = (sim.raceFlagType == ac.FlagType.Caution)
-
-  -- Detect stopped cars (incident detection)
-  local incidentDetected = false
-  local incidentCar = ""
-  for i = 0, carsCount - 1 do
-    local ok, car = pcall(ac.getCar, i)
-    if ok and car and not car.isInPitlane and not car.isInPit then
-      local spd = car.speedKmh or 0
-      if spd < 8 then
-        vscState.stoppedCars[i] = (vscState.stoppedCars[i] or 0) + dt
-        if vscState.stoppedCars[i] >= (cfg.vsc.triggerThreshold or 2.5) then
-          incidentDetected = true
-          incidentCar = ac.getDriverName(i) or ("Car #" .. i)
-        end
-      else
-        vscState.stoppedCars[i] = math.max(0, (vscState.stoppedCars[i] or 0) - dt * 2)
-      end
-    else
-      vscState.stoppedCars[i] = 0
-    end
-  end
-
-  -- Auto-activate on incident
-  if not vscState.active and incidentDetected and vscState.cooldown <= 0 then
-    vscActivate(sim, cfg, incidentCar)
-  end
-
-  if vscState.active then
-    vscState.timer = vscState.timer + dt
-
-    -- Apply speed cap to all AI
-    local capKmh = cfg.vsc.deltaKmh or 80
-    local throttleLim = cfg.vsc.throttleLimit or 0.55
-    for i = 0, carsCount - 1 do
-      local ok, car = pcall(ac.getCar, i)
-      if ok and car and car.isAIControlled then
-        pcall(physics.setAITopSpeed, i, capKmh)
-        pcall(physics.setAIThrottleLimit, i, throttleLim)
-      end
-    end
-
-    -- Player: delta time enforcement (show delta to target)
-    local pcar = ac.getCar(0)
-    if pcar and not pcar.isInPitlane then
-      local targetMs = capKmh / 3.6
-      local currentMs = pcar.speedMs or 0
-      local delta = currentMs - targetMs
-      if delta > 1.0 then
-        -- Player too fast - show warning
-        if ac.setMessage then
-          pcall(ac.setMessage, "VSC ACTIVE", string.format("Delta: +%.1f km/h - SLOW DOWN!", delta * 3.6))
-        end
-      end
-    end
-
-    -- Deactivate conditions
-    local minDur = cfg.vsc.minDuration or 10
-    local yellowGone = (sim.raceFlagType ~= ac.FlagType.Caution)
-    if vscState.timer >= minDur and (yellowGone or not cfg.vsc.requireYellowClear) and not incidentDetected then
-      vscDeactivate(sim, cfg)
-    end
-  end
-
-  vscState.prevYellow = yellowNow
-end
-
-local function vscActivate(sim, cfg, reason)
-  vscState.active = true
-  vscState.timer = 0
-  vscState.reason = reason
-  vscState.cooldown = cfg.vsc.cooldown or 30
-  ac.log("[RaceFlow VSC] Activated: " .. reason)
-  if ac.setMessage then
-    pcall(ac.setMessage, "VSC DEPLOYED", "Virtual Safety Car - Max " .. (cfg.vsc.deltaKmh or 80) .. " km/h")
-  end
-end
-
-local function vscDeactivate(sim, cfg)
-  vscState.active = false
-  vscState.timer = 0
-  vscState.reason = ""
-  -- Release AI speed caps
-  for i = 0, (sim.carsCount or 0) - 1 do
-    local ok, car = pcall(ac.getCar, i)
-    if ok and car and car.isAIControlled then
-      pcall(physics.setAITopSpeed, i, 1e9)
-      pcall(physics.setAIThrottleLimit, i, 1.0)
-    end
-  end
-  ac.log("[RaceFlow VSC] Deactivated")
-  if ac.setMessage then
-    pcall(ac.setMessage, "VSC ENDED", "Green Flag - Resume Racing!")
-  end
-end
-
-local function vscGetState()
-  return {
-    active = vscState.active,
-    timer = vscState.timer,
-    reason = vscState.reason,
-    deltaKmh = RARE2_CFG.vsc and RARE2_CFG.vsc.deltaKmh or 80,
-  }
-end
-
-local function vscManualTrigger(sim, cfg)
-  if not vscState.active then
-    vscActivate(sim, cfg, "Manual Trigger")
-  else
-    vscDeactivate(sim, cfg)
-  end
-end
-
--- ==========================================================
--- MAIN UPDATE (with VSC + GitHub + WebUI)
+-- MAIN UPDATE (GitHub + WebUI + rolling + strategy + AI)
+-- NOTE: Pure VSC system removed in v0.5.0 (see CHANGELOG).
 -- ==========================================================
 local configLoaded = false
 local memoryLoaded = false
@@ -614,8 +477,7 @@ function script.update(dt)
   if not sim.isSessionStarted then return end
   if not RARE2_CFG.enabled then return end
 
-  -- VSC (pure delta time) - LOCAL single-source implementation
-  vscUpdate(dt, sim, RARE2_CFG)
+  -- NOTE v0.5.0: VSC system removed (was here).
 
   -- Web UI (remote file-based polling)
   if webui and webui.update then
@@ -659,22 +521,9 @@ end
 
 -- ==========================================================
 -- EXPORTS for UI / other modules
--- Single source of truth = LOCAL state/functions below (not the
--- standalone src/vsc + src/github_update modules, kept for reference).
--- This fixes the "tab always empty/inactive" bug caused by dual state.
+-- NOTE v0.5.0: VSC exports removed with the VSC system.
+-- GitHub state is LOCAL single-source (no dual-state modules).
 -- ==========================================================
-_G.RARE2_API.getVSCState = function()
-  return {
-    active = vscState.active,
-    timer = vscState.timer,
-    reason = vscState.reason,
-    cooldown = vscState.cooldown,
-    deltaKmh = RARE2_CFG.vsc and RARE2_CFG.vsc.deltaKmh or 80,
-  }
-end
-_G.RARE2_API.vscManualTrigger = function(sim, cfg)
-  vscManualTrigger(sim or ac.getSim(), cfg or RARE2_CFG)
-end
 _G.RARE2_API.githubCheckUpdates = function(cfg, force)
   githubCheckUpdates(cfg or RARE2_CFG, force)
 end
@@ -702,8 +551,15 @@ local function drawFallbackIfMissingModules()
   ui.pushFont(ui.Font.Title)
   ui.textAligned("RaceFlow", vec2(0.5, 0.5), vec2(ui.availableSpaceX(), 34))
   ui.popFont()
-  ui.newLine(8)
+  ui.newLine(4)
   ui.textWrapped("RaceFlow modules failed to load. Check custom_shaders_patch.log for require() errors.")
+  ui.newLine(4)
+  ui.separator()
+  ui.text("Module status:")
+  local names = {"src.ui", "src.ai_controller", "src.rolling_start", "src.race_strategy", "src.webui"}
+  for _, n in ipairs(names) do
+    ui.text((modStatus[n] == "OK" and "✓ " or "✗ ") .. n .. ": " .. tostring(modStatus[n] or "not attempted"))
+  end
 end
 
 function script.windowMain()
