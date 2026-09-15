@@ -1,6 +1,6 @@
 SCRIPT_NAME = "RaceFlow"
-SCRIPT_VERSION = "0.5.0"
-_G.RACEFLOW_VERSION = "0.5.0"
+SCRIPT_VERSION = "0.6.0"
+_G.RACEFLOW_VERSION = "0.6.0"
 
 -- Per-module load status, shown in the fallback window so a future
 -- require() failure identifies the exact module (no more guessing).
@@ -20,10 +20,11 @@ local ui_root      = safeRequire("src.ui")
 local ai           = safeRequire("src.ai_controller")
 local rolling      = safeRequire("src.rolling_start")
 local strategy     = safeRequire("src.race_strategy")
+local caution      = safeRequire("src.caution")       -- v0.6.0: FCY + sector yellow
 local webui        = safeRequire("src.webui")         -- Remote Web UI (file polling)
--- NOTE v0.5.0: src/vsc + src/github_update modules are DEPRECATED and no
--- longer required. VSC logic was removed; GitHub check lives in this file
--- (single source of truth) to avoid dual-state bugs.
+-- NOTE v0.5.0+: src/vsc + src/github_update modules are DEPRECATED and no
+-- longer required. GitHub check lives in this file (single source of truth)
+-- to avoid dual-state bugs.
 
 local RARE2_CFG = {
   enabled      = true,
@@ -52,7 +53,18 @@ local RARE2_CFG = {
     singleFileMeters= 600,
   },
 
-  -- NOTE v0.5.0: VSC config removed (system deleted, see CHANGELOG).
+  -- v0.6.0: Caution system (FCY + sector yellow). Disabled by default.
+  caution = {
+    enabled = false,
+    fcySpeedKmh = 80,
+    yellowSpeedKmh = 80,
+    minDuration = 60,
+    maxDuration = 180,
+    fcyChance = 0.5,
+    autoTrigger = true,
+    minDrivenKm = 0.5,
+    cooldown = 10,
+  },
 
   -- NEW: GitHub update checker
   githubUpdate = {
@@ -334,6 +346,18 @@ _G.RARE2_API = {
     end
     -- NOTE v0.5.0: vsc reset block removed with the VSC system.
     -- Old saved configs may still contain cfg.vsc; it is ignored.
+    if RARE2_CFG.caution then
+      local c = RARE2_CFG.caution
+      c.enabled = false
+      c.fcySpeedKmh = 80
+      c.yellowSpeedKmh = 80
+      c.minDuration = 60
+      c.maxDuration = 180
+      c.fcyChance = 0.5
+      c.autoTrigger = true
+      c.minDrivenKm = 0.5
+      c.cooldown = 10
+    end
     if RARE2_CFG.githubUpdate then
       RARE2_CFG.githubUpdate.enabled = true
       RARE2_CFG.githubUpdate.repo = "Silxyst/RaceFlow-V2"
@@ -500,6 +524,12 @@ function script.update(dt)
     ai.update(dt, sim, RARE2_CFG)
   end
 
+  -- Caution LAST so its AI speed caps win over pace/strategy caps.
+  -- Skipped during rolling start (formation has its own control).
+  if not rollingActive and caution and caution.update then
+    caution.update(dt, sim, RARE2_CFG)
+  end
+
   memorySaveCooldown = math.max(0.0, memorySaveCooldown - dt)
   if _G.RARE2_API and _G.RARE2_API._memoryDirty and memorySaveCooldown <= 0.0 then
     if _G.RARE2_API.saveMemory then
@@ -523,7 +553,10 @@ end
 -- EXPORTS for UI / other modules
 -- NOTE v0.5.0: VSC exports removed with the VSC system.
 -- GitHub state is LOCAL single-source (no dual-state modules).
+-- v0.6.0: caution exports (module is single-source).
 -- ==========================================================
+_G.RARE2_API.getCautionState = function() return caution and caution.getState and caution.getState() or {} end
+_G.RARE2_API.cautionManualTrigger = function(sim, cfg) return caution and caution.manualTrigger and caution.manualTrigger(sim or ac.getSim(), cfg or RARE2_CFG) end
 _G.RARE2_API.githubCheckUpdates = function(cfg, force)
   githubCheckUpdates(cfg or RARE2_CFG, force)
 end
@@ -556,7 +589,7 @@ local function drawFallbackIfMissingModules()
   ui.newLine(4)
   ui.separator()
   ui.text("Module status:")
-  local names = {"src.ui", "src.ai_controller", "src.rolling_start", "src.race_strategy", "src.webui"}
+  local names = {"src.ui", "src.ai_controller", "src.rolling_start", "src.race_strategy", "src.caution", "src.webui"}
   for _, n in ipairs(names) do
     ui.text((modStatus[n] == "OK" and "✓ " or "✗ ") .. n .. ": " .. tostring(modStatus[n] or "not attempted"))
   end

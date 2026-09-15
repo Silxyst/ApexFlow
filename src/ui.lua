@@ -1185,6 +1185,118 @@ while True:
 ]])
 end
 
+
+-- ==========================================================
+-- TAB: Caution (FCY + Sector Yellow) - v0.6.0
+-- Port of Nary's caution core. Player gets HUD messages only.
+-- ==========================================================
+local function drawCautionSection(sim, cfg)
+  cfg.caution = cfg.caution or {}
+
+  ui.text("Caution por incidentes (IA parada)")
+  helpMarker("Quando uma IA para na pista fora dos boxes, sorteia FCY (todos lentos) ou bandeira amarela no setor. Só funciona em corrida, offline, com physics scripting ativo. O jogador recebe avisos no HUD (sem limitação de velocidade).")
+
+  local cState = _G.RARE2_API.getCautionState and _G.RARE2_API.getCautionState() or {}
+
+  -- Status banner
+  ui.newLine(2)
+  if not sim or not sim.isSessionStarted then
+    ui.textDisabled("⚪ Status disponível durante a sessão de corrida.")
+  elseif cState.active then
+    if cState.mode == "FCY" then
+      if rgbm then ui.textColored(string.format("🟡 FULL COURSE YELLOW — máx %d km/h (%s)", cfg.caution.fcySpeedKmh or 80, cState.reason or ""), C.warn())
+      else ui.text("FULL COURSE YELLOW") end
+    else
+      if rgbm then ui.textColored(string.format("🟡 YELLOW SETOR %s (%s)", tostring(cState.sector), cState.reason or ""), C.warn())
+      else ui.text("YELLOW SETOR " .. tostring(cState.sector)) end
+    end
+    ui.text(string.format("Tempo: %.0fs / %.0fs", cState.timer or 0, cState.duration or 0))
+  else
+    ui.textDisabled("⚪ Pista verde — sem caution ativa")
+    if cState.cooldown and cState.cooldown > 0 then
+      ui.text(string.format("Cooldown: %.0fs", cState.cooldown))
+    end
+  end
+
+  if not (physics and type(physics.setAITopSpeed) == "function") then
+    ui.newLine(2)
+    ui.textDisabled("⚠ Physics scripting indisponível nesta pista/sessão — caution ficará inativo.")
+  end
+
+  ui.newLine(3)
+  ui.separator()
+
+  local cEnabled = (cfg.caution.enabled == true)
+  if ui.checkbox("Ativar Caution automático", cEnabled) then
+    cfg.caution.enabled = not cEnabled
+    notifyChange()
+  end
+
+  if cfg.caution.enabled then
+    ui.indent(12)
+
+    cfg.caution.fcySpeedKmh = cfg.caution.fcySpeedKmh or 80
+    ui.setNextItemWidth(ui.windowWidth() - 60)
+    local newFcy = ui.slider("Velocidade no FCY (km/h)", cfg.caution.fcySpeedKmh, 40, 140, "%.0f km/h")
+    if newFcy ~= nil then
+      local val = math.floor(clamp(newFcy, 40, 140) + 0.5)
+      if val ~= cfg.caution.fcySpeedKmh then cfg.caution.fcySpeedKmh = val; notifyChange() end
+    end
+
+    cfg.caution.yellowSpeedKmh = cfg.caution.yellowSpeedKmh or 80
+    ui.setNextItemWidth(ui.windowWidth() - 60)
+    local newYel = ui.slider("Velocidade no setor (km/h)", cfg.caution.yellowSpeedKmh, 40, 140, "%.0f km/h")
+    if newYel ~= nil then
+      local val = math.floor(clamp(newYel, 40, 140) + 0.5)
+      if val ~= cfg.caution.yellowSpeedKmh then cfg.caution.yellowSpeedKmh = val; notifyChange() end
+    end
+
+    cfg.caution.minDuration = cfg.caution.minDuration or 60
+    cfg.caution.maxDuration = cfg.caution.maxDuration or 180
+    ui.setNextItemWidth(ui.windowWidth() - 60)
+    local newMin = ui.slider("Duração mínima (s)", cfg.caution.minDuration, 10, 300, "%.0f s")
+    if newMin ~= nil then
+      local val = math.floor(clamp(newMin, 10, 300) + 0.5)
+      if val ~= cfg.caution.minDuration then cfg.caution.minDuration = val; notifyChange() end
+    end
+    ui.setNextItemWidth(ui.windowWidth() - 60)
+    local newMax = ui.slider("Duração máxima (s)", cfg.caution.maxDuration, 10, 300, "%.0f s")
+    if newMax ~= nil then
+      local val = math.floor(clamp(newMax, 10, 300) + 0.5)
+      if val ~= cfg.caution.maxDuration then cfg.caution.maxDuration = val; notifyChange() end
+    end
+
+    cfg.caution.fcyChance = cfg.caution.fcyChance or 0.5
+    ui.setNextItemWidth(ui.windowWidth() - 60)
+    local newCh = ui.slider("Chance de FCY (vs setor)", cfg.caution.fcyChance, 0, 1, "%.2f")
+    if newCh ~= nil then
+      local val = clamp(newCh, 0, 1)
+      if val ~= cfg.caution.fcyChance then cfg.caution.fcyChance = val; notifyChange() end
+    end
+    helpMarker("0 = sempre amarela de setor, 1 = sempre FCY.")
+
+    cfg.caution.autoTrigger = (cfg.caution.autoTrigger ~= false)
+    if ui.checkbox("Disparo automático por IA parada", cfg.caution.autoTrigger) then
+      cfg.caution.autoTrigger = not cfg.caution.autoTrigger
+      notifyChange()
+    end
+
+    ui.unindent(12)
+  end
+
+  ui.newLine(3)
+  ui.separator()
+  ui.text("Controle manual:")
+  if ui.button(cState.active and "🟢 ENCERRAR CAUTION" or "🟡 TESTAR FCY", vec2(200, 30)) then
+    if _G.RARE2_API.cautionManualTrigger then
+      _G.RARE2_API.cautionManualTrigger(sim, cfg)
+    end
+  end
+  ui.sameLine()
+  helpMarker("Força um FCY para testar se o sistema segura as IAs. Clique de novo para encerrar.")
+end
+
+
 local function drawAboutSection(sim, cfg)
   ui.text("RaceFlow v" .. (SCRIPT_VERSION or "0.4.5"))
   ui.separator()
@@ -1222,15 +1334,22 @@ local function drawAboutSection(sim, cfg)
   ui.newLine(2)
   ui.textWrapped("Endurance-style fuel forcing for AI. Set race length and mandatory stops; AI will pit naturally when fuel runs low. Tire change on pit stop based on wear threshold.")
 
+  ui.newLine(6)
+  ui.text("Caution (FCY + Sector Yellow)")
+  ui.separator()
+  ui.newLine(2)
+  ui.textWrapped("When an AI car stops on track outside the pits, RaceFlow draws FCY (whole field slows) or a sector yellow (only that sector slows) for a configurable duration, then releases to green. Player gets HUD messages only. Needs physics scripting enabled.")
+
   ui.newLine(8)
 end
 
 
--- NOTE v0.5.0: VSC tab removed with the VSC system.
+-- v0.6.0: Caution tab (FCY + sector yellow). VSC tab stays removed.
 local TABS_ROW1 = {
   { id = "aggr",       label = "🏁 Core" },
   { id = "multiclass", label = "🏎 Multiclass" },
   { id = "strategy",   label = "⛽ Estratégia" },
+  { id = "caution",    label = "🟡 Caution" },
 }
 local TABS_ROW2 = {
   { id = "github",     label = "☁ Updates" },
@@ -1247,7 +1366,7 @@ end
 
 local function drawTabBar(cfg)
   local avail = ui.windowWidth() - 20
-  local w1 = (avail - 2 * 8) / 3
+  local w1 = (avail - 3 * 8) / 4
   for i, t in ipairs(TABS_ROW1) do
     if i > 1 then ui.sameLine(0, 8) end
     if tabButton(t.label, cfg.uiTab == t.id, w1) then cfg.uiTab = t.id end
@@ -1317,6 +1436,11 @@ function M.draw(sim, cfg)
   end
 
   cfg.uiTab = cfg.uiTab or "aggr"
+  -- Migrate stale tabs from older versions (e.g. "vsc", "rules", "updates")
+  do
+    local known = { aggr = true, multiclass = true, strategy = true, caution = true, github = true, webui = true, about = true }
+    if not known[cfg.uiTab] then cfg.uiTab = "aggr" end
+  end
   drawTabBar(cfg)
   ui.newLine(2)
   ui.separator()
@@ -1341,6 +1465,10 @@ function M.draw(sim, cfg)
   elseif cfg.uiTab == "multiclass" then
     cardTitle("🏎 Multiclass", "Classe 1 = mais rápida • yield / push automático")
     safeTab("Multiclass", function(s, c) drawMultiClassTab(s, c, aiController) end, sim, cfg)
+
+  elseif cfg.uiTab == "caution" then
+    cardTitle("🟡 Caution — FCY + Sector Yellow", "Incidentes com IA parada • leve, sem modelo 3D")
+    safeTab("Caution", drawCautionSection, sim, cfg)
 
   elseif cfg.uiTab == "github" then
     cardTitle("☁ Atualizações GitHub", "Release channel • semver • changelog")
