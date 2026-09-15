@@ -334,6 +334,34 @@ function M.update(dt, sim, cfg)
   end
 end
 
+-- Public API: other modules (e.g. caution overtake) can issue a time
+-- penalty through the standard serving flow. Returns true if queued.
+function M.issuePenalty(i, seconds, reason)
+  local ok, car = pcall(ac.getCar, i or 0)
+  if not ok or not car then return false end
+  local secs = tonumber(seconds) or 0
+  if secs <= 0 then return false end
+  local s = getState(i)
+  if s.penaltyActive then
+    s.timeLeft = s.timeLeft + secs
+  else
+    s.penaltyActive = true
+    s.timeLeft = secs
+  end
+  s.origTime = s.timeLeft
+  s.waitDone = false
+  s.waiting = false
+  s.serving = false
+  s.exitPending = false
+  s.pensTotal = s.pensTotal + 1
+  s.pensTime = s.pensTime + secs
+  s.lastEvent = reason or "Penalty"
+  s.lastEventLap = car.lapCount or 0
+  s.lastEventSector = (car.currentSector or 0) + 1
+  ac.log(string.format("[RaceFlow TrackLimits] external penalty car=%d +%ds (%s)", i, secs, s.lastEvent))
+  return true
+end
+
 function M.getState()
   local p = cars[0] or { warn = 0, penaltyActive = false, timeLeft = 0, serving = false, lastEvent = "" }
   local aiWarn, aiPen = 0, 0

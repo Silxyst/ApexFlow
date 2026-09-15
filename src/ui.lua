@@ -34,12 +34,28 @@ local function notifyChange()
   end
 end
 
--- RaceFlow v0.4.9 theme: deep-navy + cyan accent, high contrast
+-- RaceFlow theme engine (v0.8.0): accent + background opacity are user
+-- configurable (About tab -> Appearance). THEME is refreshed in M.draw.
+local ACCENTS = {
+  cyan   = { 0.22, 0.88, 1.00, "Ciano" },
+  green  = { 0.25, 0.95, 0.45, "Verde" },
+  orange = { 1.00, 0.65, 0.20, "Laranja" },
+  purple = { 0.70, 0.50, 1.00, "Roxo" },
+  red    = { 1.00, 0.35, 0.35, "Vermelho" },
+}
+local ACCENT_ORDER = { "cyan", "green", "orange", "purple", "red" }
+local THEME = { accent = "cyan", bgAlpha = 1.0 }
+
+local function accentRgb(a)
+  local t = ACCENTS[THEME.accent] or ACCENTS.cyan
+  return rgbm(t[1], t[2], t[3], a or 1.0)
+end
+
 local C = {
-  bg       = function() return rgbm(0.05, 0.07, 0.11, 0.97) end,
-  card     = function() return rgbm(0.09, 0.12, 0.18, 0.95) end,
-  accent   = function() return rgbm(0.22, 0.88, 1.00, 1.00) end,
-  accentDim= function() return rgbm(0.22, 0.55, 0.70, 1.00) end,
+  bg       = function() return rgbm(0.05, 0.07, 0.11, 0.97 * THEME.bgAlpha) end,
+  card     = function() return rgbm(0.09, 0.12, 0.18, 0.95 * THEME.bgAlpha) end,
+  accent   = function() return accentRgb(1.0) end,
+  accentDim= function() return accentRgb(0.55) end,
   ok       = function() return rgbm(0.25, 0.95, 0.45, 1.00) end,
   warn     = function() return rgbm(1.00, 0.78, 0.20, 1.00) end,
   danger   = function() return rgbm(1.00, 0.35, 0.35, 1.00) end,
@@ -49,22 +65,25 @@ local C = {
 
 local function pushDarkTheme()
   if not ui.pushStyleColor or not rgbm then return end
+  local at = ACCENTS[THEME.accent] or ACCENTS.cyan
+  local ar, ag, ab = at[1], at[2], at[3]
+  local ba = THEME.bgAlpha
   pcall(function()
-    ui.pushStyleColor(ui.StyleColor.WindowBg, rgbm(0.05, 0.07, 0.11, 0.97))
-    ui.pushStyleColor(ui.StyleColor.ChildBg, rgbm(0.09, 0.12, 0.18, 0.95))
+    ui.pushStyleColor(ui.StyleColor.WindowBg, rgbm(0.05, 0.07, 0.11, 0.97 * ba))
+    ui.pushStyleColor(ui.StyleColor.ChildBg, rgbm(0.09, 0.12, 0.18, 0.95 * ba))
     ui.pushStyleColor(ui.StyleColor.FrameBg, rgbm(0.13, 0.17, 0.24, 0.95))
     ui.pushStyleColor(ui.StyleColor.FrameBgHovered, rgbm(0.18, 0.25, 0.35, 1.00))
     ui.pushStyleColor(ui.StyleColor.FrameBgActive, rgbm(0.22, 0.32, 0.45, 1.00))
     ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.12, 0.20, 0.30, 0.95))
     ui.pushStyleColor(ui.StyleColor.ButtonHovered, rgbm(0.16, 0.35, 0.52, 1.00))
-    ui.pushStyleColor(ui.StyleColor.ButtonActive, rgbm(0.22, 0.55, 0.75, 1.00))
-    ui.pushStyleColor(ui.StyleColor.CheckMark, rgbm(0.22, 0.88, 1.00, 1.00))
-    ui.pushStyleColor(ui.StyleColor.SliderGrab, rgbm(0.22, 0.88, 1.00, 1.00))
-    ui.pushStyleColor(ui.StyleColor.SliderGrabActive, rgbm(0.45, 0.95, 1.00, 1.00))
+    ui.pushStyleColor(ui.StyleColor.ButtonActive, rgbm(ar * 0.7, ag * 0.7, ab * 0.7, 1.00))
+    ui.pushStyleColor(ui.StyleColor.CheckMark, rgbm(ar, ag, ab, 1.00))
+    ui.pushStyleColor(ui.StyleColor.SliderGrab, rgbm(ar, ag, ab, 1.00))
+    ui.pushStyleColor(ui.StyleColor.SliderGrabActive, rgbm(math.min(1, ar + 0.2), math.min(1, ag + 0.2), math.min(1, ab + 0.2), 1.00))
     ui.pushStyleColor(ui.StyleColor.Header, rgbm(0.13, 0.22, 0.34, 0.95))
     ui.pushStyleColor(ui.StyleColor.HeaderHovered, rgbm(0.18, 0.30, 0.45, 1.00))
     ui.pushStyleColor(ui.StyleColor.HeaderActive, rgbm(0.24, 0.40, 0.58, 1.00))
-    ui.pushStyleColor(ui.StyleColor.Separator, rgbm(0.22, 0.88, 1.00, 0.25))
+    ui.pushStyleColor(ui.StyleColor.Separator, rgbm(ar, ag, ab, 0.25))
     ui.pushStyleColor(ui.StyleColor.Text, rgbm(0.93, 0.96, 1.00, 1.00))
     ui.pushStyleColor(ui.StyleColor.TextDisabled, rgbm(0.60, 0.68, 0.78, 1.00))
   end)
@@ -1241,6 +1260,11 @@ local function drawCautionSection(sim, cfg)
       else ui.text("YELLOW SETOR " .. tostring(cState.sector)) end
     end
     ui.text(string.format("Tempo: %.0fs / %.0fs", cState.timer or 0, cState.duration or 0))
+    if cState.overtake then
+      if rgbm then ui.textColored(string.format("⛔ DEVOLVA A POSIÇÃO p/ %s: %.0fs",
+        tostring(cState.overtake.name), cState.overtake.timer or 0), C.danger())
+      else ui.text(string.format("DEVOLVA A POSIÇÃO: %.0fs", cState.overtake.timer or 0)) end
+    end
   else
     ui.textDisabled("⚪ Pista verde — sem caution ativa")
     if cState.cooldown and cState.cooldown > 0 then
@@ -1311,6 +1335,35 @@ local function drawCautionSection(sim, cfg)
       notifyChange()
     end
     helpMarker("Leigo: desligue para usar SÓ o botão manual de teste.\nTécnico: varre IAs <1 km/h fora do pit a cada frame.")
+
+    ui.newLine(2)
+    ui.separator()
+    ui.text("Ultrapassagem sob caution")
+
+    cfg.caution.overtakeEnabled = (cfg.caution.overtakeEnabled ~= false)
+    if ui.checkbox("Punir ultrapassagem (devolver posição)", cfg.caution.overtakeEnabled) then
+      cfg.caution.overtakeEnabled = not cfg.caution.overtakeEnabled
+      notifyChange()
+    end
+    helpMarker("Leigo: passou alguém de bandeira amarela? Devolva em X segundos ou toma punição.\nTécnico: monitora racePosition do jogador; ignora pits e carros distantes (>120 m).")
+
+    if cfg.caution.overtakeEnabled then
+      cfg.caution.giveBackTime = cfg.caution.giveBackTime or 10
+      local newGb = sliderBlock("Tempo p/ devolver (s)", "cau_gb", cfg.caution.giveBackTime, 3, 30, "%.0f s",
+        "Leigo: quanto tempo você tem para frear e devolver a posição.\nTécnico: countdown pausado nos boxes; cancela se a caution acabar.")
+      if newGb ~= nil then
+        local val = math.floor(clamp(newGb, 3, 30) + 0.5)
+        if val ~= cfg.caution.giveBackTime then cfg.caution.giveBackTime = val; notifyChange() end
+      end
+
+      cfg.caution.overtimePenalty = cfg.caution.overtimePenalty or 5
+      local newOp = sliderBlock("Punição por não devolver (s)", "cau_op", cfg.caution.overtimePenalty, 1, 30, "%.0f s",
+        "Leigo: punição aplicada se o tempo acabar.\nTécnico: entra no fluxo do Track Limits (cumpre no box) ou ac.addPenaltyTime.")
+      if newOp ~= nil then
+        local val = math.floor(clamp(newOp, 1, 30) + 0.5)
+        if val ~= cfg.caution.overtimePenalty then cfg.caution.overtimePenalty = val; notifyChange() end
+      end
+    end
 
     ui.unindent(12)
   end
@@ -1456,10 +1509,45 @@ local function drawTrackLimitsSection(sim, cfg)
 end
 
 
+-- ==========================================================
+-- Appearance (theme customization) - v0.8.0
+-- ==========================================================
+local function drawAppearanceSection(sim, cfg)
+  cfg.ui = cfg.ui or {}
+  ui.text("🎨 Aparência")
+  helpMarker("Leigo: mude a cor de destaque e a transparência do fundo.\nTécnico: cor de destaque (accent) e alfa do WindowBg/ChildBg.")
+
+  -- Accent swatches
+  cfg.ui.accent = cfg.ui.accent or "cyan"
+  for _, key in ipairs(ACCENT_ORDER) do
+    local a = ACCENTS[key]
+    local label = (cfg.ui.accent == key and "● " or "○ ") .. a[4]
+    if ui.button(label .. "##accent_" .. key, vec2(110, 24)) then
+      cfg.ui.accent = key
+      notifyChange()
+    end
+    ui.sameLine(0, 6)
+  end
+  ui.newLine(2)
+
+  cfg.ui.bgAlpha = tonumber(cfg.ui.bgAlpha) or 1.0
+  local newA = sliderBlock("Transparência do fundo", "ui_bgalpha", cfg.ui.bgAlpha, 0.4, 1.0, "%.2f",
+    "Leigo: 1.0 = fundo sólido, 0.4 = bem transparente.\nTécnico: multiplica o alfa de WindowBg/ChildBg.")
+  if newA ~= nil then
+    local val = clamp(newA, 0.4, 1.0)
+    if math.abs(val - cfg.ui.bgAlpha) > 0.001 then
+      cfg.ui.bgAlpha = val
+      notifyChange()
+    end
+  end
+end
+
 local function drawAboutSection(sim, cfg)
-  ui.text("RaceFlow v" .. (SCRIPT_VERSION or _G.RACEFLOW_VERSION or "?"))
+  drawAppearanceSection(sim, cfg)
+  ui.newLine(4)
   ui.separator()
   ui.newLine(4)
+  ui.text("RaceFlow v" .. (SCRIPT_VERSION or _G.RACEFLOW_VERSION or "?"))
 
   ui.textWrapped("RaceFlow sets out to fix the weak spots in Assetto Corsa's base AI by making drivers think, react, and race more like humans. It does this by adding personality, improving racecraft, and adapting behavior in real time.")
 
@@ -1524,7 +1612,10 @@ local TABS_ROW2 = {
 }
 
 local function tabButton(label, active, w)
-  if active and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.16, 0.45, 0.62, 1.00)) end
+  if active and rgbm then
+    local at = ACCENTS[THEME.accent] or ACCENTS.cyan
+    ui.pushStyleColor(ui.StyleColor.Button, rgbm(at[1] * 0.35, at[2] * 0.35, at[3] * 0.35, 1.00))
+  end
   local clicked = ui.button(label, vec2(w, 30))
   if active and rgbm then ui.popStyleColor() end
   return clicked
@@ -1545,6 +1636,13 @@ local function drawTabBar(cfg)
 end
 
 function M.draw(sim, cfg)
+  -- Refresh theme from user config BEFORE pushing style colors.
+  cfg.ui = cfg.ui or {}
+  local acc = cfg.ui.accent
+  local accOk = false
+  for _, k in ipairs(ACCENT_ORDER) do if k == acc then accOk = true break end end
+  THEME.accent = accOk and acc or "cyan"
+  THEME.bgAlpha = clamp(tonumber(cfg.ui.bgAlpha) or 1.0, 0.4, 1.0)
   pushDarkTheme()
 
   -- ===== Header: brand + version + master switch =====

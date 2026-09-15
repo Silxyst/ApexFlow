@@ -1,6 +1,6 @@
 SCRIPT_NAME = "RaceFlow"
-SCRIPT_VERSION = "0.7.2"
-_G.RACEFLOW_VERSION = "0.7.2"
+SCRIPT_VERSION = "0.8.0"
+_G.RACEFLOW_VERSION = "0.8.0"
 
 -- Per-module load status, shown in the fallback window so a future
 -- require() failure identifies the exact module (no more guessing).
@@ -65,6 +65,9 @@ local RARE2_CFG = {
     autoTrigger = true,
     minDrivenKm = 0.5,
     cooldown = 10,
+    overtakeEnabled = true,   -- v0.8.0: punish player overtakes
+    giveBackTime = 10,
+    overtimePenalty = 5,
   },
 
   -- v0.7.0: Track Limits (port of Mavil core). Disabled by default.
@@ -101,6 +104,12 @@ local RARE2_CFG = {
   },
 
   packs = { pace = true, ers = true, traffic = true, hud = true },
+
+  -- v0.8.0: interface theme (About tab -> Appearance).
+  ui = {
+    accent = "cyan",   -- cyan | green | orange | purple | red
+    bgAlpha = 1.0,     -- 0.4 .. 1.0 background opacity
+  },
 }
 
 -- Expose config globally for src/* modules (they run in same Lua state
@@ -376,6 +385,9 @@ _G.RARE2_API = {
       c.autoTrigger = true
       c.minDrivenKm = 0.5
       c.cooldown = 10
+      c.overtakeEnabled = true
+      c.giveBackTime = 10
+      c.overtimePenalty = 5
     end
     if RARE2_CFG.tracklimits then
       local t = RARE2_CFG.tracklimits
@@ -404,6 +416,10 @@ _G.RARE2_API = {
       RARE2_CFG.webui.enabled = false
       RARE2_CFG.webui.port = 8080
       RARE2_CFG.webui.authToken = ""
+    end
+    if RARE2_CFG.ui then
+      RARE2_CFG.ui.accent = "cyan"
+      RARE2_CFG.ui.bgAlpha = 1.0
     end
     saveConfigToFile()
     return true
@@ -562,14 +578,17 @@ function script.update(dt)
 
   -- Caution so its AI speed caps win over pace/strategy caps.
   -- Skipped during rolling start (formation has its own control).
+  -- pcall: a module error must never kill the whole frame.
   if not rollingActive and caution and caution.update then
-    caution.update(dt, sim, RARE2_CFG)
+    local okC, errC = pcall(caution.update, dt, sim, RARE2_CFG)
+    if not okC then ac.log("[RaceFlow] caution.update: " .. tostring(errC)) end
   end
 
   -- Track limits AFTER caution (uses pit/brake checks + teleport +
   -- result APIs, no fight over AI top speed except penalized AI slowdown).
   if not rollingActive and tracklimits and tracklimits.update then
-    tracklimits.update(dt, sim, RARE2_CFG)
+    local okT, errT = pcall(tracklimits.update, dt, sim, RARE2_CFG)
+    if not okT then ac.log("[RaceFlow] tracklimits.update: " .. tostring(errT)) end
   end
 
   memorySaveCooldown = math.max(0.0, memorySaveCooldown - dt)
@@ -682,6 +701,10 @@ local function drawRaceEventsBody()
         ui.text(string.format("🟡 YELLOW S%s %.0fs", tostring(cs.sector), cs.timer or 0))
       end
       if cs.reason and cs.reason ~= "" then ui.textDisabled(tostring(cs.reason)) end
+      if cs.overtake then
+        ui.text(string.format("⛔ Devolva p/ %s: %.0fs",
+          tostring(cs.overtake.name), cs.overtake.timer or 0))
+      end
     else
       ui.textDisabled("🟢 Track green")
     end
