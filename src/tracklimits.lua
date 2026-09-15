@@ -25,7 +25,7 @@ local function ensureConfig(cfg)
   t.penaltiesEnabled = (t.penaltiesEnabled ~= false)
   t.maxWarnings = tonumber(t.maxWarnings or 4) or 4
   t.penaltyTime = tonumber(t.penaltyTime or 5) or 5
-  t.cooldown = tonumber(t.cooldown or 7) or 7
+  t.cooldown = tonumber(t.cooldown or 3) or 3 -- v0.14.3: 3s (era 7s, causava 1 vs 11)
   t.extraTime = tonumber(t.extraTime or 10) or 10
   t.strictPit = (t.strictPit == true)
   t.waitTime = tonumber(t.waitTime or 1.9) or 1.9
@@ -39,16 +39,16 @@ local function ensureConfig(cfg)
   -- v0.9.0: game-penalty compat. AC's own slow-down penalty cannot be
   -- disabled from Lua; when it is active we skip NEW warnings so the
   -- driver is not punished twice for the same cut.
-  t.gamePenaltyCompat = (t.gamePenaltyCompat ~= false)
+  t.gamePenaltyCompat = (t.gamePenaltyCompat == true) -- v0.14.3: OFF default (independente do jogo)
   -- v0.10.0: precision + pit speed.
-  t.minOffTime = tonumber(t.minOffTime or 0.25) or 0.25 -- sustained off-track before counting
+  t.minOffTime = tonumber(t.minOffTime or 0.15) or 0.15 -- v0.14.3: 0.15 default (mais sensivel)
   if t.minOffTime < 0 then t.minOffTime = 0 end
   t.pitSpeedEnabled = (t.pitSpeedEnabled ~= false)
   t.pitLimitKmh = tonumber(t.pitLimitKmh or 80) or 80
   t.pitGraceSec = tonumber(t.pitGraceSec or 1.0) or 1.0
   -- v0.11.1: CMRT sync — use server's allowedTyresOut when available.
   -- v0.14.2: default OFF for true independence from game/CMRT.
-  t.syncWithCMRT = (t.syncWithCMRT == true)
+  t.syncWithCMRT = (t.syncWithCMRT ~= false) -- v0.14.3: ON default (igual CMRT, evita 1 vs 11)
 end
 
 local function getAllowedTyresOut(sim)
@@ -332,7 +332,8 @@ local function updateCar(i, car, dt, sim, cfg, isPlayer)
     local needSustain = useSync and 0.2 or (t.minOffTime or 0)
     if off then s.offTime = (s.offTime or 0) + dt else s.offTime = 0 end
     local sustained = s.offTime >= needSustain
-    if t.trackLimitsEnabled and off and sustained and not s.offPrev and not s.mustReset
+    if not off then s.mustReset = false end -- v0.14.3: voltou para pista (abaixo do limiar) libera proximo aviso
+    if t.trackLimitsEnabled and off and sustained and not s.mustReset -- v0.14.3: remove not offPrev (incompativel com debounce 0.2s, era dead-lock)
         and (now - s.lastWarn) > (t.cooldown or 7) and not s.awaitingReset then
       s.lastWarn = now
       if compatHold then
@@ -379,7 +380,6 @@ local function updateCar(i, car, dt, sim, cfg, isPlayer)
         end
       end
     end
-    if (car.wheelsOutside or 0) == 0 then s.mustReset = false end
     s.offPrev = off
     end
   end

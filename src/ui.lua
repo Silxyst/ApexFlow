@@ -1583,7 +1583,7 @@ local function drawTrackLimitsSection(sim, cfg)
       if val ~= t.wheels then t.wheels = val; notifyChange() end
     end
 
-    t.cooldown = t.cooldown or 7
+    t.cooldown = t.cooldown or 3 -- v0.14.3
     local newCd = sliderBlock("Cooldown entre avisos (s)", "tl_cd", t.cooldown, 0, 20, "%.0f s",
       "Leigo: tempo mínimo entre um aviso e outro (evita spam numa escapada longa).\nTécnico: janela por os.clock() por carro.")
     if newCd ~= nil then
@@ -1591,7 +1591,7 @@ local function drawTrackLimitsSection(sim, cfg)
       if val ~= t.cooldown then t.cooldown = val; notifyChange() end
     end
 
-    if t.minOffTime == nil then t.minOffTime = 0.25 end
+    if t.minOffTime == nil then t.minOffTime = 0.15 end -- v0.14.3 sync com ensureConfig
     local newOff = sliderBlock("Tempo fora p/ contar corte (s)", "tl_offt", t.minOffTime, 0, 2, "%.2f s",
       "Leigo: quanto tempo fora da pista até contar; filtra encostada rápida na zebra.\nTécnico: debounce de off-track contínuo (wheelsOutside >= N).")
     if newOff ~= nil then
@@ -2009,6 +2009,8 @@ function M.draw(sim, cfg)
         if isCur and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(1.00, 0.55, 0.15, 1.00)) end
         if ui.button(pr.label .. "##preset_" .. key, vec2(90, 22)) then
           if _G.RARE2_API.applyCategoryPreset then _G.RARE2_API.applyCategoryPreset(key) end
+          notifyChange()
+          if ac.setMessage then pcall(ac.setMessage, "PRESET", pr.label .. " aplicado") end
         end
         if isCur and rgbm then ui.popStyleColor() end
         ui.sameLine(0, 6)

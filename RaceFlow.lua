@@ -1,7 +1,7 @@
 -- ApexFlow — Independent race suite for Assetto Corsa (v0.13.0)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.14.2"
-_G.RACEFLOW_VERSION = "0.14.2"
+SCRIPT_VERSION = "0.14.3"
+_G.RACEFLOW_VERSION = "0.14.3"
 _G.APEXFLOW_VERSION = "0.13.1"
 
 -- Per-module load status, shown in the fallback window so a future
@@ -79,7 +79,7 @@ local RARE2_CFG = {
     penaltiesEnabled = true,
     maxWarnings = 4,
     penaltyTime = 5,
-    cooldown = 7,
+    cooldown = 3, -- v0.14.3: 3s (sync CMRT)
     extraTime = 10,
     strictPit = false,
     waitTime = 1.9,
@@ -88,9 +88,9 @@ local RARE2_CFG = {
     aiServe = false,
     qualiReset = true,
     finishAdd = true,
-    gamePenaltyCompat = false, -- v0.14.2: OFF for independence (was true, caused missed detections)
-    syncWithCMRT = false,     -- v0.14.2: OFF for independence (was true)
-    minOffTime = 0.15,        -- v0.14.2: more sensitive (was 0.25)
+    gamePenaltyCompat = false, -- v0.14.3: OFF (independente do jogo, nao pausa aviso)
+    syncWithCMRT = true,      -- v0.14.3: ON (espelha CMRT, fixa 1 vs 11)
+    minOffTime = 0.15,        -- v0.14.3: more sensitive (was 0.25)
     pitSpeedEnabled = true,   -- v0.10.0: punish pit-lane speeding
     pitLimitKmh = 80,
     pitGraceSec = 1.0,
@@ -189,6 +189,8 @@ local function applyCategoryPreset(catKey)
   local p = CATEGORY_PRESETS[catKey]
   if not p then return false end
   RARE2_CFG.categoryPreset = catKey
+  -- v0.14.3: preset ativa o sistema para feedback imediato
+  if RARE2_CFG.tracklimits then RARE2_CFG.tracklimits.enabled = true end
   if p.tracklimits then
     for k, v in pairs(p.tracklimits) do
       if RARE2_CFG.tracklimits then RARE2_CFG.tracklimits[k] = v end
@@ -698,7 +700,7 @@ _G.RARE2_API.resetToDefaults = function()
       t.penaltiesEnabled = true
       t.maxWarnings = 4
       t.penaltyTime = 5
-      t.cooldown = 7
+      t.cooldown = 3
       t.extraTime = 10
       t.strictPit = false
       t.waitTime = 1.9
@@ -708,7 +710,7 @@ _G.RARE2_API.resetToDefaults = function()
       t.qualiReset = true
       t.finishAdd = true
       t.gamePenaltyCompat = false
-      t.syncWithCMRT = false
+      t.syncWithCMRT = true
       t.minOffTime = 0.15
       t.pitSpeedEnabled = true
       t.pitLimitKmh = 80
