@@ -13,7 +13,7 @@
   <a href="https://github.com/Silxyst/RaceFlow-V2/releases/latest">
     <img src="https://img.shields.io/github/v/release/Silxyst/RaceFlow-V2?style=for-the-badge&label=Latest%20Release&color=00d4aa" alt="Latest Release"/>
   </a>
-  <img src="https://img.shields.io/badge/Version-v0.8.0-3b82f6?style=for-the-badge" alt="App Version"/>
+  <img src="https://img.shields.io/badge/Version-v0.12.0-3b82f6?style=for-the-badge" alt="App Version"/>
   <a href="https://github.com/Silxyst/RaceFlow-V2/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/Silxyst/RaceFlow-V2?style=for-the-badge&color=8b5cf6" alt="License"/>
   </a>
