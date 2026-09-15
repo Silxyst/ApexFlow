@@ -649,10 +649,11 @@ end
 -- ==========================================================
 -- EXPORTS for UI / other modules
 -- ==========================================================
-_G.RARE2_API.getVSCState = vscGetState
-_G.RARE2_API.vscManualTrigger = vscManualTrigger
-_G.RARE2_API.githubCheckUpdates = githubCheckUpdates
-_G.RARE2_API.githubGetState = function() return githubState end
+_G.RARE2_API.getVSCState = function() return vsc and vsc.getState and vsc.getState() or {} end
+_G.RARE2_API.vscManualTrigger = function(sim, cfg) return vsc and vsc.manualTrigger and vsc.manualTrigger(sim, cfg) end
+_G.RARE2_API.githubCheckUpdates = function(cfg, force) return github and github.checkUpdates and github.checkUpdates(cfg, force) end
+_G.RARE2_API.githubGetState = function() return github and github.getState and github.getState() or {} end
+_G.RARE2_API.webuiGetState = function() return webui and webui.getState and webui.getState() or {} end
 
 -- ==========================================================
 -- WINDOWS

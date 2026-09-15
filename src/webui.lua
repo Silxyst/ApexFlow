@@ -27,7 +27,14 @@ local function readJsonFile(path)
   local content = f:read("*a")
   f:close()
   if not content or content == "" then return nil end
-  local ok, data = pcall(function() return ac.decodeJson(content) end)
+  local ok, data = pcall(function() 
+    if ac.decodeJson then
+      return ac.decodeJson(content)
+    else
+      -- Simple fallback: only handles basic JSON
+      return nil
+    end
+  end)
   if ok then return data end
   return nil
 end
@@ -35,7 +42,32 @@ end
 local function writeJsonFile(path, data)
   local f = io.open(path, "w")
   if not f then return false end
-  local ok, content = pcall(function() return ac.encodeJson(data) end)
+  local ok, content = pcall(function() 
+    if ac.encodeJson then
+      return ac.encodeJson(data)
+    else
+      -- Fallback: simple JSON encoding for basic types
+      local function encode(v)
+        local t = type(v)
+        if t == "string" then return '"' .. v:gsub('"', '\\"') .. '"'
+        elseif t == "number" or t == "boolean" then return tostring(v)
+        elseif t == "table" then
+          local isArray = #v > 0
+          local parts = {}
+          if isArray then
+            for i, val in ipairs(v) do parts[i] = encode(val) end
+            return "[" .. table.concat(parts, ",") .. "]"
+          else
+            for k, val in pairs(v) do table.insert(parts, '"' .. k .. '":' .. encode(val)) end
+            return "{" .. table.concat(parts, ",") .. "}"
+          end
+        else
+          return "null"
+        end
+      end
+      return encode(data)
+    end
+  end)
   if ok then f:write(content) end
   f:close()
   return ok
