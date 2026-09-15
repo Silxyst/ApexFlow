@@ -1,3 +1,6 @@
+-- RaceFlow-V2 — Enhanced fork of RaceFlow (https://www.overtake.gg/downloads/raceflow-ai-enhancement-beta.83987/)
+-- Original RaceFlow by its author on Overtake.gg; enhancements by Silxyst.
+-- See README.md "Credits & Attribution" and LICENSE for details.
 SCRIPT_NAME = "RaceFlow"
 SCRIPT_VERSION = "0.12.0"
 _G.RACEFLOW_VERSION = "0.12.0"

@@ -315,13 +315,19 @@ See [LICENSE](LICENSE) for details.
 
 ---
 
-## 🙏 Credits
+## 🙏 Credits & Attribution
 
-- **AntiGravity AI** — original architecture & learning concepts
+This project is an **enhanced fork** of the original **RaceFlow AI Enhancement (Beta)**.
+
+- **Original RaceFlow** — by the author of [RaceFlow on Overtake.gg](https://www.overtake.gg/downloads/raceflow-ai-enhancement-beta.83987/) — all original rights reserved to the original author
+- **RaceFlow-V2 enhancements** — by **Silxyst** (this repository): caution system, track limits port, HUD, themes, Web UI, GitHub updater, CMRT sync, racecraft tuning
+- **AntiGravity AI** — original architecture & learning concepts (base)
 - **Nary (AssettoCorsaRacingCarsMods)** — caution FCY/sector-yellow core
 - **Mavil** — track limit penalty serving flow
 - **FullCourseYellow** — VSC/SC techniques, AI queue logic
 - **CSP Team** — `physics.*` APIs
+
+> **Disclaimer:** RaceFlow-V2 builds upon the original RaceFlow. Original concepts, assets and code remain property of their respective authors. Enhancements in this fork are provided under the MIT License (see `LICENSE`). If you are the original author and wish attribution changed or removed, please open an Issue.
 - **Assetto Corsa Modding Community** — endless inspiration
 
 ---
