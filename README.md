@@ -6,16 +6,14 @@
 
 <p align="center">
   <strong>AI Enhancement Suite for Assetto Corsa</strong><br/>
-  Profiles • Learning • Rolling Start • Endurance Strategy • Multiclass • GitHub Updates • Web UI
+  Profiles • Learning • Rolling Start • Endurance • Multiclass • Caution FCY • Track Limits • Themes
 </p>
 
 <p align="center">
   <a href="https://github.com/Silxyst/RaceFlow-V2/releases/latest">
     <img src="https://img.shields.io/github/v/release/Silxyst/RaceFlow-V2?style=for-the-badge&label=Latest%20Release&color=00d4aa" alt="Latest Release"/>
   </a>
-  <a href="https://github.com/Silxyst/RaceFlow-V2/releases">
-    <img src="https://img.shields.io/github/downloads/Silxyst/RaceFlow-V2/total?style=for-the-badge&color=3b82f6" alt="Downloads"/>
-  </a>
+  <img src="https://img.shields.io/badge/Version-v0.8.0-3b82f6?style=for-the-badge" alt="App Version"/>
   <a href="https://github.com/Silxyst/RaceFlow-V2/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/Silxyst/RaceFlow-V2?style=for-the-badge&color=8b5cf6" alt="License"/>
   </a>
@@ -24,17 +22,44 @@
   </a>
 </p>
 
+<p align="center">
+  <a href="#-features">Features</a> •
+  <a href="#-installation">Installation</a> •
+  <a href="#️-configuration">Configuration</a> •
+  <a href="#-usage-tips">Usage</a> •
+  <a href="#️-for-developers">Developers</a> •
+  <a href="#-roadmap">Roadmap</a>
+</p>
+
 ---
 
 ## 🎯 Overview
 
 **RaceFlow** transforms Assetto Corsa's base AI into competitive, human-like opponents. Every driver has a personality, learns from mistakes, and races with purpose — not just follow a racing line.
 
-Built for **offline single-player** and **offline championships**. No online dependencies.
+Built for **offline single-player** and **offline championships**. No online dependencies. All systems are **disabled by default** — you turn on only what you want.
+
+> 🆕 **New in v0.8.0:** overtake control under caution (give-back countdown + time penalty), interface themes (5 accent colors + background opacity), hardened update loop.
 
 ---
 
 ## ✨ Features
+
+| System | What it does | Default |
+|---|---|---|
+| 🧠 AI Personalities | Chill / Normal / Attack mix + Pace Pack field spread | ✅ On |
+| 📚 Learning Module | Per-corner memory: danger, entry caps, brake bias, corner lock | ✅ On |
+| 🏁 Rolling Start | 2×2 formation lap, pace car, green-flag release | ❌ Off |
+| ⛽ Endurance Strategy | Fuel forcing, mandatory stops, tire changes | ❌ Off |
+| 🏎️ Multiclass | Manual classes, yield/push logic | ❌ Off |
+| 🟡 Caution FCY | Full-course + sector yellow on stopped AI | ❌ Off |
+| ⛔ Overtake Control | Give-back countdown + penalty under caution | ✅ On¹ |
+| ⚖️ Track Limits | Warnings → pit-box time penalty (player + optional AI) | ❌ Off |
+| 🎨 Themes | 5 accent colors + background opacity | ✅ On |
+| 🌐 Web UI Remote | File-based status + commands for external tools | ❌ Off |
+| ☁️ GitHub Updates | Release checker (needs CSP with `ac.webRequest`) | ✅ On² |
+
+¹ Active only while a caution is running. ² Gracefully disabled on CSP builds without the API.
 
 ### 🧠 **AI Personality System**
 | Profile | Behavior | Best For |
@@ -72,11 +97,22 @@ Built for **offline single-player** and **offline championships**. No online dep
 - **Yield/Push logic** — faster classes push through, slower yield
 - **Class-aware** overtakes and blue flags
 
-> **NOTE v0.5.0:** the Pure VSC system was **removed** to eliminate a recurring
-> source of instability (dual-state bugs, log spam, setup-screen interference).
-> It may return in a future release as an isolated optional module. See CHANGELOG.
+### 🟡 **Caution — FCY + Sector Yellow** *(port of Nary's caution core)*
+- **Auto-trigger** on stopped AI outside the pits (configurable)
+- **FCY** (whole field capped) or **sector yellow** (only incident sector)
+- **Randomized duration** with "GET READY" warning before green
+- **Manual TEST FCY button** for instant validation
+- **Player gets HUD messages only** — no speed enforcement on you
+- Requires physics scripting enabled (read-only check, never modifies files)
 
-### ⚖️ **Track Limits (v0.7.0, port of Mavil TLM core)**
+### ⛔ **Overtake Control under Caution** *(v0.8.0)*
+- **Pass someone under yellow?** A give-back countdown starts (default 10 s)
+- **Give the position back** in time → cancelled, no harm done
+- **Ignore it** → time penalty through the Track Limits serving flow (pit box + brake), or `ac.addPenaltyTime` as fallback
+- **Smart filtering**: ignores pits, distant cars (>120 m) and caution end
+- Live countdown in the app tab **and** the Race Events HUD
+
+### ⚖️ **Track Limits** *(v0.7.0, port of Mavil TLM core)*
 - **Warnings** for wheels off track (configurable 2–4 wheels, cooldown)
 - **Time penalty** served stopped in the pit box holding the brake
 - **Quali reset** (guarded teleport), **extra time** for early pit exit
@@ -84,11 +120,10 @@ Built for **offline single-player** and **offline championships**. No online dep
 - **Optional AI** warnings + pit serving
 - **Extra HUD window**: live race events (caution + warnings/penalties)
 
-### 🔄 **GitHub Update Checker**
-- **Auto-checks** releases on startup + configurable interval
-- **Semantic version compare** — knows when update exists
-- **One-click** manual check + open release page
-- **Changelog rendered** in-app
+### 🎨 **Interface Themes** *(v0.8.0)*
+- **5 accent colors**: cyan, green, orange, purple, red — applied live
+- **Background opacity** slider (0.4–1.0)
+- Every control labeled + `(?)` tooltips with **layman + technical** explanations
 
 ### 🌐 **Web UI Remote (File-Based)**
 - **No HTTP server needed** — uses shared JSON files
@@ -97,18 +132,25 @@ Built for **offline single-player** and **offline championships**. No online dep
 - **Bearer token auth** optional
 - **Python example client** included in UI
 
+### 🔄 **GitHub Update Checker**
+- **Auto-checks** releases on startup + configurable interval
+- **Semantic version compare** — knows when update exists
+- **Graceful degradation**: on CSP builds without `ac.webRequest`, shows a guide panel instead of an error
+- **Changelog rendered** in-app (when the API is available)
+
 ---
 
 ## 📦 Installation
 
 ### Requirements
-- **Assetto Corsa** + **CSP 0.2.7+** (for `ac.webRequest`, `physics.setAITopSpeed`, etc.)
+- **Assetto Corsa** + **Custom Shaders Patch** (physics features need per-track scripting enabled)
 - **Content Manager** recommended
+- Offline sessions (online races are ignored by design)
 
 ### Steps
 1. **Download** latest release from [Releases](https://github.com/Silxyst/RaceFlow-V2/releases)
 2. **Extract** to `Assetto Corsa/apps/lua/RaceFlow/`
-3. **Enable** in Content Manager → Apps → RaceFlow
+3. **Enable** in Content Manager → Apps → RaceFlow (main window + optional **RaceFlow Events** overlay)
 4. **Launch** AC → Apps sidebar → RaceFlow
 
 ---
@@ -119,11 +161,14 @@ All settings persist in `RaceFlow_config.lua` (auto-saved). UI tabs:
 
 | Tab | Key Settings |
 |-----|--------------|
-| **RaceFlow Core** | Aggression mix, Pace strength, Physics intensity, Learning, Rolling Start |
-| **Multi Class** | Class count, manual assignment, auto-fill |
-| **Strategy** | Race laps, forced stops, tire wear threshold |
-| **GitHub Updates** | Repo, check interval, notify on startup |
-| **Web UI** | Enable, port, auth token |
+| **🏁 Core** | Aggression mix, Pace strength, Physics intensity, Learning, Rolling Start |
+| **🏎 Multiclass** | Class count, manual assignment, auto-fill |
+| **⛽ Strategy** | Race laps, forced stops, tire wear threshold |
+| **🟡 Caution** | Speeds, durations, FCY chance, overtake control |
+| **⚖ Limits** | Warnings, penalty time, wheels, AI, quali reset |
+| **☁ Updates** | Repo, check interval, notify on startup |
+| **🌐 Web UI** | Enable, port, auth token |
+| **ℹ About** | Docs + 🎨 Appearance (accent color, background opacity) |
 
 ---
 
@@ -134,6 +179,17 @@ All settings persist in `RaceFlow_config.lua` (auto-saved). UI tabs:
 2. **Rolling Start** → enable, pick "GT3 / WEC" preset
 3. **Strategy** → enable, set laps/stops for your race length
 4. **Start race** — watch AI form up behind pace car!
+
+### Caution + Overtakes
+1. **Caution tab** → enable + TEST FCY to see AI bunch up
+2. Pass someone under yellow → give the position back before the countdown ends
+3. Miss it → serve the time penalty stopped in your pit box, brake held
+
+### Track Limits
+1. **Limits tab** → enable, set 2 warnings for quick testing
+2. Cut the track → warning → cut again → time penalty
+3. Pit, stop, hold brake → countdown → "Cumprida!"
+4. Enable the **RaceFlow Events** window for a live overlay
 
 ### Learning Module
 - **Leave ON** — AI improves every session
@@ -151,6 +207,13 @@ All settings persist in `RaceFlow_config.lua` (auto-saved). UI tabs:
 
 ### API (via `_G.RARE2_API`)
 ```lua
+-- Caution
+_G.RARE2_API.getCautionState()              -- {active, mode, timer, ...}
+_G.RARE2_API.cautionManualTrigger(sim, cfg)
+
+-- Track Limits
+_G.RARE2_API.getTrackLimitsState()          -- {warn, penaltyActive, ...}
+
 -- GitHub
 _G.RARE2_API.githubCheckUpdates(cfg, true)
 _G.RARE2_API.githubGetState()
@@ -189,9 +252,9 @@ while True:
 
 ## 📸 Screenshots
 
-| Core UI | Strategy | Learning Module |
-|---------|----------|-----------------|
-| ![Core](docs/core.png) | ![Strategy](docs/strategy.png) | ![Learning](docs/learning.png) |
+| Core UI | Caution + Limits | Learning Module |
+|---------|------------------|-----------------|
+| ![Core](docs/core.png) | ![Caution](docs/caution.png) | ![Learning](docs/learning.png) |
 
 *(Add screenshots to `docs/` folder)*
 
@@ -199,11 +262,32 @@ while True:
 
 ## 🗺️ Roadmap
 
-- [ ] **Track Limits System** — warnings, penalties, pit serving, reports
+- [x] **Track Limits System** — warnings, penalties, pit serving *(v0.7.0)*
+- [x] **Caution FCY + overtake control** *(v0.6.0 + v0.8.0)*
 - [ ] **CrewChief Integration** — voice callouts for penalties, rolling start
 - [ ] **Championship Mode** — points, standings, calendar
-- [ ] **Live Timing Overlay** — OBS-compatible WebSocket feed
+- [ ] **Live Timing Overlay** — OBS-compatible feed
 - [ ] **AI Driver Market** — hire/fire, contracts, development
+
+<details>
+<summary><strong>📜 Changelog (clique para expandir)</strong></summary>
+
+### v0.8.0 — Overtake control + themes
+- Caution overtake monitor: give-back countdown → time penalty
+- Interface themes: 5 accents + background opacity
+- Update loop hardened with per-module `pcall`
+
+### v0.7.x — Track Limits port
+- Mavil TLM core: warnings → pit-box time penalty, AI support
+- Race Events HUD window, sliderBlock UI (no clipped labels)
+
+### v0.6.0 — Caution port
+- Nary FCY + sector yellow core (formation lap and file-writing not ported)
+
+### v0.5.0 — Stability
+- VSC system removed (dual-state bugs); syntax fixes; spam guards
+
+</details>
 
 ---
 
@@ -211,7 +295,8 @@ while True:
 
 1. Fork → feature branch → PR
 2. Follow existing code style (Lua, tabs, Portuguese/English comments)
-3. Test offline races before submitting
+3. Run the block-balance check on every edited `.lua` before committing
+4. Test offline races before submitting
 
 ---
 
@@ -225,9 +310,10 @@ See [LICENSE](LICENSE) for details.
 ## 🙏 Credits
 
 - **AntiGravity AI** — original architecture & learning concepts
+- **Nary (AssettoCorsaRacingCarsMods)** — caution FCY/sector-yellow core
+- **Mavil** — track limit penalty serving flow
 - **FullCourseYellow** — VSC/SC techniques, AI queue logic
-- **Mavil Track Limit Manager** — penalty serving, reports
-- **CSP Team** — `ac.webRequest`, `physics.*` APIs
+- **CSP Team** — `physics.*` APIs
 - **Assetto Corsa Modding Community** — endless inspiration
 
 ---
@@ -242,5 +328,5 @@ See [LICENSE](LICENSE) for details.
 
 <p align="center">
   <sub>Built with ❤️ for the Assetto Corsa community</sub><br/>
-  <sub>RaceFlow v0.7.0 — track limits port + race events HUD</sub>
+  <sub>RaceFlow v0.8.0 — overtake control + themes</sub>
 </p>
