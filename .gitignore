@@ -1,0 +1,8 @@
+# RaceFlow — ignore local user data / generated files
+RaceFlow_config.lua
+RaceFlow_memory.lua
+RaceFlow_webui_status.json
+RaceFlow_webui_cmd.json
+*.log
+.DS_Store
+Thumbs.db
