@@ -536,6 +536,32 @@ local function drawFuelStrategySection(sim, cfg)
         ui.textDisabled("Telemetria do carro ativo disponível durante a sessão.")
       end
     end
+
+    -- v0.10.0: monitor de estratégia das IAs (pit + combustível)
+    ui.newLine(4)
+    ui.separator()
+    ui.text("🤖 Estratégia das IAs ao vivo")
+    helpMarker("Leigo: mostra quem vai parar e quando.\nTécnico: próximos pitLaps calculados + combustível restante/aprendido.")
+    local sState = _G.RARE2_API.getStrategyState and _G.RARE2_API.getStrategyState(cfg) or {}
+    if sState.autoLaps then
+      ui.textDisabled(string.format("Voltas da prova (auto): %d", sState.autoLaps))
+    else
+      ui.textDisabled(string.format("Voltas da prova (manual): %d", sState.totalLaps or 0))
+    end
+    if sim and sim.isSessionStarted and sState.cars and #sState.cars > 0 then
+      local shown = 0
+      for _, c in ipairs(sState.cars) do
+        if shown >= 8 then break end
+        shown = shown + 1
+        local nm = ac.getDriverName(c.index) or ("IA " .. tostring(c.index))
+        if #nm > 16 then nm = nm:sub(1, 15) .. "…" end
+        local pitTxt = c.nextPit and ("pit v" .. tostring(c.nextPit)) or "sem pit"
+        ui.text(string.format("#%-2d %-17s v%-3d ⛽%.1fL %s",
+          c.index, nm, c.lap, c.fuel, pitTxt))
+      end
+    else
+      ui.textDisabled("Dados das IAs aparecem durante a sessão.")
+    end
   end
 end
 
@@ -578,6 +604,75 @@ local function drawLowDownforceAISection(sim, cfg)
   local s = ui.slider("##lowdf_strength", cfg.lowDownforceAIStrength, 0, 100, "%.0f")
   if s ~= nil then
     cfg.lowDownforceAIStrength = clamp(s, 0, 100)
+  end
+end
+
+-- ==========================================================
+-- Racecraft: brigas e ultrapassagens (Core tab) - v0.10.0
+-- ==========================================================
+local function drawRacecraftSection(sim, cfg)
+  ui.newLine(4)
+  ui.separator()
+  ui.text("Racecraft (brigas e ultrapassagens)")
+  helpMarker("Leigo: controla o quanto as IAs brigam por posição em vez de andar em fila.\nTécnico: impaciência atrás (stuckRamp), janela de mergulho (draft commit) e empurrão.")
+
+  ui.textDisabled("Predefinições:")
+  if ui.button("Calmo", vec2(110, 22)) then
+    cfg.stuckBehindDelay = 1.6
+    cfg.draftCommitRampGate = 0.30
+    cfg.draftCommitPushBoost = 0.040
+    cfg.tigerChancePerLap = 0.03
+    notifyChange()
+  end
+  ui.sameLine()
+  if ui.button("Equilibrado", vec2(110, 22)) then
+    cfg.stuckBehindDelay = 0.8
+    cfg.draftCommitRampGate = 0.15
+    cfg.draftCommitPushBoost = 0.070
+    cfg.tigerChancePerLap = 0.07
+    notifyChange()
+  end
+  ui.sameLine()
+  if ui.button("Agressivo", vec2(110, 22)) then
+    cfg.stuckBehindDelay = 0.4
+    cfg.draftCommitRampGate = 0.08
+    cfg.draftCommitPushBoost = 0.100
+    cfg.tigerChancePerLap = 0.12
+    notifyChange()
+  end
+
+  ui.newLine(2)
+
+  if cfg.stuckBehindDelay == nil then cfg.stuckBehindDelay = 0.8 end
+  local newDelay = sliderBlock("Tempo colado até atacar (s)", "rc_delay", cfg.stuckBehindDelay, 0.2, 3.0, "%.1f s",
+    "Leigo: menor = a IA tenta passar mais cedo.\nTécnico: stuckBehindDelay antes da rampa de impaciência.")
+  if newDelay ~= nil then
+    local val = math.floor(clamp(newDelay * 10, 2, 30) + 0.5) / 10
+    if math.abs(val - cfg.stuckBehindDelay) > 0.001 then cfg.stuckBehindDelay = val; notifyChange() end
+  end
+
+  if cfg.draftCommitRampGate == nil then cfg.draftCommitRampGate = 0.15 end
+  local newGate = sliderBlock("Coragem no mergulho", "rc_gate", cfg.draftCommitRampGate, 0.05, 0.50, "%.2f",
+    "Leigo: menor = mergulhos mais ousados por dentro.\nTécnico: limiar da rampa p/ estado commit.")
+  if newGate ~= nil then
+    local val = clamp(newGate, 0.05, 0.50)
+    if math.abs(val - cfg.draftCommitRampGate) > 0.0005 then cfg.draftCommitRampGate = val; notifyChange() end
+  end
+
+  if cfg.draftCommitPushBoost == nil then cfg.draftCommitPushBoost = 0.070 end
+  local newPush = sliderBlock("Empurrão na briga", "rc_push", cfg.draftCommitPushBoost, 0, 0.12, "%.3f",
+    "Leigo: maior = lado a lado mais intenso sem bater.\nTécnico: boost de throttle durante commit.")
+  if newPush ~= nil then
+    local val = clamp(newPush, 0, 0.12)
+    if math.abs(val - cfg.draftCommitPushBoost) > 0.0005 then cfg.draftCommitPushBoost = val; notifyChange() end
+  end
+
+  if cfg.tigerChancePerLap == nil then cfg.tigerChancePerLap = 0.07 end
+  local newTiger = sliderBlock("Chance de volta voadora (%/volta)", "rc_tiger", (cfg.tigerChancePerLap or 0.07) * 100, 0, 20, "%.0f%%",
+    "Leigo: volta mágica aleatória que embaralha o grid.\nTécnico: tigerChancePerLap × 100.")
+  if newTiger ~= nil then
+    local val = clamp(newTiger, 0, 20) / 100
+    if math.abs(val - cfg.tigerChancePerLap) > 0.0005 then cfg.tigerChancePerLap = val; notifyChange() end
   end
 end
 
@@ -1407,6 +1502,10 @@ local function drawTrackLimitsSection(sim, cfg)
   else
     ui.textDisabled("⚪ Sem advertências.")
   end
+  if st.pitAlert then
+    if rgbm then ui.textColored("🚧 Excesso nos boxes: reduza!", C.warn())
+    else ui.text("Excesso nos boxes: reduza!") end
+  end
   if st.lastEvent and st.lastEvent ~= "" then ui.textDisabled("Último: " .. st.lastEvent) end
   if (st.aiWithPenalties or 0) > 0 or (st.aiWithWarnings or 0) > 0 then
     ui.textDisabled(string.format("IA: %d com punição, %d com advertência", st.aiWithPenalties or 0, st.aiWithWarnings or 0))
@@ -1454,6 +1553,14 @@ local function drawTrackLimitsSection(sim, cfg)
     if newCd ~= nil then
       local val = math.floor(clamp(newCd, 0, 20) + 0.5)
       if val ~= t.cooldown then t.cooldown = val; notifyChange() end
+    end
+
+    if t.minOffTime == nil then t.minOffTime = 0.25 end
+    local newOff = sliderBlock("Tempo fora p/ contar corte (s)", "tl_offt", t.minOffTime, 0, 2, "%.2f s",
+      "Leigo: quanto tempo fora da pista até contar; filtra encostada rápida na zebra.\nTécnico: debounce de off-track contínuo (wheelsOutside >= N).")
+    if newOff ~= nil then
+      local val = math.floor(clamp(newOff * 100, 0, 200) + 0.5) / 100
+      if val ~= t.minOffTime then t.minOffTime = val; notifyChange() end
     end
 
     t.waitTime = t.waitTime or 1.9
@@ -1507,6 +1614,26 @@ local function drawTrackLimitsSection(sim, cfg)
       t.finishAdd = not t.finishAdd; notifyChange()
     end
     helpMarker("Leigo: terminou devendo = tempo somado no resultado.\nTécnico: ac.addPenaltyTime com guard de existência.")
+
+    ui.newLine(2)
+    ui.separator()
+    ui.text("Velocidade nos boxes")
+
+    t.pitSpeedEnabled = (t.pitSpeedEnabled ~= false)
+    if ui.checkbox("Punir excesso nos boxes", t.pitSpeedEnabled) then
+      t.pitSpeedEnabled = not t.pitSpeedEnabled; notifyChange()
+    end
+    helpMarker("Leigo: passou do limite no pitlane = punição de tempo.\nTécnico: detecção com 1 s de tolerância + 10 s de cooldown por carro.")
+
+    if t.pitSpeedEnabled then
+      if t.pitLimitKmh == nil then t.pitLimitKmh = 80 end
+      local newLim = sliderBlock("Limite nos boxes (km/h)", "tl_pitlim", t.pitLimitKmh, 30, 120, "%.0f km/h",
+        "Leigo: velocidade máxima no pitlane (padrão AC: 80).\nTécnico: compara car.speedKmh com isInPitlane.")
+      if newLim ~= nil then
+        local val = math.floor(clamp(newLim, 30, 120) + 0.5)
+        if val ~= t.pitLimitKmh then t.pitLimitKmh = val; notifyChange() end
+      end
+    end
 
     ui.newLine(2)
     ui.separator()
@@ -1769,6 +1896,7 @@ function M.draw(sim, cfg)
       drawPhysicsIntensitySection(s, c)
       drawAggressionSection(s, c)
       drawPaceSection(s, c)
+      drawRacecraftSection(s, c)
       drawLowDownforceAISection(s, c)
       drawLearningModuleSection(s, c)
       drawRollingStartSection(s, c)

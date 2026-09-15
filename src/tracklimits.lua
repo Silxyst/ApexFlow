@@ -40,6 +40,12 @@ local function ensureConfig(cfg)
   -- disabled from Lua; when it is active we skip NEW warnings so the
   -- driver is not punished twice for the same cut.
   t.gamePenaltyCompat = (t.gamePenaltyCompat ~= false)
+  -- v0.10.0: precision + pit speed.
+  t.minOffTime = tonumber(t.minOffTime or 0.25) or 0.25 -- sustained off-track before counting
+  if t.minOffTime < 0 then t.minOffTime = 0 end
+  t.pitSpeedEnabled = (t.pitSpeedEnabled ~= false)
+  t.pitLimitKmh = tonumber(t.pitLimitKmh or 80) or 80
+  t.pitGraceSec = tonumber(t.pitGraceSec or 1.0) or 1.0
 end
 
 -- Best-effort read of AC's native slow-down penalty (seconds remaining).
@@ -72,6 +78,10 @@ local function getState(i)
     warnsTotal = 0, pensTotal = 0, pensTime = 0,
     lastEvent = "", lastEventLap = -1, lastEventSector = 0,
     gamePen = 0,
+    offTime = 0,            -- sustained off-track timer (precision debounce)
+    pitOverTime = 0,        -- sustained pit speeding timer
+    pitLastHit = -100,      -- cooldown for pit-speed penalties
+    pitAlert = false,       -- currently speeding in pits (HUD)
   }
   cars[i] = s
   return s
@@ -262,6 +272,32 @@ local function updateCar(i, car, dt, sim, cfg, isPlayer)
     -- (otherwise an off-track exit from pits would never warn again).
     s.offPrev = false
     s.gamePen = gamePenaltyTime(car)
+    -- v0.10.0: pit-lane speeding. Sustained over the limit in the lane
+    -- (not parked in the box) -> time penalty. 10 s cooldown per car.
+    if t.pitSpeedEnabled and car.isInPitlane and not car.isInPit then
+      local spd = car.speedKmh or 0
+      local lim = t.pitLimitKmh or 80
+      if spd > lim then
+        s.pitOverTime = (s.pitOverTime or 0) + dt
+        s.pitAlert = true
+        if s.pitOverTime >= (t.pitGraceSec or 1.0) and (now - (s.pitLastHit or -100)) > 10 then
+          s.pitLastHit = now
+          s.pitOverTime = 0
+          if t.penaltiesEnabled then
+            issuePenalty(i, car, cfg, string.format("Pit %.0f > %.0f km/h", spd, lim))
+          else
+            s.lastEvent = string.format("Pit %.0f > %.0f (sem punição)", spd, lim)
+            if isPlayer then say("PIT SPEED", s.lastEvent) end
+          end
+        end
+      else
+        s.pitOverTime = 0
+        s.pitAlert = false
+      end
+    else
+      s.pitOverTime = 0
+      s.pitAlert = false
+    end
   else
     -- v0.9.0: game-penalty compat — while AC's own slow-down is active,
     -- skip NEW warnings so the same cut is not punished twice.
@@ -269,7 +305,10 @@ local function updateCar(i, car, dt, sim, cfg, isPlayer)
     local compatHold = t.gamePenaltyCompat and s.gamePen > 0.5
     local wheelsOut = car.wheelsOutside or 0
     local off = wheelsOut >= (t.wheels or 4)
-    if t.trackLimitsEnabled and off and not s.offPrev and not s.mustReset
+    -- v0.10.0 precision: count only SUSTAINED off-track (debounce brief kerb touches).
+    if off then s.offTime = (s.offTime or 0) + dt else s.offTime = 0 end
+    local sustained = s.offTime >= (t.minOffTime or 0)
+    if t.trackLimitsEnabled and off and sustained and not s.offPrev and not s.mustReset
         and (now - s.lastWarn) > (t.cooldown or 7) and not s.awaitingReset
         and not compatHold then
       s.lastWarn = now
@@ -412,6 +451,7 @@ function M.getState()
     gamePen = p.gamePen or 0,               -- AC native slow-down (0 = n/a)
     gamePenApi = gamePenAvailable == true,  -- field exists in this build?
     compatHold = (p.gamePen or 0) > 0.5,
+    pitAlert = p.pitAlert or false,         -- speeding in pitlane right now
   }
 end
 

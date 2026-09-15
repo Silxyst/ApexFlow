@@ -167,11 +167,40 @@ local function getProfileBias(cfg, carIndex)
   return 1.00
 end
 
+-- v0.10.0: prefer real session laps (auto-detected) over the manual value.
+local function raceLaps(cfg)
+  local sess = cfg._strategy and cfg._strategy.sessionLaps
+  local manual = math.max(3, math.floor((cfg.strategy.manualRaceLaps or 20) + 0.5))
+  if sess and sess >= 3 then return sess end
+  return manual
+end
+
+local function detectSessionLaps(cfg, sim)
+  if not sim then return end
+  local ok, s = pcall(ac.getSession, sim.currentSessionIndex)
+  if not ok or not s then return end
+  for _, k in ipairs({"laps", "raceLaps", "totalLaps", "lapCount"}) do
+    local okV, v = pcall(function() return s[k] end)
+    v = tonumber(v)
+    if okV and v and v >= 3 and v <= 5000 then
+      if cfg._strategy.sessionLaps ~= v then
+        cfg._strategy.sessionLaps = v
+        -- invalidate plans built on a different lap count
+        for _, st in pairs(cfg._strategy.car) do
+          st.pitLaps = nil
+          st.nextPitIdx = 1
+        end
+      end
+      return
+    end
+  end
+end
+
 -- Build scheduled pit laps (exactly forcedStops)
 local function computePitPlan(cfg, st, carIndex)
   if st.pitLaps ~= nil then return end
 
-  local totalLaps = math.max(3, math.floor(cfg.strategy.manualRaceLaps + 0.5))
+  local totalLaps = raceLaps(cfg)
   local stops = cfg.strategy.forcedStops
 
   st.pitLaps = {}
@@ -252,7 +281,7 @@ end
 
 -- Refuel on pit to reach next stop or finish
 local function computeRefuelTarget(cfg, st, carIndex, lap, fuelNow)
-  local totalLaps = math.max(3, math.floor(cfg.strategy.manualRaceLaps + 0.5))
+  local totalLaps = raceLaps(cfg)
 
   local reachLap = totalLaps
   if st.pitLaps and st.nextPitIdx and (st.nextPitIdx + 1) <= #st.pitLaps then
@@ -293,7 +322,17 @@ function M.update(dt, sim, cfg)
   local carsCount = (sim2 and sim2.carsCount) or 0
   if carsCount <= 1 then return end
 
-  local totalLaps = math.max(3, math.floor(cfg.strategy.manualRaceLaps + 0.5))
+  detectSessionLaps(cfg, sim2)
+
+  -- v0.10.0: wipe per-car state on session change (avoids ghost rows).
+  local sessIdx = sim2.currentSessionIndex or 0
+  if cfg._strategy.lastSessionIdx ~= sessIdx then
+    cfg._strategy.lastSessionIdx = sessIdx
+    cfg._strategy.car = {}
+    cfg._strategy.tankMax = {}
+  end
+
+  local totalLaps = raceLaps(cfg)
 
   for i = 1, carsCount - 1 do
     local car = ac.getCar(i)
@@ -352,6 +391,36 @@ function M.update(dt, sim, cfg)
       end
     end
   end
+end
+
+-- v0.10.0: live monitor for UI (per-AI fuel + next pit).
+function M.getState(cfg)
+  cfg = cfg or {}
+  local out = {
+    totalLaps = raceLaps(cfg),
+    autoLaps = (cfg._strategy and cfg._strategy.sessionLaps) or nil,
+    cars = {},
+  }
+  if not cfg._strategy or not cfg._strategy.car then return out end
+  for i, st in pairs(cfg._strategy.car) do
+    local ok, car = pcall(ac.getCar, i)
+    local fuel = (ok and car and tonumber(car.fuel)) or 0
+    local lap = (ok and car and tonumber(car.lapCount)) or 0
+    local nextPit = nil
+    if st.pitLaps and st.nextPitIdx and st.nextPitIdx <= #st.pitLaps then
+      nextPit = st.pitLaps[st.nextPitIdx]
+    end
+    out.cars[#out.cars + 1] = {
+      index = i,
+      lap = lap,
+      fuel = fuel,
+      fuelPerLap = st.fuelPerLap or 0,
+      nextPit = nextPit,
+      stopsLeft = (st.pitLaps and (#st.pitLaps - (st.nextPitIdx or 1) + 1)) or 0,
+    }
+  end
+  table.sort(out.cars, function(a, b) return (a.nextPit or 9999) < (b.nextPit or 9999) end)
+  return out
 end
 
 return M

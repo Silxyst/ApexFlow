@@ -114,11 +114,19 @@ Built for **offline single-player** and **offline championships**. No online dep
 
 ### ⚖️ **Track Limits** *(v0.7.0, port of Mavil TLM core)*
 - **Warnings** for wheels off track (configurable 2–4 wheels, cooldown)
+- **Sustained-cut debounce** (v0.10.0): brief kerb touches don't count
+- **Pit-lane speeding** detection (v0.10.0, default 80 km/h)
+- **Game-penalty compat**: pauses our warnings while AC punishes (no double penalty)
 - **Time penalty** served stopped in the pit box holding the brake
 - **Quali reset** (guarded teleport), **extra time** for early pit exit
 - **Unserved time** added to the final result (guarded API)
 - **Optional AI** warnings + pit serving
 - **Extra HUD window**: live race events (caution + warnings/penalties)
+
+### 🤝 **CMRT HUD Compatibility** *(v0.10.0)*
+- Verified: CMRT Complete/Essential HUDs are **read-only** (no physics writes, no shared globals) — zero conflicts
+- They visualize `wheelsOutside`; we enforce — complementary systems
+- Our Web UI status file (`RaceFlow_webui_status.json`) can feed external overlays
 
 ### 🎨 **Interface Themes** *(v0.8.0)*
 - **5 accent colors**: cyan, green, orange, purple, red — applied live
@@ -328,5 +336,5 @@ See [LICENSE](LICENSE) for details.
 
 <p align="center">
   <sub>Built with ❤️ for the Assetto Corsa community</sub><br/>
-  <sub>RaceFlow v0.8.0 — overtake control + themes</sub>
+  <sub>RaceFlow v0.10.0 — precise penalties, pit speed, spicier AI, CMRT-friendly</sub>
 </p>

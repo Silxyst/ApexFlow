@@ -1,6 +1,6 @@
 SCRIPT_NAME = "RaceFlow"
-SCRIPT_VERSION = "0.9.0"
-_G.RACEFLOW_VERSION = "0.9.0"
+SCRIPT_VERSION = "0.10.0"
+_G.RACEFLOW_VERSION = "0.10.0"
 
 -- Per-module load status, shown in the fallback window so a future
 -- require() failure identifies the exact module (no more guessing).
@@ -87,6 +87,10 @@ local RARE2_CFG = {
     qualiReset = true,
     finishAdd = true,
     gamePenaltyCompat = true, -- v0.9.0: skip new warnings while game punishes
+    minOffTime = 0.25,        -- v0.10.0: sustained off-track debounce
+    pitSpeedEnabled = true,   -- v0.10.0: punish pit-lane speeding
+    pitLimitKmh = 80,
+    pitGraceSec = 1.0,
   },
 
   -- NEW: GitHub update checker
@@ -204,15 +208,16 @@ RARE2_CFG.multiclassPushStrength   = 75
 RARE2_CFG.multiclassYieldDistM     = 120
 RARE2_CFG.multiclassPushDistM      = 80
 
-RARE2_CFG.stuckBehindDelay           = 1.0
-RARE2_CFG.stuckBehindRampTime        = 6.0
-RARE2_CFG.draftCommitRampGate        = 0.20
+-- v0.10.0: racecraft mais vivo por padrão (mais brigas e ultrapassagens).
+RARE2_CFG.stuckBehindDelay           = 0.8
+RARE2_CFG.stuckBehindRampTime        = 5.0
+RARE2_CFG.draftCommitRampGate        = 0.15
 RARE2_CFG.draftCommitTime            = 3.5
-RARE2_CFG.stuckBehindAggressionBoost = 0.22
-RARE2_CFG.stuckBehindPushBoost       = 0.028
-RARE2_CFG.draftCommitAggBoost        = 0.28
-RARE2_CFG.draftCommitPushBoost       = 0.060
-RARE2_CFG.draftCommitTopSpeedBoost   = 0.045
+RARE2_CFG.stuckBehindAggressionBoost = 0.26
+RARE2_CFG.stuckBehindPushBoost       = 0.034
+RARE2_CFG.draftCommitAggBoost        = 0.32
+RARE2_CFG.draftCommitPushBoost       = 0.070
+RARE2_CFG.draftCommitTopSpeedBoost   = 0.050
 
 RARE2_CFG.difficultyTopSpeedScale    = 0.10
 
@@ -223,8 +228,8 @@ RARE2_CFG.lap1PaceBoost    = 0.05
 RARE2_CFG.cleanAirTopSpeedBoost    = 0.020
 RARE2_CFG.cleanAirPushBoost        = 0.018
 RARE2_CFG.huntPaceBoost            = 0.030
-RARE2_CFG.huntDuration             = 45.0
-RARE2_CFG.tigerChancePerLap        = 0.05
+RARE2_CFG.huntDuration             = 50.0
+RARE2_CFG.tigerChancePerLap        = 0.07
 
 local MEMORY_FILE = "RaceFlow_memory.lua"
 
@@ -369,6 +374,18 @@ _G.RARE2_API = {
     RARE2_CFG.aggression = 50
     RARE2_CFG.difficultyBoost = 100
     RARE2_CFG.paceStrength = 65
+    -- v0.10.0: racecraft defaults (spicier racing).
+    RARE2_CFG.stuckBehindDelay = 0.8
+    RARE2_CFG.stuckBehindRampTime = 5.0
+    RARE2_CFG.draftCommitRampGate = 0.15
+    RARE2_CFG.draftCommitTime = 3.5
+    RARE2_CFG.stuckBehindAggressionBoost = 0.26
+    RARE2_CFG.stuckBehindPushBoost = 0.034
+    RARE2_CFG.draftCommitAggBoost = 0.32
+    RARE2_CFG.draftCommitPushBoost = 0.070
+    RARE2_CFG.draftCommitTopSpeedBoost = 0.050
+    RARE2_CFG.huntDuration = 50.0
+    RARE2_CFG.tigerChancePerLap = 0.07
     if RARE2_CFG.strategy then
       RARE2_CFG.strategy.manualRaceLaps = 20
       RARE2_CFG.strategy.forcedStops = 1
@@ -409,6 +426,10 @@ _G.RARE2_API = {
       t.qualiReset = true
       t.finishAdd = true
       t.gamePenaltyCompat = true
+      t.minOffTime = 0.25
+      t.pitSpeedEnabled = true
+      t.pitLimitKmh = 80
+      t.pitGraceSec = 1.0
     end
     if RARE2_CFG.githubUpdate then
       RARE2_CFG.githubUpdate.enabled = true
@@ -625,6 +646,7 @@ end
 _G.RARE2_API.getCautionState = function() return caution and caution.getState and caution.getState() or {} end
 _G.RARE2_API.cautionManualTrigger = function(sim, cfg) return caution and caution.manualTrigger and caution.manualTrigger(sim or ac.getSim(), cfg or RARE2_CFG) end
 _G.RARE2_API.getTrackLimitsState = function() return tracklimits and tracklimits.getState and tracklimits.getState() or {} end
+_G.RARE2_API.getStrategyState = function(cfg) return strategy and strategy.getState and strategy.getState(cfg or RARE2_CFG) or {} end
 _G.RARE2_API.githubCheckUpdates = function(cfg, force)
   githubCheckUpdates(cfg or RARE2_CFG, force)
 end
@@ -758,6 +780,9 @@ local function drawRaceEventsBody()
       ui.text(string.format("⚠ Warnings: %d/%d", ts.warn, ts.maxWarn or 4))
     else
       ui.textDisabled("⚖ No warnings")
+    end
+    if ts.pitAlert then
+      hudBlinkText("🚧 PIT SPEED: reduza!", red)
     end
     if (ts.gamePenApi and (ts.gamePen or 0) > 0.5) then
       ui.textDisabled(string.format("🎮 Game penalty: %.1fs", ts.gamePen))
