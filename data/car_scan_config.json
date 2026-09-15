@@ -1,0 +1,10 @@
+{
+  "acCarsFolder": "AUTO",
+  "metric": "topspeed",
+  "kwToHpThreshold": 200,
+  "defaultClassCount": 2,
+  "minCarsWithMetric": 1,
+  "minCarsPerClass": 1,
+  "gapSplit": true,
+  "gapSplitMinPercent": 0.04
+}
