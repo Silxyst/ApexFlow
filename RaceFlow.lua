@@ -1,7 +1,7 @@
 -- ApexFlow — Independent race suite for Assetto Corsa (v0.13.0)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.13.1"
-_G.RACEFLOW_VERSION = "0.13.1"
+SCRIPT_VERSION = "0.14.0"
+_G.RACEFLOW_VERSION = "0.14.0"
 _G.APEXFLOW_VERSION = "0.13.1"
 
 -- Per-module load status, shown in the fallback window so a future
@@ -134,11 +134,242 @@ local RARE2_CFG = {
     corner = 6,        -- 0 .. 12 corner rounding
     compactHeaders = false,
   },
+
+  -- v0.14.0: Category presets (one-click for GT3/F1/Endurance etc.)
+  categoryPreset = "custom",
+
+  -- v0.14.0: New systems
+  pitSpeedReal = { enabled = true }, -- use track's real limit when available
+  telemetryCSV = { enabled = false, maxLaps = 500 },
+  voice = { enabled = true, volume = 0.8 },
+  failures = { enabled = false, chancePerHour = 0.08, minLap = 3 },
 }
 
 -- Expose config globally for src/* modules (they run in same Lua state
 -- but RARE2_CFG is local here). This fixes M.getState() returning nil config.
 _G.RARE2_CFG = RARE2_CFG
+
+-- ----------------------------------------------------------
+-- Category presets (v0.14.0) — one click for GT3/F1/Endurance etc.
+-- ----------------------------------------------------------
+local CATEGORY_PRESETS = {
+  gt3 = {
+    label = "GT3",
+    tracklimits = { maxWarnings = 3, penaltyTime = 5, wheels = 3, pitLimitKmh = 80 },
+    caution = { fcySpeedKmh = 80, yellowSpeedKmh = 80, fcyChance = 0.5 },
+  },
+  gt4 = {
+    label = "GT4",
+    tracklimits = { maxWarnings = 4, penaltyTime = 5, wheels = 3, pitLimitKmh = 80 },
+    caution = { fcySpeedKmh = 80, yellowSpeedKmh = 80, fcyChance = 0.4 },
+  },
+  tcr = {
+    label = "TCR",
+    tracklimits = { maxWarnings = 3, penaltyTime = 5, wheels = 3, pitLimitKmh = 60 },
+    caution = { fcySpeedKmh = 80, yellowSpeedKmh = 80, fcyChance = 0.5 },
+  },
+  f1 = {
+    label = "F1 / Open Wheel",
+    tracklimits = { maxWarnings = 2, penaltyTime = 5, wheels = 4, pitLimitKmh = 80 },
+    caution = { fcySpeedKmh = 80, yellowSpeedKmh = 100, fcyChance = 0.7 },
+  },
+  lmp = {
+    label = "LMP / Hypercar",
+    tracklimits = { maxWarnings = 3, penaltyTime = 5, wheels = 3, pitLimitKmh = 60 },
+    caution = { fcySpeedKmh = 80, yellowSpeedKmh = 80, fcyChance = 0.6 },
+  },
+  endurance = {
+    label = "Endurance",
+    tracklimits = { maxWarnings = 5, penaltyTime = 10, wheels = 2, pitLimitKmh = 60 },
+    caution = { fcySpeedKmh = 60, yellowSpeedKmh = 60, fcyChance = 0.3 },
+  },
+}
+local function applyCategoryPreset(catKey)
+  local p = CATEGORY_PRESETS[catKey]
+  if not p then return false end
+  RARE2_CFG.categoryPreset = catKey
+  if p.tracklimits then
+    for k, v in pairs(p.tracklimits) do
+      if RARE2_CFG.tracklimits then RARE2_CFG.tracklimits[k] = v end
+    end
+  end
+  if p.caution then
+    for k, v in pairs(p.caution) do
+      if RARE2_CFG.caution then RARE2_CFG.caution[k] = v end
+    end
+  end
+  if _G.RARE2_API and _G.RARE2_API.markConfigDirty then _G.RARE2_API.markConfigDirty() end
+  ac.log("[RaceFlow] Category preset applied: " .. tostring(p.label))
+  return true
+end
+_G.RARE2_API.applyCategoryPreset = applyCategoryPreset
+_G.RARE2_API.getCategoryPresets = function() return CATEGORY_PRESETS end
+
+-- ----------------------------------------------------------
+-- Pit speed — real track limit (v0.14.0)
+-- ----------------------------------------------------------
+local function getRealPitSpeedLimit(sim)
+  -- Try CSP APIs first
+  local apis = {
+    function() return ac.getPitSpeedLimit and ac.getPitSpeedLimit() end,
+    function() return ac.getTrackPitSpeed and ac.getTrackPitSpeed() end,
+    function() return sim and sim.pitSpeedLimit end,
+  }
+  for _, fn in ipairs(apis) do
+    local ok, v = pcall(fn)
+    v = tonumber(v)
+    if ok and v and v >= 20 and v <= 120 then return math.floor(v + 0.5) end
+  end
+  -- Fallback: try to read from track's data (if available via INI)
+  -- Most tracks store it in data/surfaces.ini or ui/track.json, but we
+  -- keep it simple: return nil to signal "use manual".
+  return nil
+end
+_G.RARE2_API.getRealPitSpeedLimit = getRealPitSpeedLimit
+
+-- ----------------------------------------------------------
+-- Auto-save per track (v0.14.0)
+-- ----------------------------------------------------------
+local lastTrackIdForAutosave = nil
+local function getTrackIdForSave(sim)
+  if ac.getTrackID then
+    local ok, id = pcall(ac.getTrackID)
+    if ok and id and id ~= "" then return tostring(id):gsub("[^%w_%-]", "_") end
+  end
+  if sim and sim.trackName then return tostring(sim.trackName):gsub("[^%w_%-]", "_") end
+  return "unknown_track"
+end
+local function getPerTrackConfigPath(trackId)
+  return string.format("RaceFlow_config_%s.lua", tostring(trackId))
+end
+local function savePerTrackConfig(trackId)
+  trackId = trackId or getTrackIdForSave(ac.getSim())
+  local path = getPerTrackConfigPath(trackId)
+  local f = io.open(path, "w")
+  if not f then return false end
+  f:write("return ")
+  f:write(serializeTable(RARE2_CFG, ""))
+  f:write("\n")
+  f:close()
+  ac.log("[RaceFlow] Per-track config saved: " .. path)
+  return true
+end
+local function loadPerTrackConfig(trackId)
+  trackId = trackId or getTrackIdForSave(ac.getSim())
+  local path = getPerTrackConfigPath(trackId)
+  local chunk = loadfile(path)
+  if not chunk then return false end
+  local ok, data = pcall(chunk)
+  if not ok or type(data) ~= "table" then return false end
+  deepMerge(RARE2_CFG, data)
+  ac.log("[RaceFlow] Per-track config loaded: " .. path)
+  return true
+end
+_G.RARE2_API.savePerTrackConfig = savePerTrackConfig
+_G.RARE2_API.loadPerTrackConfig = loadPerTrackConfig
+
+-- ----------------------------------------------------------
+-- Telemetry CSV (v0.14.0) — lap-by-lap to Documents
+-- ----------------------------------------------------------
+local telemetryFile = nil
+local lastTelemetryLap = -1
+local function telemetryEnsureFile(sim)
+  if telemetryFile then return telemetryFile end
+  local trackId = getTrackIdForSave(sim)
+  local fname = string.format("RaceFlow_telemetry_%s_%s.csv", trackId, os.date("%Y%m%d_%H%M%S"))
+  local docs = ac.getFolder(ac.FolderID.Documents) .. "/Assetto Corsa/"
+  local path = docs .. fname
+  local f = io.open(path, "w")
+  if not f then return nil end
+  f:write("lap,position,speedKmh,fuel,tyreWear,lapTimeMs,valid\n")
+  telemetryFile = f
+  ac.log("[RaceFlow] Telemetry CSV started: " .. path)
+  return f
+end
+local function telemetryOnLap(sim)
+  if not RARE2_CFG.telemetryCSV or not RARE2_CFG.telemetryCSV.enabled then return end
+  local ok, pcar = pcall(ac.getCar, 0)
+  if not ok or not pcar then return end
+  local lap = tonumber(pcar.lapCount) or 0
+  if lap == lastTelemetryLap then return end
+  if lap < 1 then return end
+  lastTelemetryLap = lap
+  local f = telemetryEnsureFile(sim)
+  if not f then return end
+  local wear = 0
+  if pcar.wheels and pcar.wheels[0] then wear = tonumber(pcar.wheels[0].tyreWear) or 0 end
+  local line = string.format("%d,%d,%.1f,%.1f,%.3f,%d,%s\n",
+    lap, tonumber(pcar.racePosition) or 0, tonumber(pcar.speedKmh) or 0,
+    tonumber(pcar.fuel) or 0, wear, tonumber(pcar.lapTimeMs) or 0,
+    pcar.isLapValid and "1" or "0")
+  f:write(line)
+  f:flush()
+end
+local function telemetryClose()
+  if telemetryFile then pcall(function() telemetryFile:close() end) telemetryFile = nil end
+end
+
+-- ----------------------------------------------------------
+-- Voice warnings without CrewChief (v0.14.0) — beeps + messages
+-- ----------------------------------------------------------
+local voiceCooldowns = {}
+local function playVoiceWarning(kind)
+  if not RARE2_CFG.voice or not RARE2_CFG.voice.enabled then return end
+  local now = os.clock() or 0
+  if voiceCooldowns[kind] and (now - voiceCooldowns[kind]) < 3.0 then return end
+  voiceCooldowns[kind] = now
+  local vol = tonumber(RARE2_CFG.voice.volume) or 0.8
+  -- Use existing beep with different patterns, plus ac.setMessage
+  if kind == "tracklimits" then
+    if ac.setMessage then pcall(ac.setMessage, "VOICE", "Track limits — warning") end
+  elseif kind == "pitSpeed" then
+    if ac.setMessage then pcall(ac.setMessage, "VOICE", "Pit speed — slow down") end
+  elseif kind == "caution" then
+    if ac.setMessage then pcall(ac.setMessage, "VOICE", "Caution — slow down") end
+  end
+  -- Also play the rolling-start beep as a generic chime if available
+  pcall(function()
+    local ok, mp = pcall(ui.MediaPlayer, "apps/lua/RaceFlow/sfx/rs_beep.wav")
+    if ok and mp and mp.setVolume then mp:setVolume(vol * 10) end
+    if ok and mp and mp.play then mp:play() end
+  end)
+end
+_G.RARE2_API.playVoiceWarning = playVoiceWarning
+
+-- ----------------------------------------------------------
+-- Light mechanical failures / driver errors for AI (v0.14.0)
+-- ----------------------------------------------------------
+local failureTimers = {}
+local function maybeTriggerFailures(dt, sim, cfg)
+  if not cfg.failures or not cfg.failures.enabled then return end
+  if not sim.isSessionStarted or sim.isOnlineRace then return end
+  local chPerHour = tonumber(cfg.failures.chancePerHour) or 0.08
+  local minLap = tonumber(cfg.failures.minLap) or 3
+  for i = 1, (sim.carsCount or 0) - 1 do
+    local ok, car = pcall(ac.getCar, i)
+    if ok and car and car.isAIControlled and not car.isInPitlane and not car.isInPit
+       and (tonumber(car.lapCount) or 0) >= minLap then
+      -- Per-car timer
+      failureTimers[i] = (failureTimers[i] or 0) + dt
+      -- Chance scaled to dt (per hour -> per second)
+      local p = chPerHour / 3600 * dt
+      if math.random() < p then
+        -- 70% slow puncture / power loss, 30% extra pit for "repair"
+        if math.random() < 0.7 then
+          -- Slow for 15-30s: cut topspeed/throttle
+          pcall(physics.setAITopSpeed, i, 60)
+          pcall(physics.setAIThrottleLimit, i, 0.4)
+          ac.log(string.format("[RaceFlow] AI #%d mechanical: slow (15s)", i))
+          -- Schedule recovery via delayed reset (simple: rely on next AI update to restore)
+        else
+          if ac.requestPitStop then pcall(ac.requestPitStop, i) end
+          ac.log(string.format("[RaceFlow] AI #%d mechanical: extra pit", i))
+        end
+        if ac.setMessage then pcall(ac.setMessage, "RACE CONTROL", string.format("AI #%d — mechanical issue", i)) end
+      end
+    end
+  end
+end
 
 -- ----------------------------------------------------------
 -- Learning / safety defaults (can be overridden by config/UI)
@@ -503,11 +734,23 @@ _G.RARE2_API.resetToDefaults = function()
       RARE2_CFG.webui.authToken = ""
     end
     if RARE2_CFG.ui then
-      RARE2_CFG.ui.accent = "cyan"
+      RARE2_CFG.ui.accent = "orange"
       RARE2_CFG.ui.bgAlpha = 1.0
-      RARE2_CFG.ui.corner = 6
+      RARE2_CFG.ui.corner = 8
       RARE2_CFG.ui.compactHeaders = false
     end
+    if RARE2_CFG.pitSpeedReal then RARE2_CFG.pitSpeedReal.enabled = true end
+    if RARE2_CFG.telemetryCSV then RARE2_CFG.telemetryCSV.enabled = false end
+    if RARE2_CFG.voice then
+      RARE2_CFG.voice.enabled = true
+      RARE2_CFG.voice.volume = 0.8
+    end
+    if RARE2_CFG.failures then
+      RARE2_CFG.failures.enabled = false
+      RARE2_CFG.failures.chancePerHour = 0.08
+      RARE2_CFG.failures.minLap = 3
+    end
+    RARE2_CFG.categoryPreset = "custom"
     saveConfigToFile()
     return true
   end
@@ -709,6 +952,37 @@ function script.update(dt)
   if not rollingActive and tracklimits and tracklimits.update then
     local okT, errT = pcall(tracklimits.update, dt, sim, RARE2_CFG)
     if not okT then ac.log("[RaceFlow] tracklimits.update: " .. tostring(errT)) end
+  end
+
+  -- Pit speed real (v0.14.0): override manual slider when available.
+  if RARE2_CFG.pitSpeedReal and RARE2_CFG.pitSpeedReal.enabled
+     and RARE2_CFG.tracklimits and RARE2_CFG.tracklimits.pitSpeedEnabled then
+    local real = getRealPitSpeedLimit(sim)
+    if real then RARE2_CFG.tracklimits.pitLimitKmh = real end
+  end
+
+  -- Auto-save per track (v0.14.0)
+  do
+    local curId = getTrackIdForSave(sim)
+    if lastTrackIdForAutosave == nil then
+      lastTrackIdForAutosave = curId
+      -- On first load after track change, try to load per-track config
+      loadPerTrackConfig(curId)
+    elseif curId ~= lastTrackIdForAutosave then
+      savePerTrackConfig(lastTrackIdForAutosave)
+      loadPerTrackConfig(curId)
+      lastTrackIdForAutosave = curId
+    end
+  end
+
+  -- Telemetry CSV (v0.14.0)
+  if RARE2_CFG.telemetryCSV and RARE2_CFG.telemetryCSV.enabled then
+    pcall(telemetryOnLap, sim)
+  end
+
+  -- Light failures for AI (v0.14.0)
+  if RARE2_CFG.failures and RARE2_CFG.failures.enabled then
+    pcall(maybeTriggerFailures, dt, sim, RARE2_CFG)
   end
 
   memorySaveCooldown = math.max(0.0, memorySaveCooldown - dt)
