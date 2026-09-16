@@ -2043,7 +2043,7 @@ end-- ==========================================================
 -- ==========================================================
 
 local NAV_RAIL = {
-  { id = "dash",   icon = "🏠", label = "Início",   desc = "Assistente, preset e saúde do sistema" },
+  { id = "dash",   icon = "🏠", label = "Início",   desc = "Telemetria viva da sessão" },
   { id = "ai",     icon = "🤖", label = "Pilotos",  desc = "Personalidade, brigas e aprendizado da IA" },
   { id = "race",   icon = "🏁", label = "Corrida",  desc = "Duração, pits, pneus e largada" },
   { id = "safety", icon = "🟡", label = "Segurança", desc = "Bandeiras, cortes de pista e box" },
@@ -2450,36 +2450,39 @@ local function drawPresetList(cfg)
   local presets = RARE2_API.getCategoryPresets and RARE2_API.getCategoryPresets() or {}
   if not next(presets) then return end
   if not matchesSearch(cfg, "preset gt3 f1 tcr categoria corrida") then return end
+  ui.textDisabled("PRESET")
   local cur = cfg.categoryPreset or "custom"
+  local first = true
   for _, row in ipairs(PRESET_ROWS) do
     local pr = presets[row.key]
     if pr then
+      if not first then ui.sameLine(0, 6) end
+      first = false
       local isCur = cur == row.key
-      if isCur then
-        band("##pre_" .. row.key, 0.45, 0.22, 0.05, 52, function()
-          ui.pushFont(ui.Font.Title)
-          if rgbm then ui.textColored("● " .. pr.label .. "  EM USO", rgbm(1, 1, 1, 1))
-          else ui.text("● " .. pr.label .. "  EM USO") end
-          ui.popFont()
-          ui.textDisabled("      " .. row.desc)
-        end)
-      else
-        if ui.button("○  " .. pr.label .. "##p_" .. row.key, vec2(-1, 30)) then
-          if RARE2_API.applyCategoryPreset then RARE2_API.applyCategoryPreset(row.key) end
-          notifyChange()
-          if ac.setMessage then pcall(ac.setMessage, "PRESET", pr.label .. " aplicado") end
-          toast(cfg, "ok", "Preset", pr.label .. " aplicado")
-          trackSection(cfg, "preset_" .. row.key)
-        end
-        hand()
-        ui.textDisabled("      " .. row.desc)
+      if isCur and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(1.00, 0.55, 0.15, 1.00)) end
+      if ui.button((isCur and "● " or "") .. row.key:upper() .. "##p_" .. row.key, vec2(92, 28)) then
+        if RARE2_API.applyCategoryPreset then RARE2_API.applyCategoryPreset(row.key) end
+        notifyChange()
+        if ac.setMessage then pcall(ac.setMessage, "PRESET", pr.label .. " aplicado") end
+        toast(cfg, "ok", "Preset", pr.label .. " aplicado")
+        trackSection(cfg, "preset_" .. row.key)
       end
-      ui.newLine(2)
+      hand()
+      if isCur and rgbm then ui.popStyleColor() end
     end
   end
+  ui.sameLine(0, 6)
+  if ui.button("Custom##p_custom", vec2(92, 28)) then
+    cfg.categoryPreset = "custom"
+    notifyChange()
+  end
+  hand()
+  for _, row in ipairs(PRESET_ROWS) do
+    if cur == row.key then ui.textDisabled(row.desc) break end
+  end
+  if cur == "custom" then ui.textDisabled("Ajustes manuais (sem preset)") end
 end
 
--- ---------------- assistente ----------------
 -- ---------------- inspetores ----------------
 local function heroNumbers(sim, cfg)
   if not (sim and sim.isSessionStarted) then
@@ -2488,44 +2491,89 @@ local function heroNumbers(sim, cfg)
   end
   local ok, pcar = pcall(ac.getCar, 0)
   if not (ok and pcar) then return end
+  local fuel = tonumber(pcar.fuel) or 0
   band("##hero_num", 0.08, 0.13, 0.22, 54, function()
     ui.pushFont(ui.Font.Title)
-    local txt = string.format("P%d   ·   V%d   ·   %d km/h",
-      pcar.racePosition or 0, (pcar.lapCount or 0) + 1, math.floor(pcar.speedKmh or 0))
+    local txt = string.format("P%d   ·   V%d   ·   %d km/h   ·   %.1fL",
+      pcar.racePosition or 0, (pcar.lapCount or 0) + 1, math.floor(pcar.speedKmh or 0), fuel)
     if rgbm then ui.textColored(txt, rgbm(1, 1, 1, 1)) else ui.text(txt) end
     ui.popFont()
   end)
 end
 
 local function drawDashInspector(sim, cfg)
+  -- Telemetria viva estilo Events: só dados, zero assistente, zero poluição.
   heroNumbers(sim, cfg)
-  ui.newLine(4)
-  local tl, cs, stt, memCount = getSystemStatus(sim, cfg)
-  ui.text("Saúde agora")
   ui.newLine(2)
+  local tl, cs, stt, memCount = getSystemStatus(sim, cfg)
+  -- Avisos em pips (mesma leitura do painel de corrida)
   if cfg.tracklimits and cfg.tracklimits.enabled then
     local w, mw = tonumber(tl.warn) or 0, tonumber(tl.maxWarn) or 4
-    ui.text(w > 0 and ("⚖ Avisos: " .. w .. "/" .. mw) or "⚖ Sem avisos")
-    animBar(mw > 0 and (w / mw) or 0)
+    local pips = ""
+    for i = 1, mw do pips = pips .. (i <= w and "●" or "○") end
+    if w > 0 then
+      if rgbm then ui.textColored("⚖ " .. pips .. string.format("  %d/%d", w, mw), C.warn())
+      else ui.text("Avisos: " .. pips) end
+    else
+      ui.textDisabled("⚖ " .. pips .. "  limpo")
+    end
   else
-    ui.textDisabled("⚖ Fiscalização desligada (passo 2 do assistente liga)")
+    ui.textDisabled("⚖ fiscalização off — ative em Segurança")
   end
-  ui.newLine(2)
+  -- Punição piscando
   if tl.penaltyActive and (tonumber(tl.timeLeft) or 0) > 0 then
-    ui.text(string.format("🛑 Punição %.0fs — box + freio", tl.timeLeft))
+    local msg = string.format("🛑 %.0fs — BOX + FREIO", tonumber(tl.timeLeft) or 0)
+    if math.floor(animT() * 2.5) % 2 == 0 then
+      if rgbm then ui.textColored(msg, rgbm(1.0, 0.35, 0.35, animPulse(5, 0.7, 1.0)))
+      else ui.text(msg) end
+    else
+      ui.textDisabled(msg)
+    end
     animBar((tl.origTime or 0) > 0 and (tl.timeLeft / tl.origTime) or 0)
-    ui.newLine(2)
   end
-  ui.text(cs.active and ("🟡 " .. tostring(cs.mode or "Caution") .. " ativa") or "🟢 Pista verde")
-  ui.textDisabled(string.format("🧠 %d pista(s) na memória", memCount))
+  -- Bandeira + pit + sessão (1 linha viva cada)
+  if cs.active then
+    local tmr = ""
+    if (tonumber(cs.duration) or 0) > 0 then
+      tmr = string.format("  %.0fs/%.0fs", tonumber(cs.timer) or 0, tonumber(cs.duration) or 0)
+    elseif (tonumber(cs.timer) or 0) > 0 then
+      tmr = string.format("  %.0fs", tonumber(cs.timer) or 0)
+    end
+    ui.text("🟡 " .. tostring(cs.mode or "Caution") .. tmr)
+  else
+    ui.textDisabled("🟢 pista verde")
+  end
+  if sim and sim.isSessionStarted and stt and stt.cars then
+    for _, c in ipairs(stt.cars) do
+      if c.index == 0 then
+        local pit = c.nextPit and ("pit v" .. tostring(c.nextPit)) or "sem pit"
+        ui.textDisabled(string.format("⛽ %.1fL  ·  %s", tonumber(c.fuel) or 0, pit))
+        break
+      end
+    end
+    local sessName, trackName = "", ""
+    if ac.getSessionName then
+      local ok, n = pcall(ac.getSessionName, sim.currentSessionIndex)
+      if ok and n then sessName = tostring(n) end
+    end
+    if ac.getTrackName then
+      local ok, tn = pcall(ac.getTrackName)
+      if ok and tn then trackName = tostring(tn) end
+    end
+    local info = sessName
+    if trackName ~= "" then info = info .. "  ·  " .. trackName end
+    if sim.sessionTimeLeft and sim.sessionTimeLeft > 0 then
+      info = info .. string.format("  ·  %02d:%02d",
+        math.floor(sim.sessionTimeLeft / 60000), math.floor((sim.sessionTimeLeft % 60000) / 1000))
+    end
+    if info ~= "" then ui.textDisabled(info) end
+  end
+  ui.textDisabled(string.format("🧠 %d pista(s)", memCount))
   if (tl.lastEvent or "") ~= "" then ui.textDisabled("↳ " .. tostring(tl.lastEvent)) end
-  ui.newLine(4)
+  ui.newLine(2)
   ui.separator()
-  ui.newLine(4)
-  ui.text("Preset da corrida")
   ui.newLine(2)
   drawPresetList(cfg)
-  ui.newLine(2)
 end
 
 local function drawAiInspector(sim, cfg)
