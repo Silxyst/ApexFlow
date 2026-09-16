@@ -584,167 +584,8 @@ local function drawPaceSection(sim, cfg)
   end
 end
 
--- ==========================================================
--- v0.15.1 (Sug1): cards unificados
---  * Ritmo & Dificuldade = Difficulty + Physics Intensity + Pace
---  * Pit Real & Falhas = pitSpeedReal + failures (sai telemetria/voz daqui)
---  * Telemetria & Voz = CSV + modulo de voz (fonte unica, so no HUD)
--- ==========================================================
-local function drawRhythmSection(sim, cfg)
-  drawDifficultyBoostSection(sim, cfg)
-  drawPhysicsIntensitySection(sim, cfg)
-  drawPaceSection(sim, cfg)
-end
 
-local function drawPitFailuresSection(sim, cfg)
-  ui.text("Pit Real & Falhas da IA")
-  helpMarker("Leigo: limite real da pista + IAs que podem quebrar.\nTécnico: override do pitLimitKmh por pista + chance/hora por IA.")
-  cfg.pitSpeedReal = cfg.pitSpeedReal or {}
-  if cfg.pitSpeedReal.enabled == nil then cfg.pitSpeedReal.enabled = true end
-  if ui.checkbox("Pit Real (auto)##pitreal_only", cfg.pitSpeedReal.enabled) then
-    cfg.pitSpeedReal.enabled = not cfg.pitSpeedReal.enabled; notifyChange()
-  end
-  helpMarker("Leigo: ON = pega o limite verdadeiro da pista (60/80/100).\nTécnico: tenta ac.getPitSpeedLimit() etc., senão usa manual.")
-  cfg.failures = cfg.failures or {}
-  if cfg.failures.enabled == nil then cfg.failures.enabled = false end
-  if ui.checkbox("Falhas mecânicas da IA##fail_only", cfg.failures.enabled) then
-    cfg.failures.enabled = not cfg.failures.enabled; notifyChange()
-  end
-  helpMarker("Leigo: IA pode quebrar e ir ao box.\nTécnico: chance/hora por IA após minLap.")
-  if cfg.failures.enabled then
-    cfg.failures.chancePerHour = tonumber(cfg.failures.chancePerHour) or 0.08
-    local newCh = sliderBlock("Chance por hora", "fail_ch", cfg.failures.chancePerHour, 0, 1, "%.2f",
-      "Leigo: 0.08 = ~8% por hora por IA.\nTécnico: probabilidade/hora convertida por frame.")
-    if newCh ~= nil then
-      local val = clamp(newCh, 0, 1)
-      if math.abs(val - cfg.failures.chancePerHour) > 0.0005 then cfg.failures.chancePerHour = val; notifyChange() end
-    end
-  end
-end
 
--- Voz (v0.15.1, Sug5): fila por eventos inspirada no AC-Engineer-Spotter-Audio
--- (cooldown por grupo, prioridade, clips opcionais em sfx/voice/<CAT>/).
-local function drawVoiceSection(sim, cfg)
-  cfg.voice = cfg.voice or {}
-  if cfg.voice.enabled == nil then cfg.voice.enabled = true end
-  if ui.checkbox("Ativar voz##voice_en", cfg.voice.enabled) then
-    cfg.voice.enabled = not cfg.voice.enabled; notifyChange()
-  end
-  helpMarker("Leigo: avisos falados/beep sem CrewChief.\nTécnico: fila FIFO com cooldown por grupo + prioridade; clips opcionais em sfx/voice/.")
-  if not cfg.voice.enabled then
-    ui.textDisabled("Voz desligada — só mensagens de texto.")
-    return
-  end
-  cfg.voice.volume = tonumber(cfg.voice.volume) or 0.8
-  local newV = sliderBlock("Volume", "voice_vol", cfg.voice.volume, 0, 1, "%.2f",
-    "Leigo: altura do aviso.\nTécnico: ganho aplicado ao AudioEvent/beep.")
-  if newV ~= nil then
-    local val = clamp(newV, 0, 1)
-    if math.abs(val - cfg.voice.volume) > 0.001 then cfg.voice.volume = val; notifyChange() end
-  end
-  cfg.voice.speed = tonumber(cfg.voice.speed) or 1.0
-  local newS = sliderBlock("Velocidade da fala", "voice_spd", cfg.voice.speed, 0.75, 1.5, "%.2f",
-    "Leigo: mais rápido/devagar.\nTécnico: pitch do AudioEvent (beeps não mudam).")
-  if newS ~= nil then
-    local val = clamp(newS, 0.75, 1.5)
-    if math.abs(val - cfg.voice.speed) > 0.001 then cfg.voice.speed = val; notifyChange() end
-  end
-  cfg.voice.categories = cfg.voice.categories or {}
-  local cats = {
-    { id = "limits",  label = "Track limits" },
-    { id = "pit",     label = "Pit speed" },
-    { id = "caution", label = "Caution" },
-    { id = "penalty", label = "Punições" },
-  }
-  ui.textDisabled("Categorias avisadas:")
-  for _, c in ipairs(cats) do
-    if cfg.voice.categories[c.id] == nil then cfg.voice.categories[c.id] = true end
-    if ui.checkbox(c.label .. "##voice_cat_" .. c.id, cfg.voice.categories[c.id]) then
-      cfg.voice.categories[c.id] = not cfg.voice.categories[c.id]; notifyChange()
-    end
-    ui.sameLine(0, 8)
-  end
-  ui.newLine(4)
-  ui.textDisabled("Testar (ignora cooldown):")
-  for _, c in ipairs(cats) do
-    if ui.button("▶ " .. c.label .. "##voice_test_" .. c.id, vec2(120, 24)) then
-      if RARE2_API.voiceTest then RARE2_API.voiceTest(c.id) end
-    end
-    ui.sameLine(0, 6)
-  end
-  ui.newLine(4)
-  local vs = RARE2_API.voiceGetState and RARE2_API.voiceGetState() or {}
-  if vs.available then
-    local parts = {}
-    for _, c in ipairs(cats) do
-      parts[#parts + 1] = c.id .. ":" .. tostring((vs.clips or {})[c.id] or 0)
-    end
-    ui.textDisabled("Áudio: API ok • clips (" .. table.concat(parts, " ") .. ")")
-    ui.textDisabled("Para voz falada, coloque .mp3/.wav/.ogg em sfx/voice/LIMITS|PIT|CAUTION|PENALTY.")
-  else
-    ui.textDisabled("Áudio: ac.AudioEvent indisponível — usando beep + mensagem.")
-  end
-  if vs.busy then ui.textDisabled("Fila: ocupada (" .. tostring(vs.queue or 0) .. " pendentes)") end
-end
-
-local function drawTelemetryVoiceSection(sim, cfg)
-  ui.text("Telemetria & Voz")
-  helpMarker("Leigo: grava voltas em CSV + avisos por voz.\nTécnico: CSV em Documents + fila de áudio por eventos.")
-  cfg.telemetryCSV = cfg.telemetryCSV or {}
-  if cfg.telemetryCSV.enabled == nil then cfg.telemetryCSV.enabled = false end
-  if ui.checkbox("Gravar telemetria CSV##tel_en", cfg.telemetryCSV.enabled) then
-    cfg.telemetryCSV.enabled = not cfg.telemetryCSV.enabled; notifyChange()
-  end
-  helpMarker("Leigo: um CSV por volta em Documents/Assetto Corsa.\nTécnico: lap, posição, combustível, pneus, tempos.")
-  if cfg.telemetryCSV.enabled then
-    cfg.telemetryCSV.maxLaps = tonumber(cfg.telemetryCSV.maxLaps) or 500
-    local newM = sliderBlock("Máximo de voltas no arquivo", "tel_max", cfg.telemetryCSV.maxLaps, 50, 2000, "%.0f",
-      "Leigo: limite do arquivo atual.\nTécnico: rotação simples por sessão.")
-    if newM ~= nil then
-      local val = math.floor(clamp(newM, 50, 2000) + 0.5)
-      if val ~= cfg.telemetryCSV.maxLaps then cfg.telemetryCSV.maxLaps = val; notifyChange() end
-    end
-  end
-  ui.newLine(4)
-  ui.separator()
-  ui.newLine(4)
-  drawVoiceSection(sim, cfg)
-end
-
--- ==========================================================
--- New systems (v0.14.0) — quick toggles
--- DEPRECADO em v0.15.1 (Sug1): mantido por compatibilidade; os cards
--- oficiais agora são Pit Real & Falhas (IA) e Telemetria & Voz (HUD).
--- ==========================================================
-local function drawNewSystemsSection(sim, cfg)
-  ui.separator()
-  ui.text("Novidades v0.14")
-  cfg.pitSpeedReal = cfg.pitSpeedReal or {}
-  if cfg.pitSpeedReal.enabled == nil then cfg.pitSpeedReal.enabled = true end
-  if ui.checkbox("Pit Real (auto)##pitreal_core", cfg.pitSpeedReal.enabled) then
-    cfg.pitSpeedReal.enabled = not cfg.pitSpeedReal.enabled; notifyChange()
-  end
-  ui.sameLine(0, 8)
-  cfg.telemetryCSV = cfg.telemetryCSV or {}
-  if cfg.telemetryCSV.enabled == nil then cfg.telemetryCSV.enabled = false end
-  if ui.checkbox("Telemetria CSV##tel_core", cfg.telemetryCSV.enabled) then
-    cfg.telemetryCSV.enabled = not cfg.telemetryCSV.enabled; notifyChange()
-  end
-  ui.sameLine(0, 8)
-  cfg.voice = cfg.voice or {}
-  if cfg.voice.enabled == nil then cfg.voice.enabled = true end
-  if ui.checkbox("Voz (beep)##voice_core", cfg.voice.enabled) then
-    cfg.voice.enabled = not cfg.voice.enabled; notifyChange()
-  end
-  cfg.failures = cfg.failures or {}
-  if cfg.failures.enabled == nil then cfg.failures.enabled = false end
-  if ui.checkbox("Falhas IA##fail_core", cfg.failures.enabled) then
-    cfg.failures.enabled = not cfg.failures.enabled; notifyChange()
-  end
-  helpMarker("Pit Real = limite da pista; Telemetria = CSV por volta em Documents; Voz = beep em avisos; Falhas = IA pode quebrar (0.08/h).")
-end
-
--- ==========================================================
 -- Low Downforce AI (Core tab)
 -- ==========================================================
 local function drawLowDownforceAISection(sim, cfg)
@@ -1069,6 +910,128 @@ local function drawRollingStartSection(sim, cfg)
   end
 end
 
+-- ==========================================================
+-- v0.15.1 (Sug1): cards unificados
+--  * Ritmo & Dificuldade = Difficulty + Physics Intensity + Pace
+--  * Pit Real & Falhas = pitSpeedReal + failures (sai telemetria/voz daqui)
+--  * Telemetria & Voz = CSV + modulo de voz (fonte unica, so no HUD)
+--  (v0.22.0: movidos p/ depois das seções que usam — forward-ref vira global nil)
+-- ==========================================================
+local function drawRhythmSection(sim, cfg)
+  drawDifficultyBoostSection(sim, cfg)
+  drawPhysicsIntensitySection(sim, cfg)
+  drawPaceSection(sim, cfg)
+end
+
+local function drawFailuresSection(sim, cfg)
+  ui.text("Falhas mecânicas da IA")
+  helpMarker("Leigo: a IA pode quebrar e ir ao box.\nTécnico: chance/hora por IA após minLap.")
+  cfg.failures = cfg.failures or {}
+  if cfg.failures.enabled == nil then cfg.failures.enabled = false end
+  if ui.checkbox("Falhas mecânicas da IA##fail_only", cfg.failures.enabled) then
+    cfg.failures.enabled = not cfg.failures.enabled; notifyChange()
+  end
+  helpMarker("Leigo: IA pode quebrar e ir ao box.\nTécnico: chance/hora por IA após minLap.")
+  if cfg.failures.enabled then
+    cfg.failures.chancePerHour = tonumber(cfg.failures.chancePerHour) or 0.08
+    local newCh = sliderBlock("Chance por hora", "fail_ch", cfg.failures.chancePerHour, 0, 1, "%.2f",
+      "Leigo: 0.08 = ~8% por hora por IA.\nTécnico: probabilidade/hora convertida por frame.")
+    if newCh ~= nil then
+      local val = clamp(newCh, 0, 1)
+      if math.abs(val - cfg.failures.chancePerHour) > 0.0005 then cfg.failures.chancePerHour = val; notifyChange() end
+    end
+  end
+end
+
+-- Voz (v0.15.1, Sug5): fila por eventos inspirada no AC-Engineer-Spotter-Audio
+-- (cooldown por grupo, prioridade, clips opcionais em sfx/voice/<CAT>/).
+local function drawVoiceSection(sim, cfg)
+  cfg.voice = cfg.voice or {}
+  if cfg.voice.enabled == nil then cfg.voice.enabled = true end
+  if ui.checkbox("Ativar voz##voice_en", cfg.voice.enabled) then
+    cfg.voice.enabled = not cfg.voice.enabled; notifyChange()
+  end
+  helpMarker("Leigo: avisos falados/beep sem CrewChief.\nTécnico: fila FIFO com cooldown por grupo + prioridade; clips opcionais em sfx/voice/.")
+  if not cfg.voice.enabled then
+    ui.textDisabled("Voz desligada — só mensagens de texto.")
+    return
+  end
+  cfg.voice.volume = tonumber(cfg.voice.volume) or 0.8
+  local newV = sliderBlock("Volume", "voice_vol", cfg.voice.volume, 0, 1, "%.2f",
+    "Leigo: altura do aviso.\nTécnico: ganho aplicado ao AudioEvent/beep.")
+  if newV ~= nil then
+    local val = clamp(newV, 0, 1)
+    if math.abs(val - cfg.voice.volume) > 0.001 then cfg.voice.volume = val; notifyChange() end
+  end
+  cfg.voice.speed = tonumber(cfg.voice.speed) or 1.0
+  local newS = sliderBlock("Velocidade da fala", "voice_spd", cfg.voice.speed, 0.75, 1.5, "%.2f",
+    "Leigo: mais rápido/devagar.\nTécnico: pitch do AudioEvent (beeps não mudam).")
+  if newS ~= nil then
+    local val = clamp(newS, 0.75, 1.5)
+    if math.abs(val - cfg.voice.speed) > 0.001 then cfg.voice.speed = val; notifyChange() end
+  end
+  cfg.voice.categories = cfg.voice.categories or {}
+  local cats = {
+    { id = "limits",  label = "Track limits" },
+    { id = "pit",     label = "Pit speed" },
+    { id = "caution", label = "Caution" },
+    { id = "penalty", label = "Punições" },
+  }
+  ui.textDisabled("Categorias avisadas:")
+  for _, c in ipairs(cats) do
+    if cfg.voice.categories[c.id] == nil then cfg.voice.categories[c.id] = true end
+    if ui.checkbox(c.label .. "##voice_cat_" .. c.id, cfg.voice.categories[c.id]) then
+      cfg.voice.categories[c.id] = not cfg.voice.categories[c.id]; notifyChange()
+    end
+    ui.sameLine(0, 8)
+  end
+  ui.newLine(4)
+  ui.textDisabled("Testar (ignora cooldown):")
+  for _, c in ipairs(cats) do
+    if ui.button("▶ " .. c.label .. "##voice_test_" .. c.id, vec2(120, 24)) then
+      if RARE2_API.voiceTest then RARE2_API.voiceTest(c.id) end
+    end
+    ui.sameLine(0, 6)
+  end
+  ui.newLine(4)
+  local vs = RARE2_API.voiceGetState and RARE2_API.voiceGetState() or {}
+  if vs.available then
+    local parts = {}
+    for _, c in ipairs(cats) do
+      parts[#parts + 1] = c.id .. ":" .. tostring((vs.clips or {})[c.id] or 0)
+    end
+    ui.textDisabled("Áudio: API ok • clips (" .. table.concat(parts, " ") .. ")")
+    ui.textDisabled("Para voz falada, coloque .mp3/.wav/.ogg em sfx/voice/LIMITS|PIT|CAUTION|PENALTY.")
+  else
+    ui.textDisabled("Áudio: ac.AudioEvent indisponível — usando beep + mensagem.")
+  end
+  if vs.busy then ui.textDisabled("Fila: ocupada (" .. tostring(vs.queue or 0) .. " pendentes)") end
+end
+
+local function drawTelemetryVoiceSection(sim, cfg)
+  ui.text("Telemetria & Voz")
+  helpMarker("Leigo: grava voltas em CSV + avisos por voz.\nTécnico: CSV em Documents + fila de áudio por eventos.")
+  cfg.telemetryCSV = cfg.telemetryCSV or {}
+  if cfg.telemetryCSV.enabled == nil then cfg.telemetryCSV.enabled = false end
+  if ui.checkbox("Gravar telemetria CSV##tel_en", cfg.telemetryCSV.enabled) then
+    cfg.telemetryCSV.enabled = not cfg.telemetryCSV.enabled; notifyChange()
+  end
+  helpMarker("Leigo: um CSV por volta em Documents/Assetto Corsa.\nTécnico: lap, posição, combustível, pneus, tempos.")
+  if cfg.telemetryCSV.enabled then
+    cfg.telemetryCSV.maxLaps = tonumber(cfg.telemetryCSV.maxLaps) or 500
+    local newM = sliderBlock("Máximo de voltas no arquivo", "tel_max", cfg.telemetryCSV.maxLaps, 50, 2000, "%.0f",
+      "Leigo: limite do arquivo atual.\nTécnico: rotação simples por sessão.")
+    if newM ~= nil then
+      local val = math.floor(clamp(newM, 50, 2000) + 0.5)
+      if val ~= cfg.telemetryCSV.maxLaps then cfg.telemetryCSV.maxLaps = val; notifyChange() end
+    end
+  end
+  ui.newLine(4)
+  ui.separator()
+  ui.newLine(4)
+  drawVoiceSection(sim, cfg)
+end
+
 -------------------------------------------------------
 -- TAB: ABOUT
 -------------------------------------------------------
@@ -1380,123 +1343,6 @@ local function drawGitHubUpdateSection(sim, cfg)
   if gState.publishedAt and gState.publishedAt ~= "" then
     ui.newLine(2)
     ui.textDisabled("Publicado em: " .. gState.publishedAt)
-  end
-end
-
-
--- ==========================================================
--- TAB: Web UI Remote
--- ==========================================================
-local function drawWebUISection(sim, cfg)
-  cfg.webui = cfg.webui or {}
-
-  ui.text("Web UI Remota (painel pronto em web/)")
-  ui.textDisabled("Rode web/panel_server.py e abra panel.html (PC, celular ou OBS).")
-  helpMarker("Interface remota via arquivos JSON compartilhados. Ferramenta externa lê status e escreve comandos.\nStatus: Documents/Assetto Corsa/RaceFlow_webui_status.json\nComandos: Documents/Assetto Corsa/RaceFlow_webui_cmd.json")
-
-  local wState = RARE2_API.webuiGetState and RARE2_API.webuiGetState() or {
-    statusFile = "Documents/Assetto Corsa/RaceFlow_webui_status.json",
-    commandFile = "Documents/Assetto Corsa/RaceFlow_webui_cmd.json",
-    authToken = "(none)",
-    pollInterval = 0.5,
-  }
-
-  -- Status
-  ui.newLine(2)
-  if cfg.webui.enabled then
-    if rgbm then
-      ui.textColored("🟢 Web UI ATIVA", rgbm(0.3, 1.0, 0.3, 1))
-    else
-      ui.text("Web UI ATIVA")
-    end
-    ui.text("Arquivo de Status: " .. wState.statusFile)
-    ui.text("Arquivo de Comandos: " .. wState.commandFile)
-    ui.text("Token: " .. wState.authToken)
-    ui.text("Intervalo de escrita: " .. wState.pollInterval .. "s")
-  else
-    ui.textDisabled("⚪ Web UI Desativada")
-  end
-
-  ui.newLine(3)
-  ui.separator()
-
-  -- Enable toggle
-  local webuiEnabled = (cfg.webui.enabled == true)
-  if ui.checkbox("Ativar Web UI", webuiEnabled) then
-    cfg.webui.enabled = not webuiEnabled
-    notifyChange()
-  end
-
-  if cfg.webui.enabled then
-    ui.indent(12)
-
-    cfg.webui.port = cfg.webui.port or 8080
-    local newPort = sliderBlock("Porta (referência)", "webui_port", cfg.webui.port, 1024, 65535, "%.0f",
-      "Leigo: só um rótulo — o CSP não tem servidor HTTP, a Web UI usa arquivos.\nTécnico: polling em Documents/Assetto Corsa/RaceFlow_webui_*.json a cada 0.5 s.")
-    if newPort ~= nil then
-      local val = math.floor(clamp(newPort, 1024, 65535) + 0.5)
-      if val ~= cfg.webui.port then cfg.webui.port = val; notifyChange() end
-    end
-    ui.textDisabled("Nota: CSP não tem servidor HTTP. Porta é apenas referência para ferramenta externa.")
-
-    cfg.webui.authToken = cfg.webui.authToken or ""
-    ui.text("Bearer Token (opcional):")
-    if ui.inputText then
-      ui.setNextItemWidth(ui.windowWidth() - 60)
-      local newToken = ui.inputText("##webui_token", cfg.webui.authToken)
-      if newToken ~= nil and newToken ~= cfg.webui.authToken then
-        cfg.webui.authToken = newToken
-        notifyChange()
-      end
-    else
-      ui.textDisabled("Edição de texto indisponível nesta build do CSP.")
-    end
-    helpMarker("Deixe vazio para desativar autenticação. Ferramenta externa deve enviar header 'Authorization: Bearer <token>'.")
-
-    ui.unindent(12)
-  end
-
-  ui.newLine(3)
-  ui.separator()
-
-  -- Example client code (v0.15.1 Sug4: oculto por padrão)
-  cfg._ui_state = cfg._ui_state or {}
-  if ui.button(((cfg._ui_state["sys_web_ex"] and "▼ ") or "▶ ") .. "Exemplo de Cliente (Python)##web_ex", vec2(-1, 28)) then
-    cfg._ui_state["sys_web_ex"] = not cfg._ui_state["sys_web_ex"]
-  end
-  if cfg._ui_state["sys_web_ex"] then
-  ui.text("Exemplo de Cliente (Python):")
-  ui.separator()
-  ui.textWrapped([[
-import json, time, requests
-
-STATUS_FILE = "RaceFlow_webui_status.json"
-CMD_FILE = "RaceFlow_webui_cmd.json"
-TOKEN = "seu_token_aqui"  # ou None
-
-def send_command(action, params=None):
-    cmd = {
-        "commands": [{
-            "id": int(time.time() * 1000),
-            "action": action,
-            "params": params or {},
-            "token": TOKEN
-        }]
-    }
-    with open(CMD_FILE, "w") as f:
-        json.dump(cmd, f)
-
-# Loop de polling
-while True:
-    with open(STATUS_FILE) as f:
-        status = json.load(f)
-    print(f"Cars: {len(status['cars'])}, leader: {status['leaderboard'][0]['driver'] if status['leaderboard'] else '-'}")
-
-    # Exemplo: alternar rolling start
-    # send_command("rolling_toggle")
-
-    time.sleep(0.5)
-]])
   end
 end
 
@@ -1905,10 +1751,6 @@ local function drawAppearanceSection(sim, cfg)
 end
 
 local function drawAboutSection(sim, cfg)
-  drawAppearanceSection(sim, cfg)
-  ui.newLine(4)
-  ui.separator()
-  ui.newLine(4)
   ui.text("ApexFlow v" .. (SCRIPT_VERSION or _G.RACEFLOW_VERSION or _G.APEXFLOW_VERSION or "?"))
   ui.textDisabled("Independent race suite for Assetto Corsa — offline AI, strategy & race control.")
 
@@ -2609,11 +2451,11 @@ local function drawAiInspector(sim, cfg)
       { advanced = true },
       function(s, c) drawLowDownforceAISection(s, c) end, sim)
   end
-  if matchesSearch(cfg, "pit box limite real quebra falha") then
-    view(cfg, "ai_pitfail", "06", "Box e quebras",
-      "Limite de box da pista de verdade + IA que pode quebrar.",
+  if matchesSearch(cfg, "falha quebra mecanica box ia") then
+    view(cfg, "ai_fail", "06", "Falhas da IA",
+      "A IA pode quebrar e ir ao box. Pit-real fica em Segurança.",
       {},
-      function(s, c) drawPitFailuresSection(s, c) end, sim)
+      function(s, c) drawFailuresSection(s, c) end, sim)
   end
   if matchesSearch(cfg, "aprende memoria curva erro") then
     view(cfg, "ai_learn", "07", "IA que aprende",
@@ -2675,12 +2517,6 @@ local function drawHudInspector(sim, cfg)
       {},
       function(s, c) drawTelemetryVoiceSection(s, c) end, sim)
   end
-  if matchesSearch(cfg, "memoria aprender limpar pista") then
-    view(cfg, "hud_learn", "03", "Memória",
-      "Ver e apagar o que a IA aprendeu por pista.",
-      { advanced = true },
-      function(s, c) drawLearningModuleSection(s, c) end, sim)
-  end
 end
 
 local function drawSysInspector(sim, cfg)
@@ -2699,14 +2535,8 @@ local function drawSysInspector(sim, cfg)
       { status = gs.hasUpdate and "nova!" or "" },
       function(s, c) drawGitHubUpdateSection(s, c) end, sim)
   end
-  if matchesSearch(cfg, "web remota avancado externo painel") then
-    view(cfg, "sys_web", "03", "Web remota (painel)",
-      "Painel no navegador: ver a corrida e mandar comandos.",
-      {},
-      function(s, c) drawWebUISection(s, c) end, sim)
-  end
   if matchesSearch(cfg, "ajuda sobre como funciona") then
-    view(cfg, "sys_about", "04", "Ajuda",
+    view(cfg, "sys_about", "03", "Ajuda",
       "O que cada parte faz, em linguagem simples.",
       {},
       function(s, c) drawAboutSection(s, c) end, sim)
