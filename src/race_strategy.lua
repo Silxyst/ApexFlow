@@ -92,7 +92,7 @@ local function maybeChangeTyresInPit(cfg, carIndex)
   local patch = (ac.getPatchVersionCode and ac.getPatchVersionCode()) or 0
   if patch < 2278 then return end
 
-  local car = ac.getCar(carIndex)
+  local ok, car = pcall(ac.getCar, carIndex) if not ok then car = nil end
   if not car then return end
 
   local wearMax = getMaxTyreWear(car)
@@ -340,7 +340,7 @@ function M.update(dt, sim, cfg)
   local totalLaps = raceLaps(cfg)
 
   for i = 1, carsCount - 1 do
-    local car = ac.getCar(i)
+    local ok, car = pcall(ac.getCar, i) if not ok then car = nil end
     if car then
       local st = getCarState(cfg, i)
 

@@ -411,7 +411,7 @@ local function readMaybeFunction(carObj, v)
 end
 
 local function getCarIdForIndex(i)
-  local car = ac.getCar(i)
+  local ok, car = pcall(ac.getCar, i) if not ok then car = nil end
   if not car then return nil end
 
   -- Try the common identifiers
@@ -517,7 +517,7 @@ function M.getSessionCarStats(sim, cfg)
   -- collect AI indices
   local indices = {}
   for i = 0, (sim.carsCount - 1) do
-    local car = ac.getCar(i)
+    local ok, car = pcall(ac.getCar, i) if not ok then car = nil end
     if car and car.isAIControlled then
       indices[#indices + 1] = i
     end
@@ -1258,7 +1258,7 @@ local function rebuildDrivers(sim, cfg)
 
   local aiCars = {}
   for i = 0, carsCount - 1 do
-    local car = ac.getCar(i)
+    local ok, car = pcall(ac.getCar, i) if not ok then car = nil end
     if car and car.isAIControlled then
       local name = ac.getDriverName(i) or ("AI" .. i)
       local key  = tostring(i) .. "|" .. name

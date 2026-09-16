@@ -89,6 +89,11 @@ local function gamePenaltyTime(car)
   return v
 end
 
+local function safeCarSpeed(car)
+  local ok, v = pcall(function() return car.speedKmh end)
+  return ok and tonumber(v) or 99
+end
+
 local function getState(i)
   local s = cars[i]
   if s then return s end
@@ -193,7 +198,7 @@ local function serveStep(i, car, dt, sim, cfg, needBrake)
 
   local inPitlane = car.isInPitlane
   local canServe = (t.strictPit and inPitlane and car.isInPit) or inPitlane
-  local stopped = (car.speedKmh or 99) <= 1.0
+  local stopped = (safeCarSpeed(car) or 99) <= 1.0
   local brakeHeld = (car.brake or 0) > 0.7
 
   -- Track pit exit with unserved penalty -> extra time (Mavil rule)
@@ -292,7 +297,7 @@ local function updateCar(i, car, dt, sim, cfg, isPlayer)
     s.awaitingReset = false
   end
 
-  if car.isInPitlane or car.isInPit or (car.speedKmh or 0) < 20 then
+  if car.isInPitlane or car.isInPit or (safeCarSpeed(car) or 0) < 20 then
     -- In pits / too slow: no new detections, and re-arm the edge trigger
     -- (otherwise an off-track exit from pits would never warn again).
     s.offPrev = false
@@ -300,7 +305,7 @@ local function updateCar(i, car, dt, sim, cfg, isPlayer)
     -- v0.10.0: pit-lane speeding. Sustained over the limit in the lane
     -- (not parked in the box) -> time penalty. 10 s cooldown per car.
     if t.pitSpeedEnabled and car.isInPitlane and not car.isInPit then
-      local spd = car.speedKmh or 0
+      local spd = safeCarSpeed(car) or 0
       local lim = t.pitLimitKmh or 80
       if spd > lim then
         s.pitOverTime = (s.pitOverTime or 0) + dt
@@ -330,7 +335,7 @@ local function updateCar(i, car, dt, sim, cfg, isPlayer)
     local compatHold = t.gamePenaltyCompat and s.gamePen > 0.5
     local allowed = getAllowedTyresOut(sim)
     local useSync = t.syncWithCMRT and allowed >= 0 and allowed < 4
-    local wheelsOut = car.wheelsOutside or 0
+    local ok_wo, wheelsOut = pcall(function() return car.wheelsOutside end) wheelsOut = tonumber(wheelsOut) or 0
     local off = useSync and (wheelsOut > allowed) or (wheelsOut >= (t.wheels or 4))
     -- v0.10.0 precision: count only SUSTAINED off-track (debounce brief kerb touches).
     -- v0.11.1: CMRT uses 0.2s confirm (2 samples at 10 Hz) — match when synced.

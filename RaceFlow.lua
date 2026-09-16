@@ -1,10 +1,10 @@
 -- ApexFlow — Independent race suite for Assetto Corsa (v0.13.0)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.14.4"
+SCRIPT_VERSION = "0.15.0"
 
 _G.RARE2_API = _G.RARE2_API or {}
 local RARE2_API = _G.RARE2_API
-_G.RACEFLOW_VERSION = "0.14.4"
+_G.RACEFLOW_VERSION = "0.15.0"
 _G.APEXFLOW_VERSION = "0.13.1"
 
 -- Per-module load status, shown in the fallback window so a future
@@ -69,7 +69,7 @@ local RARE2_CFG = {
     fcyChance = 0.5,
     autoTrigger = true,
     minDrivenKm = 0.5,
-    cooldown = 10,
+    cooldown = 3, -- v0.14.5: sync with tracklimits (was 10)
     overtakeEnabled = true,   -- v0.8.0: punish player overtakes
     giveBackTime = 10,
     overtimePenalty = 5,
@@ -82,7 +82,7 @@ local RARE2_CFG = {
     penaltiesEnabled = true,
     maxWarnings = 4,
     penaltyTime = 5,
-    cooldown = 3, -- v0.14.4: 3s (sync CMRT)
+    cooldown = 3, -- v0.15.0: 3s (sync CMRT)
     extraTime = 10,
     strictPit = false,
     waitTime = 1.9,
@@ -91,9 +91,9 @@ local RARE2_CFG = {
     aiServe = false,
     qualiReset = true,
     finishAdd = true,
-    gamePenaltyCompat = false, -- v0.14.4: OFF (independente do jogo, nao pausa aviso)
-    syncWithCMRT = true,      -- v0.14.4: ON (espelha CMRT, fixa 1 vs 11)
-    minOffTime = 0.15,        -- v0.14.4: more sensitive (was 0.25)
+    gamePenaltyCompat = false, -- v0.15.0: OFF (independente do jogo, nao pausa aviso)
+    syncWithCMRT = true,      -- v0.15.0: ON (espelha CMRT, fixa 1 vs 11)
+    minOffTime = 0.15,        -- v0.15.0: more sensitive (was 0.25)
     pitSpeedEnabled = true,   -- v0.10.0: punish pit-lane speeding
     pitLimitKmh = 80,
     pitGraceSec = 1.0,
@@ -192,7 +192,7 @@ local function applyCategoryPreset(catKey)
   local p = CATEGORY_PRESETS[catKey]
   if not p then return false end
   RARE2_CFG.categoryPreset = catKey
-  -- v0.14.4: preset ativa o sistema para feedback imediato
+  -- v0.15.0: preset ativa o sistema para feedback imediato
   if RARE2_CFG.tracklimits then RARE2_CFG.tracklimits.enabled = true end
   if p.tracklimits then
     for k, v in pairs(p.tracklimits) do
@@ -210,8 +210,8 @@ local function applyCategoryPreset(catKey)
   return true
 end
 _G.RARE2_API = _G.RARE2_API or {}
-_G.RARE2_API.applyCategoryPreset = applyCategoryPreset
-_G.RARE2_API.getCategoryPresets = function() return CATEGORY_PRESETS end
+RARE2_API.applyCategoryPreset = applyCategoryPreset
+RARE2_API.getCategoryPresets = function() return CATEGORY_PRESETS end
 
 -- ----------------------------------------------------------
 -- Pit speed — real track limit (v0.14.0)
@@ -234,7 +234,7 @@ local function getRealPitSpeedLimit(sim)
   return nil
 end
 _G.RARE2_API = _G.RARE2_API or {}
-_G.RARE2_API.getRealPitSpeedLimit = getRealPitSpeedLimit
+RARE2_API.getRealPitSpeedLimit = getRealPitSpeedLimit
 
 -- ----------------------------------------------------------
 -- Auto-save per track (v0.14.0)
@@ -275,8 +275,8 @@ local function loadPerTrackConfig(trackId)
   return true
 end
 _G.RARE2_API = _G.RARE2_API or {}
-_G.RARE2_API.savePerTrackConfig = savePerTrackConfig
-_G.RARE2_API.loadPerTrackConfig = loadPerTrackConfig
+RARE2_API.savePerTrackConfig = savePerTrackConfig
+RARE2_API.loadPerTrackConfig = loadPerTrackConfig
 
 -- ----------------------------------------------------------
 -- Telemetry CSV (v0.14.0) — lap-by-lap to Documents
@@ -345,7 +345,7 @@ local function playVoiceWarning(kind)
   end)
 end
 _G.RARE2_API = _G.RARE2_API or {}
-_G.RARE2_API.playVoiceWarning = playVoiceWarning
+RARE2_API.playVoiceWarning = playVoiceWarning
 
 -- ----------------------------------------------------------
 -- Light mechanical failures / driver errors for AI (v0.14.0)
@@ -524,7 +524,7 @@ if origSetMessage then
   end
 end
 _G.RARE2_API = _G.RARE2_API or {}
-_G.RARE2_API.getRaceMessages = function() return raceMsgLog end
+RARE2_API.getRaceMessages = function() return raceMsgLog end
 
 ---------------------------------------------------------------------
 -- CONFIG SAVE / LOAD
@@ -650,15 +650,15 @@ local function loadMemoryFromFile()
 end
 
 _G.RARE2_API = _G.RARE2_API or {}
-_G.RARE2_API.saveConfig = saveConfigToFile
-_G.RARE2_API.loadConfig = loadConfigFromFile
-_G.RARE2_API.saveMemory = saveMemoryToFile
-_G.RARE2_API.loadMemory = loadMemoryFromFile
-_G.RARE2_API.getMemory  = function() return RARE2_MEMORY end
-_G.RARE2_API.markConfigDirty = function()
-  if _G.RARE2_API then _G.RARE2_API._configDirty = true end
+RARE2_API.saveConfig = saveConfigToFile
+RARE2_API.loadConfig = loadConfigFromFile
+RARE2_API.saveMemory = saveMemoryToFile
+RARE2_API.loadMemory = loadMemoryFromFile
+RARE2_API.getMemory  = function() return RARE2_MEMORY end
+RARE2_API.markConfigDirty = function()
+  if _G.RARE2_API then RARE2_API._configDirty = true end
 end
-_G.RARE2_API.resetToDefaults = function()
+RARE2_API.resetToDefaults = function()
     RARE2_CFG.aggression = 50
     RARE2_CFG.difficultyBoost = 100
     RARE2_CFG.paceStrength = 65
@@ -874,8 +874,8 @@ function script.update(dt)
     configLoaded = true
   end
 
-  if not memoryLoaded and _G.RARE2_API and _G.RARE2_API.loadMemory then
-    _G.RARE2_API.loadMemory()
+  if not memoryLoaded and _G.RARE2_API and RARE2_API.loadMemory then
+    RARE2_API.loadMemory()
     memoryLoaded = true
   end
 
@@ -997,20 +997,20 @@ function script.update(dt)
   end
 
   memorySaveCooldown = math.max(0.0, memorySaveCooldown - dt)
-  if _G.RARE2_API and _G.RARE2_API._memoryDirty and memorySaveCooldown <= 0.0 then
-    if _G.RARE2_API.saveMemory then
-      pcall(_G.RARE2_API.saveMemory)
+  if _G.RARE2_API and RARE2_API._memoryDirty and memorySaveCooldown <= 0.0 then
+    if RARE2_API.saveMemory then
+      pcall(RARE2_API.saveMemory)
     end
-    _G.RARE2_API._memoryDirty = false
+    RARE2_API._memoryDirty = false
     memorySaveCooldown = memorySaveInterval
   end
 
   configSaveCooldown = math.max(0.0, configSaveCooldown - dt)
-  if _G.RARE2_API and _G.RARE2_API._configDirty and configSaveCooldown <= 0.0 then
-    if _G.RARE2_API.saveConfig then
-      pcall(_G.RARE2_API.saveConfig)
+  if _G.RARE2_API and RARE2_API._configDirty and configSaveCooldown <= 0.0 then
+    if RARE2_API.saveConfig then
+      pcall(RARE2_API.saveConfig)
     end
-    _G.RARE2_API._configDirty = false
+    RARE2_API._configDirty = false
     configSaveCooldown = configSaveInterval
   end
 end
@@ -1021,14 +1021,14 @@ end
 -- GitHub state is LOCAL single-source (no dual-state modules).
 -- v0.6.0: caution exports (module is single-source).
 -- ==========================================================
-_G.RARE2_API.getCautionState = function() return caution and caution.getState and caution.getState() or {} end
-_G.RARE2_API.cautionManualTrigger = function(sim, cfg) return caution and caution.manualTrigger and caution.manualTrigger(sim or ac.getSim(), cfg or RARE2_CFG) end
-_G.RARE2_API.getTrackLimitsState = function() return tracklimits and tracklimits.getState and tracklimits.getState() or {} end
-_G.RARE2_API.getStrategyState = function(cfg) return strategy and strategy.getState and strategy.getState(cfg or RARE2_CFG) or {} end
-_G.RARE2_API.githubCheckUpdates = function(cfg, force)
+RARE2_API.getCautionState = function() return caution and caution.getState and caution.getState() or {} end
+RARE2_API.cautionManualTrigger = function(sim, cfg) return caution and caution.manualTrigger and caution.manualTrigger(sim or ac.getSim(), cfg or RARE2_CFG) end
+RARE2_API.getTrackLimitsState = function() return tracklimits and tracklimits.getState and tracklimits.getState() or {} end
+RARE2_API.getStrategyState = function(cfg) return strategy and strategy.getState and strategy.getState(cfg or RARE2_CFG) or {} end
+RARE2_API.githubCheckUpdates = function(cfg, force)
   githubCheckUpdates(cfg or RARE2_CFG, force)
 end
-_G.RARE2_API.githubGetState = function()
+RARE2_API.githubGetState = function()
   return {
     checking = githubState.checking,
     lastCheck = githubState.lastCheck,
@@ -1043,7 +1043,7 @@ _G.RARE2_API.githubGetState = function()
     repo = RARE2_CFG.githubUpdate and RARE2_CFG.githubUpdate.repo or "Silxyst/RaceFlow-V2",
   }
 end
-_G.RARE2_API.webuiGetState = function() return webui and webui.getState and webui.getState() or {} end
+RARE2_API.webuiGetState = function() return webui and webui.getState and webui.getState() or {} end
 
 -- ==========================================================
 -- WINDOWS
@@ -1146,7 +1146,7 @@ local function drawRaceEventsBody()
 
     -- Race Control message mirror (v0.13.0): last ac.setMessage banners
     if hudCfg.showMessages ~= false then
-      local msgs = _G.RARE2_API and _G.RARE2_API.getRaceMessages and _G.RARE2_API.getRaceMessages() or {}
+      local msgs = _G.RARE2_API and RARE2_API.getRaceMessages and RARE2_API.getRaceMessages() or {}
       if #msgs > 0 then
         if not compact then ui.textDisabled("📢 Race Control:") end
         for i = 1, math.min(3, #msgs) do
@@ -1217,7 +1217,7 @@ local function drawRaceEventsBody()
 
     -- Caution status
     if showCaution then
-      local cs = _G.RARE2_API and _G.RARE2_API.getCautionState and _G.RARE2_API.getCautionState() or {}
+      local cs = _G.RARE2_API and RARE2_API.getCautionState and RARE2_API.getCautionState() or {}
       if cs.active then
         if cs.mode == "FCY" then
           hudBlinkText(string.format("🟡 FCY %.0fs / %.0fs", cs.timer or 0, cs.duration or 0), amber, hudCfg)
@@ -1242,7 +1242,7 @@ local function drawRaceEventsBody()
 
     -- Track limits status (player)
     if showLimits then
-      local ts = _G.RARE2_API and _G.RARE2_API.getTrackLimitsState and _G.RARE2_API.getTrackLimitsState() or {}
+      local ts = _G.RARE2_API and RARE2_API.getTrackLimitsState and RARE2_API.getTrackLimitsState() or {}
       if ts.penaltyActive and (ts.timeLeft or 0) > 0 then
         hudBlinkText(string.format("🛑 Penalty: %.1fs%s", ts.timeLeft, ts.serving and " (serving)" or ""), red, hudCfg)
         if (ts.origTime or 0) > 0 then hudBar((ts.timeLeft or 0) / ts.origTime, hudCfg) end
@@ -1271,7 +1271,7 @@ local function drawRaceEventsBody()
 
     -- Strategy (next pit)
     if showStrategy and inSession then
-      local st = _G.RARE2_API and _G.RARE2_API.getStrategyState and _G.RARE2_API.getStrategyState(RARE2_CFG) or {}
+      local st = _G.RARE2_API and RARE2_API.getStrategyState and RARE2_API.getStrategyState(RARE2_CFG) or {}
       if st and st.cars and #st.cars > 0 then
         -- Find player's next pit or nearest AI
         local nextPit = nil
@@ -1294,7 +1294,7 @@ local function drawRaceEventsBody()
 
     -- Learning (when enabled)
     if showLearn then
-      local mem = _G.RARE2_API and _G.RARE2_API.getMemory and _G.RARE2_API.getMemory() or nil
+      local mem = _G.RARE2_API and RARE2_API.getMemory and RARE2_API.getMemory() or nil
       if mem and mem.tracks then
         local cnt = 0
         for _ in pairs(mem.tracks) do cnt = cnt + 1 end
