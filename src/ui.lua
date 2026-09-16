@@ -2218,6 +2218,7 @@ local function view(cfg, id, num, title, summary, opts, fn, sim)
     if not isOpen then trackSection(cfg, id) end
     isOpen = not isOpen
   end
+  hand()
   if summary and summary ~= "" then ui.textDisabled("      " .. summary) end
   if isOpen then
     ui.indent(12)
@@ -2295,7 +2296,140 @@ local function drawCommandBar(sim, cfg)
   end
 end
 
--- ---------------- trilho ----------------
+-- ---------------- peças classe-Dream (v0.20.0) ----------------
+-- Raiz do app p/ assets (mesmo truque do AC-Engineer: ScriptOrigin).
+local function appRoot()
+  if not (ac and ac.getFolder and ac.FolderID) then return nil end
+  local ok, dir = pcall(ac.getFolder, ac.FolderID.ScriptOrigin)
+  if ok and dir and dir ~= "" then return tostring(dir) end
+  return nil
+end
+
+-- Título com Segoe UI Bold quando existir (pcall, como o Dream faz);
+-- senão cai para a fonte Title. Nunca quebra.
+local function titleText(txt, color)
+  if ui.pushDWriteFont and ui.popDWriteFont then
+    local ok = pcall(ui.pushDWriteFont, "Segoe UI;Weight=Bold")
+    if ok then
+      if color and rgbm then ui.textColored(txt, color) else ui.text(txt) end
+      pcall(ui.popDWriteFont)
+      return
+    end
+  end
+  ui.pushFont(ui.Font.Title)
+  if color and rgbm then ui.textColored(txt, color) else ui.text(txt) end
+  ui.popFont()
+end
+
+-- Cursor de mão sobre o último widget (tudo guardado).
+local function hand()
+  if ui.setMouseCursor and ui.MouseCursor and ui.MouseCursor.Hand and ui.itemHovered then
+    local ok, hov = pcall(ui.itemHovered)
+    if ok and hov then pcall(ui.setMouseCursor, ui.MouseCursor.Hand) end
+  end
+end
+
+-- Largura útil (responsivo como o Dream: availableSpaceX com fallback).
+local function contentWidth()
+  if ui.availableSpaceX then
+    local ok, w = pcall(ui.availableSpaceX)
+    if ok and tonumber(w) and tonumber(w) > 100 then return tonumber(w) end
+  end
+  return math.max(300, ui.windowWidth() - 20)
+end
+
+-- Cabeçalho com logo (icon.png) à esquerda, estilo Dream.
+local function drawLogoHeader()
+  local shown = false
+  if ui.image then
+    local root = appRoot()
+    if root then
+      local f = io.open(tostring(root) .. "/icon.png", "rb")
+      if f then
+        f:close()
+        if rgbm then
+          shown = pcall(function()
+            ui.image(tostring(root) .. "/icon.png", vec2(46, 46), rgbm(1, 1, 1, 1))
+          end)
+        else
+          shown = pcall(function()
+            ui.image(tostring(root) .. "/icon.png", vec2(46, 46))
+          end)
+        end
+      end
+    end
+  end
+  if shown then ui.sameLine(0, 12) end
+  titleText("APEXFLOW", C.accent())
+  ui.sameLine(0, 10)
+  ui.textDisabled("v" .. (SCRIPT_VERSION or "?"))
+  ui.newLine(1)
+  ui.textDisabled(" central de IA, estratégia e direção de prova ")
+end
+
+-- Splash de lançamento (1x por versão, pulável, sem espera forçada).
+local function drawSplash(cfg)
+  drawLogoHeader()
+  ui.newLine(6)
+  titleText("Bem-vindo ao ApexFlow", nil)
+  ui.textDisabled("Sua central de IA, estratégia e direção de prova.")
+  ui.newLine(4)
+  ui.text("✅  1 · Escolha um preset de corrida")
+  ui.text("✅  2 · Ative a fiscalização e a voz")
+  ui.text("✅  3 · Entre em pista — o resto é automático")
+  ui.newLine(6)
+  if ui.button("🏁 Começar##splash_go", vec2(-1, 36)) then
+    cfg._splashSeen = (SCRIPT_VERSION or "?")
+    cfg._onboardHide = false
+    cfg._wizStep = 1
+    notifyChange()
+  end
+  hand()
+  ui.newLine(2)
+  if ui.button("Não mostrar de novo##splash_hide", vec2(-1, 28)) then
+    cfg._splashSeen = (SCRIPT_VERSION or "?")
+    cfg._splashHide = true
+    notifyChange()
+  end
+  hand()
+  ui.newLine(2)
+  ui.textDisabled("Aparece 1x por versão. O assistente completo está no Início.")
+end
+
+-- Tab-strip superior estilo Dream (pills + micro-label + badge).
+local function drawTabStrip(cfg, badges)
+  ui.textDisabled("SEÇÕES")
+  local avail = contentWidth()
+  local bw = math.max(120, (avail - 5 * 6) / 6)
+  for i, cat in ipairs(NAV_RAIL) do
+    if i > 1 then ui.sameLine(0, 6) end
+    local active = cfg.uiNav == cat.id
+    if active then
+      local glow = animPulse(3, 0.45, 0.7)
+      if rgbm then
+        local at = ACCENTS[THEME.accent] or ACCENTS.cyan
+        ui.pushStyleColor(ui.StyleColor.Button, rgbm(at[1]*glow*1.6, at[2]*glow*1.6, at[3]*glow*1.6, 1.00))
+      end
+    end
+    local dot = (badges and badges[cat.id]) and " •" or ""
+    if ui.button(cat.icon .. " " .. cat.label .. dot .. "##tab_" .. cat.id, vec2(bw, 34)) then
+      if cfg.uiNav ~= cat.id then cfg.uiNav = cat.id trackNav(cfg, cat.id) end
+    end
+    hand()
+    if active and rgbm then ui.popStyleColor() end
+  end
+  for _, cat in ipairs(NAV_RAIL) do
+    if cfg.uiNav == cat.id then
+      if rgbm then ui.textColored("━━━ " .. cat.label, C.accent())
+      else ui.text(cat.label) end
+      ui.sameLine(0, 8)
+      ui.textDisabled(cat.desc)
+      break
+    end
+  end
+end
+
+-- ---------------- trilho (legado v0.17–v0.19, mantido p/ fallback) ----------------
 local function railBadges(sim, cfg)
   local tl = RARE2_API.getTrackLimitsState and RARE2_API.getTrackLimitsState() or {}
   local cs = RARE2_API.getCautionState and RARE2_API.getCautionState() or {}
@@ -2310,26 +2444,7 @@ local function railBadges(sim, cfg)
   }
 end
 
-local function drawRail(cfg, badges)
-  ui.textDisabled("RF")
-  ui.separator()
-  for _, cat in ipairs(NAV_RAIL) do
-    local active = cfg.uiNav == cat.id
-    if active then
-      local glow = animPulse(3, 0.30, 0.55)
-      if rgbm then
-        local at = ACCENTS[THEME.accent] or ACCENTS.cyan
-        ui.pushStyleColor(ui.StyleColor.Button, rgbm(at[1]*glow*2, at[2]*glow*2, at[3]*glow*2, 1.00))
-      end
-    end
-    local dot = (badges and badges[cat.id]) and "•" or " "
-    if ui.button(cat.icon .. dot .. "##rail_" .. cat.id, vec2(48, 44)) then
-      if cfg.uiNav ~= cat.id then cfg.uiNav = cat.id trackNav(cfg, cat.id) end
-    end
-    if active and rgbm then ui.popStyleColor() end
-    if ui.setTooltip and ui.itemHovered and ui.itemHovered() then ui.setTooltip(cat.label .. " — " .. cat.desc) end
-  end
-end
+-- (navegação lateral removida na v0.20.0: agora é tab-strip superior estilo Dream)
 
 -- ---------------- barra de status ----------------
 local function drawStatusBar(sim, cfg)
@@ -2383,6 +2498,7 @@ local function drawPresetList(cfg)
           toast(cfg, "ok", "Preset", pr.label .. " aplicado")
           trackSection(cfg, "preset_" .. row.key)
         end
+        hand()
         ui.textDisabled("      " .. row.desc)
       end
       ui.newLine(2)
@@ -2457,7 +2573,7 @@ end
 
 -- ---------------- inspetores ----------------
 local function crumb(label)
-  ui.textDisabled("APEXFLOW › " .. label)
+  ui.textDisabled(("APEXFLOW › " .. label):upper())
   ui.newLine(2)
 end
 
@@ -2690,6 +2806,14 @@ function M.draw(sim, cfg)
   ensureUiState(cfg)
   if sim and sim.isSessionStarted then cfg._everInSession = true end
 
+  if cfg._splashSeen ~= (SCRIPT_VERSION or "?") and not cfg._splashHide then
+    drawSplash(cfg)
+    popDarkTheme()
+    return
+  end
+
+  drawLogoHeader()
+  ui.newLine(4)
   drawStateBand(sim, cfg)
   ui.newLine(2)
   drawCommandBar(sim, cfg)
@@ -2697,31 +2821,10 @@ function M.draw(sim, cfg)
   drawToasts(cfg)
   ui.separator()
 
-  local badges = railBadges(sim, cfg)
-  local hasChild = ui.beginChild ~= nil and ui.endChild ~= nil
-  if hasChild then
-    ui.beginChild("##rf_rail", vec2(60, 0), false)
-    drawRail(cfg, badges)
-    ui.endChild()
-    ui.sameLine(0, 6)
-    ui.beginChild("##rf_main", vec2(0, 0), false)
-  else
-    for _, cat in ipairs(NAV_RAIL) do
-      local active = cfg.uiNav == cat.id
-      if active and rgbm then
-        local at = ACCENTS[THEME.accent] or ACCENTS.cyan
-        ui.pushStyleColor(ui.StyleColor.Button, rgbm(at[1]*0.4, at[2]*0.4, at[3]*0.4, 1.00))
-      end
-      if ui.button(cat.icon .. "##rail_" .. cat.id, vec2(44, 30)) then
-        if cfg.uiNav ~= cat.id then cfg.uiNav = cat.id trackNav(cfg, cat.id) end
-      end
-      if active and rgbm then ui.popStyleColor() end
-      ui.sameLine(0, 4)
-    end
-    ui.newLine(4)
-    ui.separator()
-    ui.newLine(2)
-  end
+  drawTabStrip(cfg, railBadges(sim, cfg))
+  ui.newLine(2)
+  ui.separator()
+  ui.newLine(2)
 
   local nav = cfg.uiNav or "dash"
   local flash = (animT() - (cfg._navFlash or -10)) < 0.8
@@ -2759,12 +2862,9 @@ function M.draw(sim, cfg)
   end
   ui.sameLine(0, 8)
   if ui.button("🔄 Padrões", vec2(110, 26)) then
-    if RARE2_API.resetToDefaults then
-      RARE2_API.resetToDefaults()
-      cfg._resetFeedback = 180
-      toast(cfg, "warn", "Padrões de volta", "")
-    end
+    cfg._confirmReset = true
   end
+  hand()
   ui.sameLine(0, 8)
   if ui.button("📊 Painel", vec2(100, 26)) then
     if ac.setWindowOpen then pcall(ac.setWindowOpen, "events", true) end
@@ -2780,17 +2880,27 @@ function M.draw(sim, cfg)
     ui.textDisabled("✓ padrões")
   end
 
-  if hasChild then
-    ui.endChild()
+  -- Modal de confirmação estilo Dream (passo explícito, sem desfazer)
+  if cfg._confirmReset then
+    ui.newLine(4)
     ui.separator()
-    ui.beginChild("##rf_status", vec2(0, 24), false)
-    drawStatusBar(sim, cfg)
-    ui.endChild()
-  else
     ui.newLine(2)
-    ui.separator()
-    drawStatusBar(sim, cfg)
+    titleText("⚠️ Voltar aos padrões?", C.warn())
+    ui.textDisabled("Apaga TODOS os ajustes (perfis, limites, voz, tema). Sem desfazer.")
+    ui.newLine(2)
+    if ui.button("Sim, restaurar##cf_yes", vec2(170, 30)) then
+      if RARE2_API.resetToDefaults then RARE2_API.resetToDefaults() end
+      cfg._confirmReset = false
+      cfg._resetFeedback = 180
+      toast(cfg, "warn", "Padrões de volta", "")
+    end
+    ui.sameLine(0, 8)
+    if ui.button("Cancelar##cf_no", vec2(130, 30)) then cfg._confirmReset = false end
   end
+
+  ui.newLine(2)
+  ui.separator()
+  drawStatusBar(sim, cfg)
 
   popDarkTheme()
 end
