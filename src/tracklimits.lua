@@ -13,6 +13,11 @@
 
 local M = {}
 
+-- RARE2_API guard
+_G.RARE2_API = _G.RARE2_API or {}
+local RARE2_API = _G.RARE2_API
+
+
 -- Per-car state (index 0 = player, rest = AI)
 local cars = {}
 local lastSessionIndex = -1

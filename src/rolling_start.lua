@@ -9,6 +9,11 @@
 
 local M = {}
 
+-- RARE2_API guard
+_G.RARE2_API = _G.RARE2_API or {}
+local RARE2_API = _G.RARE2_API
+
+
 -- =========================================================
 -- Audio (CSP reliable): ui.MediaPlayer one-shot from absolute file path
 -- File location: assettocorsa/apps/lua/RaceFlow/sfx/rs_beep.wav

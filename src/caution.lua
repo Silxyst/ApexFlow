@@ -14,6 +14,11 @@
 
 local M = {}
 
+-- RARE2_API guard
+_G.RARE2_API = _G.RARE2_API or {}
+local RARE2_API = _G.RARE2_API
+
+
 local state = {
   mode = nil,            -- nil | "FCY" | "YELLOW"
   timer = 0,

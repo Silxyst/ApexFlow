@@ -2,6 +2,11 @@
 
 local M = {}
 
+-- RARE2_API guard (prevents nil errors if called before RaceFlow init)
+_G.RARE2_API = _G.RARE2_API or {}
+local RARE2_API = _G.RARE2_API
+
+
 local function hash01(s)
   local h = 0
   for i = 1, #s do
@@ -29,8 +34,8 @@ local function helpMarker(text)
 end
 
 local function notifyChange()
-  if _G.RARE2_API and _G.RARE2_API.markConfigDirty then
-    _G.RARE2_API.markConfigDirty()
+  if RARE2_API and RARE2_API.markConfigDirty then
+    RARE2_API.markConfigDirty()
   end
 end
 
@@ -541,7 +546,7 @@ local function drawFuelStrategySection(sim, cfg)
     ui.separator()
     ui.text("🤖 Estratégia das IAs ao vivo")
     helpMarker("Leigo: mostra quem vai parar e quando.\nTécnico: próximos pitLaps calculados + combustível restante/aprendido.")
-    local sState = _G.RARE2_API.getStrategyState and _G.RARE2_API.getStrategyState(cfg) or {}
+    local sState = RARE2_API.getStrategyState and RARE2_API.getStrategyState(cfg) or {}
     if sState.autoLaps then
       ui.textDisabled(string.format("Voltas da prova (auto): %d", sState.autoLaps))
     else
@@ -758,7 +763,7 @@ local function drawLearningModuleSection(sim, cfg)
     ui.text("Clear this track's learned memory?")
     ui.sameLine(0, 8)
     if ui.button("Yes##rf_clear_track_yes") then
-      local mem = _G.RARE2_API and _G.RARE2_API.getMemory and _G.RARE2_API.getMemory()
+      local mem = _G.RARE2_API and RARE2_API.getMemory and RARE2_API.getMemory()
       if mem and mem.tracks and trackId and mem.tracks[trackId] then
         local count = 0
         local t = mem.tracks[trackId]
@@ -768,8 +773,8 @@ local function drawLearningModuleSection(sim, cfg)
         mem.tracks[trackId] = nil
         -- Save immediately — don't wait for the 12s autosave cycle
         if _G.RARE2_API then
-          _G.RARE2_API._memoryDirty = false
-          if _G.RARE2_API.saveMemory then pcall(_G.RARE2_API.saveMemory) end
+          RARE2_API._memoryDirty = false
+          if RARE2_API.saveMemory then pcall(RARE2_API.saveMemory) end
         end
         cfg._clearMsg = string.format("Cleared %d corners for %s.", count, tostring(trackId))
         ac.log(string.format("[RaceFlow] Cleared and saved memory for: %s (%d corners)", tostring(trackId), count))
@@ -790,7 +795,7 @@ local function drawLearningModuleSection(sim, cfg)
     ui.text("Clear ALL track memory? Cannot be undone.")
     ui.sameLine(0, 8)
     if ui.button("Yes, clear all##rf_clear_all_yes") then
-      local mem = _G.RARE2_API and _G.RARE2_API.getMemory and _G.RARE2_API.getMemory()
+      local mem = _G.RARE2_API and RARE2_API.getMemory and RARE2_API.getMemory()
       if mem and mem.tracks then
         local trackCount, cornerCount = 0, 0
         for _, t in pairs(mem.tracks) do
@@ -802,8 +807,8 @@ local function drawLearningModuleSection(sim, cfg)
         mem.tracks = {}
         -- Save immediately
         if _G.RARE2_API then
-          _G.RARE2_API._memoryDirty = false
-          if _G.RARE2_API.saveMemory then pcall(_G.RARE2_API.saveMemory) end
+          RARE2_API._memoryDirty = false
+          if RARE2_API.saveMemory then pcall(RARE2_API.saveMemory) end
         end
         cfg._clearMsg = string.format("Cleared %d tracks, %d corners total.", trackCount, cornerCount)
         ac.log(string.format("[RaceFlow] Cleared ALL memory: %d tracks, %d corners.", trackCount, cornerCount))
@@ -865,7 +870,7 @@ local function drawRollingStartSection(sim, cfg)
     ui.indent(12)
 
     -- Status do Pace Car
-    local director = (_G.RARE2_API and _G.RARE2_API.getDirector and _G.RARE2_API.getDirector())
+    local director = (_G.RARE2_API and RARE2_API.getDirector and RARE2_API.getDirector())
     local dirState = director and director.getState and director.getState()
     if dirState and dirState.hasSafetyCar then
       if rgbm then
@@ -1153,7 +1158,7 @@ local function drawGitHubUpdateSection(sim, cfg)
     return
   end
 
-  local gState = _G.RARE2_API.githubGetState and _G.RARE2_API.githubGetState() or {}
+  local gState = RARE2_API.githubGetState and RARE2_API.githubGetState() or {}
 
   -- Status
   ui.newLine(2)
@@ -1223,14 +1228,14 @@ local function drawGitHubUpdateSection(sim, cfg)
 
   -- Manual check button
   if ui.button("🔍 Verificar Agora", vec2(180, 30)) then
-    if _G.RARE2_API.githubCheckUpdates then
-      _G.RARE2_API.githubCheckUpdates(cfg, true)
+    if RARE2_API.githubCheckUpdates then
+      RARE2_API.githubCheckUpdates(cfg, true)
     end
   end
   ui.sameLine()
   if gState.htmlUrl and gState.htmlUrl ~= "" and ui.button("🌐 Abrir Release", vec2(180, 30)) then
-    if _G.RARE2_API.githubGetState then
-      local state = _G.RARE2_API.githubGetState()
+    if RARE2_API.githubGetState then
+      local state = RARE2_API.githubGetState()
       if state.htmlUrl and ac.openWebLink then
         pcall(ac.openWebLink, state.htmlUrl)
       end
@@ -1262,7 +1267,7 @@ local function drawWebUISection(sim, cfg)
   ui.text("Web UI Remota (File-based Polling)")
   helpMarker("Interface remota via arquivos JSON compartilhados. Ferramenta externa lê status e escreve comandos.\nStatus: Documents/Assetto Corsa/RaceFlow_webui_status.json\nComandos: Documents/Assetto Corsa/RaceFlow_webui_cmd.json")
 
-  local wState = _G.RARE2_API.webuiGetState and _G.RARE2_API.webuiGetState() or {
+  local wState = RARE2_API.webuiGetState and RARE2_API.webuiGetState() or {
     statusFile = "Documents/Assetto Corsa/RaceFlow_webui_status.json",
     commandFile = "Documents/Assetto Corsa/RaceFlow_webui_cmd.json",
     authToken = "(none)",
@@ -1373,7 +1378,7 @@ local function drawCautionSection(sim, cfg)
   ui.text("Caution por incidentes (IA parada)")
   helpMarker("Quando uma IA para na pista fora dos boxes, sorteia FCY (todos lentos) ou bandeira amarela no setor. Só funciona em corrida, offline, com physics scripting ativo. O jogador recebe avisos no HUD (sem limitação de velocidade).")
 
-  local cState = _G.RARE2_API.getCautionState and _G.RARE2_API.getCautionState() or {}
+  local cState = RARE2_API.getCautionState and RARE2_API.getCautionState() or {}
 
   -- Status banner
   ui.newLine(2)
@@ -1500,8 +1505,8 @@ local function drawCautionSection(sim, cfg)
   ui.separator()
   ui.text("Controle manual:")
   if ui.button(cState.active and "🟢 ENCERRAR CAUTION" or "🟡 TESTAR FCY", vec2(200, 30)) then
-    if _G.RARE2_API.cautionManualTrigger then
-      _G.RARE2_API.cautionManualTrigger(sim, cfg)
+    if RARE2_API.cautionManualTrigger then
+      RARE2_API.cautionManualTrigger(sim, cfg)
     end
   end
   ui.sameLine()
@@ -1519,7 +1524,7 @@ local function drawTrackLimitsSection(sim, cfg)
   ui.text("Limites de pista (port do Mavil TLM)")
   helpMarker("Detecção por rodas fora (wheelsOutside). Avisos → punição de tempo cumprida no box com freio pressionado. IA opcional. Desligado por padrão.")
 
-  local st = _G.RARE2_API.getTrackLimitsState and _G.RARE2_API.getTrackLimitsState() or {}
+  local st = RARE2_API.getTrackLimitsState and RARE2_API.getTrackLimitsState() or {}
 
   -- Player status
   ui.newLine(2)
@@ -1676,7 +1681,7 @@ local function drawTrackLimitsSection(sim, cfg)
       end
       helpMarker("Leigo: ON = pega o limite verdadeiro da pista (60/80/100).\nTécnico: tenta ac.getPitSpeedLimit() etc., senão usa manual.")
       if cfg.pitSpeedReal.enabled then
-        local real = _G.RARE2_API.getRealPitSpeedLimit and _G.RARE2_API.getRealPitSpeedLimit(ac.getSim()) or nil
+        local real = RARE2_API.getRealPitSpeedLimit and RARE2_API.getRealPitSpeedLimit(ac.getSim()) or nil
         if real then ui.textDisabled(string.format("Detectado: %d km/h", real))
         else ui.textDisabled("Detectado: (não disponível, usando manual)") end
       end
@@ -1697,7 +1702,7 @@ local function drawTrackLimitsSection(sim, cfg)
 
     -- Live game-penalty indicator (player)
     do
-      local st = _G.RARE2_API.getTrackLimitsState and _G.RARE2_API.getTrackLimitsState() or {}
+      local st = RARE2_API.getTrackLimitsState and RARE2_API.getTrackLimitsState() or {}
       if st.gamePenApi then
         if (st.gamePen or 0) > 0.5 then
           if rgbm then ui.textColored(string.format("🎮 JOGO punindo: %.1fs (avisos pausados)", st.gamePen), C.warn())
@@ -1986,7 +1991,7 @@ function M.draw(sim, cfg)
     if carsN > 0 then info = info .. string.format("  •  %d carros", carsN) end
     ui.textDisabled(info ~= "" and info or "Em sessão")
     statusLine(cfg.enabled, "Sistema pronto", "Sistema pausado")
-    local gs = _G.RARE2_API and _G.RARE2_API.githubGetState and _G.RARE2_API.githubGetState() or {}
+    local gs = _G.RARE2_API and RARE2_API.githubGetState and RARE2_API.githubGetState() or {}
     if gs.hasUpdate then
       if rgbm then ui.textColored("☁ Atualização disponível: v" .. tostring(gs.latestVersion or "?"), C.ok())
       else ui.text("Atualização disponível") end
@@ -2000,7 +2005,7 @@ function M.draw(sim, cfg)
 
   -- Category presets (v0.14.0) — one-click for GT3/F1/Endurance etc.
   do
-    local presets = _G.RARE2_API.getCategoryPresets and _G.RARE2_API.getCategoryPresets() or {}
+    local presets = RARE2_API.getCategoryPresets and RARE2_API.getCategoryPresets() or {}
     if next(presets) then
       ui.textDisabled("Presets por categoria (1 clique):")
       local cur = cfg.categoryPreset or "custom"
@@ -2008,7 +2013,7 @@ function M.draw(sim, cfg)
         local isCur = cur == key
         if isCur and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(1.00, 0.55, 0.15, 1.00)) end
         if ui.button(pr.label .. "##preset_" .. key, vec2(90, 22)) then
-          if _G.RARE2_API.applyCategoryPreset then _G.RARE2_API.applyCategoryPreset(key) end
+          if RARE2_API.applyCategoryPreset then RARE2_API.applyCategoryPreset(key) end
           notifyChange()
           if ac.setMessage then pcall(ac.setMessage, "PRESET", pr.label .. " aplicado") end
         end
@@ -2095,15 +2100,15 @@ function M.draw(sim, cfg)
   ui.separator()
   ui.newLine(2)
   if ui.button("💾 Salvar Configurações", vec2(160, 24)) then
-    if _G.RARE2_API and _G.RARE2_API.saveConfig then
-      _G.RARE2_API.saveConfig()
+    if _G.RARE2_API and RARE2_API.saveConfig then
+      RARE2_API.saveConfig()
       cfg._savedFeedback = 180
     end
   end
   ui.sameLine(0, 8)
   if ui.button("🔄 Restaurar Padrões", vec2(160, 24)) then
-    if _G.RARE2_API and _G.RARE2_API.resetToDefaults then
-      _G.RARE2_API.resetToDefaults()
+    if _G.RARE2_API and RARE2_API.resetToDefaults then
+      RARE2_API.resetToDefaults()
       cfg._resetFeedback = 180
     end
   end

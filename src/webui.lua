@@ -5,6 +5,11 @@
 
 local M = {}
 
+-- RARE2_API guard
+_G.RARE2_API = _G.RARE2_API or {}
+local RARE2_API = _G.RARE2_API
+
+
 local state = {
   enabled = false,
   port = 8080,
@@ -80,9 +85,9 @@ end
 
 -- Build status payload
 local function buildStatus(sim, cfg)
-  local mem = _G.RARE2_API and _G.RARE2_API.getMemory and _G.RARE2_API.getMemory() or {}
+  local mem = _G.RARE2_API and RARE2_API.getMemory and RARE2_API.getMemory() or {}
   -- NOTE v0.5.0: VSC removed; field kept as explicit marker for old clients.
-  local githubState = _G.RARE2_API.githubGetState and _G.RARE2_API.githubGetState() or {}
+  local githubState = RARE2_API.githubGetState and RARE2_API.githubGetState() or {}
 
   local cars = {}
   if sim and sim.carsCount then
@@ -182,42 +187,42 @@ local function processCommands(sim, cfg)
           ac.log("[RaceFlow WebUI] command '" .. tostring(action) .. "' ignored: VSC removed in v0.5.0")
         elseif action == "rolling_toggle" then
           cfg.rollingStart.enabled = not cfg.rollingStart.enabled
-          _G.RARE2_API.markConfigDirty()
+          RARE2_API.markConfigDirty()
         elseif action == "strategy_toggle" then
           cfg.strategy.enabled = not cfg.strategy.enabled
-          _G.RARE2_API.markConfigDirty()
+          RARE2_API.markConfigDirty()
         elseif action == "set_aggression" then
           cfg.aggression = tonumber(params.value) or cfg.aggression
-          _G.RARE2_API.markConfigDirty()
+          RARE2_API.markConfigDirty()
         elseif action == "set_pace" then
           cfg.paceStrength = tonumber(params.value) or cfg.paceStrength
-          _G.RARE2_API.markConfigDirty()
+          RARE2_API.markConfigDirty()
         elseif action == "set_difficulty" then
           cfg.difficultyBoost = tonumber(params.value) or cfg.difficultyBoost
-          _G.RARE2_API.markConfigDirty()
+          RARE2_API.markConfigDirty()
         elseif action == "github_check" then
-          if _G.RARE2_API.githubCheckUpdates then
-            _G.RARE2_API.githubCheckUpdates(cfg, true)
+          if RARE2_API.githubCheckUpdates then
+            RARE2_API.githubCheckUpdates(cfg, true)
           end
         elseif action == "save_config" then
-          if _G.RARE2_API.saveConfig then
-            _G.RARE2_API.saveConfig()
+          if RARE2_API.saveConfig then
+            RARE2_API.saveConfig()
           end
         elseif action == "reset_defaults" then
-          if _G.RARE2_API.resetToDefaults then
-            _G.RARE2_API.resetToDefaults()
+          if RARE2_API.resetToDefaults then
+            RARE2_API.resetToDefaults()
           end
         elseif action == "clear_memory_track" then
-          local mem = _G.RARE2_API.getMemory and _G.RARE2_API.getMemory()
+          local mem = RARE2_API.getMemory and RARE2_API.getMemory()
           if mem and mem.tracks and params.trackId then
             mem.tracks[params.trackId] = nil
-            _G.RARE2_API._memoryDirty = true
+            RARE2_API._memoryDirty = true
           end
         elseif action == "clear_memory_all" then
-          local mem = _G.RARE2_API.getMemory and _G.RARE2_API.getMemory()
+          local mem = RARE2_API.getMemory and RARE2_API.getMemory()
           if mem then
             mem.tracks = {}
-            _G.RARE2_API._memoryDirty = true
+            RARE2_API._memoryDirty = true
           end
         end
       end

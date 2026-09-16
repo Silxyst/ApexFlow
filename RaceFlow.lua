@@ -1,7 +1,10 @@
 -- ApexFlow — Independent race suite for Assetto Corsa (v0.13.0)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.14.3"
-_G.RACEFLOW_VERSION = "0.14.3"
+SCRIPT_VERSION = "0.14.4"
+
+_G.RARE2_API = _G.RARE2_API or {}
+local RARE2_API = _G.RARE2_API
+_G.RACEFLOW_VERSION = "0.14.4"
 _G.APEXFLOW_VERSION = "0.13.1"
 
 -- Per-module load status, shown in the fallback window so a future
@@ -79,7 +82,7 @@ local RARE2_CFG = {
     penaltiesEnabled = true,
     maxWarnings = 4,
     penaltyTime = 5,
-    cooldown = 3, -- v0.14.3: 3s (sync CMRT)
+    cooldown = 3, -- v0.14.4: 3s (sync CMRT)
     extraTime = 10,
     strictPit = false,
     waitTime = 1.9,
@@ -88,9 +91,9 @@ local RARE2_CFG = {
     aiServe = false,
     qualiReset = true,
     finishAdd = true,
-    gamePenaltyCompat = false, -- v0.14.3: OFF (independente do jogo, nao pausa aviso)
-    syncWithCMRT = true,      -- v0.14.3: ON (espelha CMRT, fixa 1 vs 11)
-    minOffTime = 0.15,        -- v0.14.3: more sensitive (was 0.25)
+    gamePenaltyCompat = false, -- v0.14.4: OFF (independente do jogo, nao pausa aviso)
+    syncWithCMRT = true,      -- v0.14.4: ON (espelha CMRT, fixa 1 vs 11)
+    minOffTime = 0.15,        -- v0.14.4: more sensitive (was 0.25)
     pitSpeedEnabled = true,   -- v0.10.0: punish pit-lane speeding
     pitLimitKmh = 80,
     pitGraceSec = 1.0,
@@ -189,7 +192,7 @@ local function applyCategoryPreset(catKey)
   local p = CATEGORY_PRESETS[catKey]
   if not p then return false end
   RARE2_CFG.categoryPreset = catKey
-  -- v0.14.3: preset ativa o sistema para feedback imediato
+  -- v0.14.4: preset ativa o sistema para feedback imediato
   if RARE2_CFG.tracklimits then RARE2_CFG.tracklimits.enabled = true end
   if p.tracklimits then
     for k, v in pairs(p.tracklimits) do
@@ -201,8 +204,9 @@ local function applyCategoryPreset(catKey)
       if RARE2_CFG.caution then RARE2_CFG.caution[k] = v end
     end
   end
-  if _G.RARE2_API and _G.RARE2_API.markConfigDirty then _G.RARE2_API.markConfigDirty() end
+  if RARE2_API and RARE2_API.markConfigDirty then RARE2_API.markConfigDirty() end
   ac.log("[RaceFlow] Category preset applied: " .. tostring(p.label))
+  if ac.setMessage then pcall(ac.setMessage, "PRESET", p.label .. " aplicado") end
   return true
 end
 _G.RARE2_API = _G.RARE2_API or {}

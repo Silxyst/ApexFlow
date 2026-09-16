@@ -33,13 +33,13 @@ local function markMemoryDirty()
   memoryDirty = true
   -- also tell RaceFlow (global) so it can save to disk
   if _G.RARE2_API then
-    _G.RARE2_API._memoryDirty = true
+    RARE2_API._memoryDirty = true
   end
 end
 
 local function getMemory()
-  if not memory and _G.RARE2_API and _G.RARE2_API.getMemory then
-    memory = _G.RARE2_API.getMemory()
+  if not memory and _G.RARE2_API and RARE2_API.getMemory then
+    memory = RARE2_API.getMemory()
   end
   return memory
 end
@@ -54,7 +54,12 @@ local function getTrackId(sim)
   return sim and sim.trackName or "unknown"
 end
 
-local function clamp(v, minV, maxV)
+local function clamp
+
+-- RARE2_API guard
+_G.RARE2_API = _G.RARE2_API or {}
+local RARE2_API = _G.RARE2_API
+(v, minV, maxV)
   if v < minV then return minV end
   if v > maxV then return maxV end
   return v
