@@ -1819,6 +1819,7 @@ local function drawHudEventsSettings(sim, cfg)
   if h.showPosition == nil then h.showPosition = true end
   if h.showSession == nil then h.showSession = true end
   if h.showLearning == nil then h.showLearning = false end
+  if h.showExtras == nil then h.showExtras = true end
   if h.compact == nil then h.compact = false end
   if h.progressBars == nil then h.progressBars = true end
   if h.blink == nil then h.blink = true end
@@ -1848,6 +1849,10 @@ local function drawHudEventsSettings(sim, cfg)
   if ui.checkbox("Learning (pistas memorizadas)", h.showLearning) then
     h.showLearning = not h.showLearning; notifyChange()
   end
+  if ui.checkbox("Extras (preset · voz · update · detalhes)", h.showExtras) then
+    h.showExtras = not h.showExtras; notifyChange()
+  end
+  helpMarker("Leigo: preset atual, voz falando, aviso de update, marcha/pneus/paradas da IA.\nTécnico: lê voiceGetState, githubGetState e strategy.getState.")
 
   ui.newLine(2)
   ui.separator()
@@ -1873,7 +1878,7 @@ local function drawHudEventsSettings(sim, cfg)
 
   ui.newLine(2)
   if ui.button("📺 Abrir RaceFlow Events", vec2(220, 28)) then
-    ac.setWindowOpen("events", true)
+    if ac.setWindowOpen then pcall(ac.setWindowOpen, "events", true) end
   end
   ui.sameLine()
   helpMarker("Abre a janela overlay. Arraste para reposicionar; redimensione pelas bordas.")
@@ -1934,7 +1939,6 @@ local function ensureUiState(cfg)
   cfg._ui_state = cfg._ui_state or {}
   cfg._usage = cfg._usage or { nav = {}, sections = {} }
   cfg.ui = cfg.ui or {}
-  if cfg.ui.simpleMode == nil then cfg.ui.simpleMode = true end
   cfg.uiNav = cfg.uiNav or "dash"
   local migrate = {
     aggr = "ai", multiclass = "ai",
@@ -1952,7 +1956,6 @@ local function ensureUiState(cfg)
   return cfg._ui_state
 end
 
-local function isSimple(cfg) return (cfg.ui and cfg.ui.simpleMode) ~= false end
 
 local function trackNav(cfg, navId)
   cfg._usage = cfg._usage or { nav = {}, sections = {} }
@@ -2014,8 +2017,6 @@ local function band(id, r, g, b, h, fn)
   return okFn
 end
 
--- Toggle pill ON/OFF (botão primeiro, rótulo depois — sem matemática de cursor).
--- Retorna o novo valor (ou o mesmo se não clicado).
 -- Helpers puros (declarados cedo: usados por view()/pills — evita forward-ref).
 -- Raiz do app p/ assets (mesmo truque do AC-Engineer: ScriptOrigin).
 local function appRoot()
@@ -2076,20 +2077,10 @@ local function pillToggle(id, label, val, summary)
 end
 
 -- Linha de visão numerada com barra lateral de acento.
--- opts = { advanced=false, status="" }
+-- opts = { status="" } (modo Leigo/Técnico removido na v0.23.0: tudo visível)
 local function view(cfg, id, num, title, summary, opts, fn, sim)
   opts = opts or {}
   local st = ensureUiState(cfg)
-  if isSimple(cfg) and opts.advanced and not st[id .. "_show"] then
-    if rgbm then ui.textColored("▌", C.accent()) else ui.text("|") end
-    ui.sameLine(0, 4)
-    if ui.button("🔧 " .. num .. " · " .. title .. "  (toque p/ abrir — avançado)##adv_" .. id, vec2(-1, 30)) then
-      st[id .. "_show"] = true
-      trackSection(cfg, id)
-    end
-    ui.newLine(2)
-    return
-  end
   if st[id] == nil then st[id] = true end
   local isOpen = st[id]
   if rgbm then ui.textColored("▌", C.accent()) else ui.text("|") end
@@ -2158,21 +2149,13 @@ local function drawCommandBar(sim, cfg)
   if on and rgbm then ui.popStyleColor() end
   ui.sameLine(0, 8)
   if ui.inputText then
-    ui.setNextItemWidth(math.max(120, ui.windowWidth() - 300))
+    ui.setNextItemWidth(math.max(120, ui.windowWidth() - 140))
     local q = cfg._search or ""
     local newQ = ui.inputText("⌨ filtrar…##cmd_search", q)
     if newQ ~= nil and newQ ~= q then cfg._search = newQ end
     ui.sameLine(0, 8)
   end
-  local simple = isSimple(cfg)
-  if simple and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.16, 0.45, 0.30, 1.00)) end
-  if ui.button("😊##mode_s", vec2(44, 32)) then cfg.ui.simpleMode = true notifyChange() end
-  if simple and rgbm then ui.popStyleColor() end
-  ui.sameLine(0, 4)
-  if (not simple) and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.35, 0.30, 0.55, 1.00)) end
-  if ui.button("🛠️##mode_t", vec2(44, 32)) then cfg.ui.simpleMode = false notifyChange() end
-  if (not simple) and rgbm then ui.popStyleColor() end
-  ui.textDisabled("😊 simples · 🛠️ técnico" .. ((cfg._search or "") ~= "" and " · filtro ativo" or ""))
+  ui.textDisabled("Filtre por nome: “pit”, “voz”, “caution”…" .. ((cfg._search or "") ~= "" and " · filtro ativo" or ""))
   if (cfg._search or "") ~= "" then
     ui.sameLine(0, 8)
     if ui.button("X##cmd_clear", vec2(28, 22)) then cfg._search = "" end
@@ -2442,13 +2425,13 @@ local function drawAiInspector(sim, cfg)
   if matchesSearch(cfg, "multiclasse categoria lmp gt classe") then
     view(cfg, "ai_multi", "04", "Várias categorias juntas",
       "Ex: protótipos + GT. Classe 1 = mais rápida.",
-      { advanced = true },
+      {},
       function(s, c) drawMultiClassTab(s, c, aiController) end, sim)
   end
   if matchesSearch(cfg, "reta monza velocidade final downforce") then
     view(cfg, "ai_lowdf", "05", "Pistas de reta (Monza)",
       "Só mexa p/ pistas de alta velocidade.",
-      { advanced = true },
+      {},
       function(s, c) drawLowDownforceAISection(s, c) end, sim)
   end
   if matchesSearch(cfg, "falha quebra mecanica box ia") then
@@ -2460,7 +2443,7 @@ local function drawAiInspector(sim, cfg)
   if matchesSearch(cfg, "aprende memoria curva erro") then
     view(cfg, "ai_learn", "07", "IA que aprende",
       "Lembra onde erra e melhora com o tempo.",
-      { advanced = true },
+      {},
       function(s, c) drawLearningModuleSection(s, c) end, sim)
   end
 end
@@ -2479,7 +2462,7 @@ local function drawRaceInspector(sim, cfg)
   if matchesSearch(cfg, "largada movimento fila formacao") then
     view(cfg, "race_rolling", "02", "Largada em movimento",
       "Volta de apresentação em fila antes da verde. Vem desligado.",
-      { advanced = true, status = (cfg.rollingStart and cfg.rollingStart.enabled) and "armado" or "off" },
+      { status = (cfg.rollingStart and cfg.rollingStart.enabled) and "armado" or "off" },
       function(s, c) drawRollingStartSection(s, c) end, sim)
   end
 end

@@ -1,10 +1,10 @@
 -- ApexFlow — Independent race suite for Assetto Corsa (v0.13.0)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.22.0"
+SCRIPT_VERSION = "0.23.0"
 
 _G.RARE2_API = _G.RARE2_API or {}
 local RARE2_API = _G.RARE2_API
-_G.RACEFLOW_VERSION = "0.22.0"
+_G.RACEFLOW_VERSION = "0.23.0"
 _G.APEXFLOW_VERSION = "0.13.1"
 
 -- Per-module load status, shown in the fallback window so a future
@@ -28,7 +28,7 @@ local strategy     = safeRequire("src.race_strategy")
 local caution      = safeRequire("src.caution")       -- v0.6.0: FCY + sector yellow
 local tracklimits  = safeRequire("src.tracklimits")   -- v0.7.0: warnings -> time penalty
 local webui        = safeRequire("src.webui")         -- Remote Web UI (file polling)
-local voice        = safeRequire("src.voice")          -- v0.22.0 (Sug5): fila de voz por eventos
+local voice        = safeRequire("src.voice")          -- v0.23.0 (Sug5): fila de voz por eventos
 -- NOTE v0.5.0+: src/vsc + src/github_update modules are DEPRECATED and no
 -- longer required. GitHub check lives in this file (single source of truth)
 -- to avoid dual-state bugs.
@@ -83,7 +83,7 @@ local RARE2_CFG = {
     penaltiesEnabled = true,
     maxWarnings = 4,
     penaltyTime = 5,
-    cooldown = 3, -- v0.22.0: 3s (sync CMRT)
+    cooldown = 3, -- v0.23.0: 3s (sync CMRT)
     extraTime = 10,
     strictPit = false,
     waitTime = 1.9,
@@ -92,9 +92,9 @@ local RARE2_CFG = {
     aiServe = false,
     qualiReset = true,
     finishAdd = true,
-    gamePenaltyCompat = false, -- v0.22.0: OFF (independente do jogo, nao pausa aviso)
-    syncWithCMRT = true,      -- v0.22.0: ON (espelha CMRT, fixa 1 vs 11)
-    minOffTime = 0.15,        -- v0.22.0: more sensitive (was 0.25)
+    gamePenaltyCompat = false, -- v0.23.0: OFF (independente do jogo, nao pausa aviso)
+    syncWithCMRT = true,      -- v0.23.0: ON (espelha CMRT, fixa 1 vs 11)
+    minOffTime = 0.15,        -- v0.23.0: more sensitive (was 0.25)
     pitSpeedEnabled = true,   -- v0.10.0: punish pit-lane speeding
     pitLimitKmh = 80,
     pitGraceSec = 1.0,
@@ -117,6 +117,7 @@ local RARE2_CFG = {
     showSession = true,
     showLearning = false,
     showMessages = true,
+    showExtras = true, -- v0.23.0: preset/voz/update/detalhes no HUD
     compact = false,
     progressBars = true,
     blink = true,
@@ -146,7 +147,7 @@ local RARE2_CFG = {
   -- v0.14.0: New systems
   pitSpeedReal = { enabled = true }, -- use track's real limit when available
   telemetryCSV = { enabled = false, maxLaps = 500 },
-  voice = { enabled = true, volume = 0.8, speed = 1.0, -- v0.22.0 (Sug5): fila estilo AC-Engineer
+  voice = { enabled = true, volume = 0.8, speed = 1.0, -- v0.23.0 (Sug5): fila estilo AC-Engineer
     categories = { limits = true, pit = true, caution = true, penalty = true } },
   failures = { enabled = false, chancePerHour = 0.08, minLap = 3 },
 }
@@ -194,7 +195,7 @@ local function applyCategoryPreset(catKey)
   local p = CATEGORY_PRESETS[catKey]
   if not p then return false end
   RARE2_CFG.categoryPreset = catKey
-  -- v0.22.0: preset ativa o sistema para feedback imediato
+  -- v0.23.0: preset ativa o sistema para feedback imediato
   if RARE2_CFG.tracklimits then RARE2_CFG.tracklimits.enabled = true end
   if p.tracklimits then
     for k, v in pairs(p.tracklimits) do
@@ -239,7 +240,7 @@ _G.RARE2_API = _G.RARE2_API or {}
 RARE2_API.getRealPitSpeedLimit = getRealPitSpeedLimit
 
 -- ----------------------------------------------------------
--- Helpers de serialização (v0.22.0: declarados CEDO — o save/load
+-- Helpers de serialização (v0.23.0: declarados CEDO — o save/load
 -- per-track os usa; forward-ref em Lua vira global nil e crasha).
 -- ----------------------------------------------------------
 local function serializeTable(tbl, indent)
@@ -373,7 +374,7 @@ end
 -- ----------------------------------------------------------
 -- Voice warnings without CrewChief (v0.14.0) — beeps + messages
 -- ----------------------------------------------------------
--- v0.22.0 (Sug5): roteia para o modulo de voz (fila + cooldown + clips).
+-- v0.23.0 (Sug5): roteia para o modulo de voz (fila + cooldown + clips).
 -- Mapeia kinds legados ("tracklimits"/"pitSpeed") para o modulo.
 local function playVoiceWarning(kind, opts)
   if voice and voice.say then
@@ -755,6 +756,7 @@ RARE2_API.resetToDefaults = function()
       h.showPosition = (h.showPosition ~= false)
       h.showSession = (h.showSession ~= false)
       h.showLearning = (h.showLearning == true)
+      h.showExtras = (h.showExtras ~= false) -- v0.23.0: preset/voz/update no HUD
       h.compact = (h.compact == true)
       h.progressBars = (h.progressBars ~= false)
       h.blink = (h.blink ~= false)
@@ -994,7 +996,7 @@ function script.update(dt)
     if not okT then ac.log("[RaceFlow] tracklimits.update: " .. tostring(errT)) end
   end
 
-  -- Voz (v0.22.0 Sug5): avanca a fila + dispara por borda de subida
+  -- Voz (v0.23.0 Sug5): avanca a fila + dispara por borda de subida
   -- (novo aviso, nova punicao, pit-alert, caution). Leitura pura de estado.
   if voice and voice.update then pcall(voice.update, dt) end
   if not rollingActive and RARE2_CFG.voice and RARE2_CFG.voice.enabled then
@@ -1180,9 +1182,8 @@ local function animBarPlaceholder(fuel, maxF)
 end
 
 local function drawRaceEventsBody()
-  -- v0.22.0: visual de TRANSMISSÃO — faixa de bandeira + herói + pips.
-  -- Referências: overlays RaceLab/MRT/iFL03 (faixa de flag em 2 tons,
-  -- LED de bandeira, tudo legível a 200 km/h).
+  -- v0.23.0: par-a-par com o app — faixa + herói + pips + IA + jogo +
+  -- estratégia estendida + preset/voz/update + ⚙ p/ abrir o app.
   local sim = ac.getSim()
   local inSession = sim and sim.isSessionStarted
   local hudCfg = (RARE2_CFG and RARE2_CFG.hudEvents) or {}
@@ -1192,17 +1193,22 @@ local function drawRaceEventsBody()
   local showPos     = hudCfg.showPosition ~= false
   local showSess    = hudCfg.showSession ~= false
   local showLearn   = hudCfg.showLearning == true
+  local showExtras  = hudCfg.showExtras ~= false
   local compact     = hudCfg.compact == true
   local amber = rgbm and rgbm(1.0, 0.78, 0.20, hudCfg.blink == false and 1.0 or hudPulse(4, 0.75, 1.0)) or nil
   local red   = rgbm and rgbm(1.0, 0.35, 0.35, hudCfg.blink == false and 1.0 or hudPulse(5, 0.7, 1.0)) or nil
   local green = rgbm and rgbm(0.25, 0.95, 0.45, 1.0) or nil
   local cyan  = rgbm and rgbm(0.22, 0.88, 1.00, 1.0) or nil
 
-  local cs = (showCaution and _G.RARE2_API and _G.RARE2_API.getCautionState and _G.RARE2_API.getCautionState()) or {}
-  local ts = (showLimits and _G.RARE2_API and _G.RARE2_API.getTrackLimitsState and _G.RARE2_API.getTrackLimitsState()) or {}
+  local api = _G.RARE2_API or {}
+  local cs = (showCaution and api.getCautionState and api.getCautionState()) or {}
+  local ts = (showLimits and api.getTrackLimitsState and api.getTrackLimitsState()) or {}
+  local st = (showStrategy and api.getStrategyState and api.getStrategyState(RARE2_CFG)) or {}
+  local vs = (showExtras and api.voiceGetState and api.voiceGetState()) or {}
+  local gs = (showExtras and api.githubGetState and api.githubGetState()) or {}
   local hasPenalty = (ts.penaltyActive and (ts.timeLeft or 0) > 0)
 
-  -- ===== 1. FAIXA DE BANDEIRA (sempre visível, ocupa a largura) =====
+  -- ===== 1. FAIXA DE BANDEIRA (sempre visível) =====
   if hasPenalty then
     hudBlinkText("🛑  PUNIÇÃO  —  BOX + FREIO", red, hudCfg)
   elseif cs.active then
@@ -1216,15 +1222,16 @@ local function drawRaceEventsBody()
   end
   if not compact then ui.separator() end
 
-  -- ===== 2. HERÓI: posição / volta / velocidade =====
+  -- ===== 2. HERÓI: posição / volta / velocidade / marcha / pneus =====
   if showPos and inSession then
     local ok, pcar = pcall(ac.getCar, 0)
     if ok and pcar then
       local pos = pcar.racePosition or 0
       local lap = pcar.lapCount or 0
       local spd = math.floor(pcar.speedKmh or 0)
+      local gear = pcar.gear or 0
       ui.pushFont(ui.Font.Title)
-      ui.text(string.format("P%d   ·   V%d   ·   %d km/h", pos, lap + 1, spd))
+      ui.text(string.format("P%d   ·   V%d   ·   %d km/h   ·   M%d", pos, lap + 1, spd, gear))
       ui.popFont()
       if not compact then
         local fuel = pcar.fuel or 0
@@ -1232,6 +1239,20 @@ local function drawRaceEventsBody()
         local pct = maxF > 0 and (fuel / maxF * 100) or 0
         animBarPlaceholder(fuel, maxF)
         ui.textDisabled(string.format("⛽ %.1f L (%d%%)", fuel, math.floor(pct)))
+        -- Desgaste dos 4 pneus (leitura guardada, 0 = sem dado)
+        local okW, wear = pcall(function()
+          local w = pcar.wheels
+          if not w then return nil end
+          local out = {}
+          for i = 0, 3 do
+            local tw = w[i] and tonumber(w[i].tyreWear) or 0
+            out[#out + 1] = math.floor(math.max(0, 1 - tw) * 100 + 0.5)
+          end
+          return out
+        end)
+        if okW and wear then
+          ui.textDisabled(string.format("🛞 %d%% %d%% · %d%% %d%%", wear[1], wear[2], wear[3], wear[4]))
+        end
       end
     end
   elseif not inSession then
@@ -1239,7 +1260,7 @@ local function drawRaceEventsBody()
   end
   if not compact then ui.separator() end
 
-  -- ===== 3. AVISOS EM PIPS (●●○○) + barra =====
+  -- ===== 3. LIMITS: pips + punição + IA + jogo nativo =====
   if showLimits then
     if hasPenalty then
       hudBlinkText(string.format("⏱ %.1fs%s", ts.timeLeft or 0, ts.serving and "  (cumprindo…)" or ""), red, hudCfg)
@@ -1254,7 +1275,7 @@ local function drawRaceEventsBody()
         else ui.text("Avisos: " .. pips) end
         hudBar(mw > 0 and (w / mw) or 0, hudCfg)
       else
-        ui.textDisabled("⚖ ○○○○  limpo")
+        ui.textDisabled("⚖ " .. string.rep("○", math.max(1, mw)) .. "  limpo")
       end
       if ts.lastEvent and ts.lastEvent ~= "" and not compact then
         ui.textDisabled("↳ " .. tostring(ts.lastEvent))
@@ -1262,6 +1283,15 @@ local function drawRaceEventsBody()
     end
     if ts.pitAlert then
       hudBlinkText("🚧 BOX: REDUZA", red, hudCfg)
+    end
+    -- IAs punidas/avisadas (mesmos números da aba Segurança)
+    if not compact and ((tonumber(ts.aiWithPenalties) or 0) > 0 or (tonumber(ts.aiWithWarnings) or 0) > 0) then
+      ui.textDisabled(string.format("🤖 IA: %d punida(s) · %d avisada(s)",
+        tonumber(ts.aiWithPenalties) or 0, tonumber(ts.aiWithWarnings) or 0))
+    end
+    -- Punição nativa do jogo (quando a leitura existe)
+    if not compact and ts.gamePenApi and (tonumber(ts.gamePen) or 0) > 0.5 then
+      ui.textDisabled(string.format("🎮 Jogo punindo: %.1fs", tonumber(ts.gamePen) or 0))
     end
     if cs.overtake then
       hudBlinkText(string.format("⛔ DEVOLVA p/ %s: %.0fs",
@@ -1271,7 +1301,7 @@ local function drawRaceEventsBody()
     if not compact then ui.separator() end
   end
 
-  -- ===== 4. CAUTION detalhe (duração) =====
+  -- ===== 4. CAUTION detalhe =====
   if showCaution and cs.active and not compact then
     if (cs.duration or 0) > 0 then hudBar((cs.timer or 0) / cs.duration, hudCfg) end
     if cs.reason and cs.reason ~= "" then ui.textDisabled("→ " .. tostring(cs.reason)) end
@@ -1281,21 +1311,36 @@ local function drawRaceEventsBody()
     ui.separator()
   end
 
-  -- ===== 5. ESTRATÉGIA (1 linha) =====
+  -- ===== 5. ESTRATÉGIA estendida (pit + faltam + total) =====
   if showStrategy and inSession then
-    local st = _G.RARE2_API and _G.RARE2_API.getStrategyState and _G.RARE2_API.getStrategyState(RARE2_CFG) or {}
-    local nextPit = nil
+    local nextPit, stopsLeft, myLap = nil, nil, 0
     if st and st.cars then
       for _, c in ipairs(st.cars) do
-        if c.index == 0 then nextPit = c.nextPit break end
+        if c.index == 0 then
+          nextPit = c.nextPit
+          stopsLeft = c.stopsLeft
+          myLap = c.lap or 0
+          break
+        end
       end
     end
-    if nextPit then ui.textDisabled(string.format("⛽ Pit: volta %d", nextPit))
-    else ui.textDisabled("⛽ Sem pit agendado") end
+    local totalTxt = ""
+    if st.autoLaps then totalTxt = string.format("de %dv (auto)", st.autoLaps)
+    elseif st.totalLaps then totalTxt = string.format("de %dv", st.totalLaps) end
+    if nextPit then
+      ui.textDisabled(string.format("⛽ Pit: volta %d%s%s", nextPit,
+        totalTxt ~= "" and (" " .. totalTxt) or "",
+        (stopsLeft and stopsLeft > 0) and string.format(" · faltam %d", stopsLeft) or ""))
+    else
+      ui.textDisabled("⛽ Sem pit agendado" .. (totalTxt ~= "" and (" · " .. totalTxt) or ""))
+    end
+    if not compact and myLap > 0 then
+      ui.textDisabled(string.format("🏁 Você na volta %d", myLap + 1))
+    end
     if not compact then ui.separator() end
   end
 
-  -- ===== 6. SESSÃO (1 linha) =====
+  -- ===== 6. SESSÃO =====
   if showSess and not compact then
     local track = ""
     if ac.getTrackName then
@@ -1309,6 +1354,9 @@ local function drawRaceEventsBody()
     end
     local line = sessName
     if track ~= "" then line = line .. (line ~= "" and " • " or "") .. track end
+    if sim and tonumber(sim.carsCount) and sim.carsCount > 0 then
+      line = line .. (line ~= "" and " • " or "") .. string.format("%d carros", sim.carsCount)
+    end
     if line ~= "" then ui.textDisabled(line) end
     if sim and sim.sessionTimeLeft and sim.sessionTimeLeft > 0 then
       local mins = math.floor(sim.sessionTimeLeft / 60000)
@@ -1318,9 +1366,36 @@ local function drawRaceEventsBody()
     ui.separator()
   end
 
-  -- ===== 7. RACE CONTROL (2 últimas) =====
+  -- ===== 7. EXTRAS: preset · voz · update =====
+  if showExtras and not compact then
+    local bits = {}
+    -- Preset atual (mesmo nome da lista do app)
+    local presetKey = (_G.RARE2_CFG and _G.RARE2_CFG.categoryPreset) or "custom"
+    if presetKey ~= "custom" then
+      local label = presetKey:upper()
+      if api.getCategoryPresets then
+        local ok, presets = pcall(api.getCategoryPresets)
+        if ok and presets and presets[presetKey] and presets[presetKey].label then
+          label = tostring(presets[presetKey].label)
+        end
+      end
+      bits[#bits + 1] = "🏁 " .. label
+    end
+    if vs.busy then
+      bits[#bits + 1] = "🔔 voz falando…"
+    end
+    if gs.hasUpdate then
+      bits[#bits + 1] = "☁ update v" .. tostring(gs.latestVersion or "?")
+    end
+    if #bits > 0 then
+      ui.textDisabled(table.concat(bits, "   ·   "))
+      ui.separator()
+    end
+  end
+
+  -- ===== 8. RACE CONTROL (2 últimas) =====
   if hudCfg.showMessages ~= false then
-    local msgs = _G.RARE2_API and _G.RARE2_API.getRaceMessages and _G.RARE2_API.getRaceMessages() or {}
+    local msgs = api.getRaceMessages and api.getRaceMessages() or {}
     local shown = 0
     for i = 1, #msgs do
       if shown >= 2 then break end
@@ -1336,9 +1411,9 @@ local function drawRaceEventsBody()
     end
   end
 
-  -- ===== 8. LEARNING (opt-in) =====
+  -- ===== 9. LEARNING (opt-in) =====
   if showLearn then
-    local mem = _G.RARE2_API and _G.RARE2_API.getMemory and _G.RARE2_API.getMemory() or nil
+    local mem = api.getMemory and api.getMemory() or nil
     if mem and mem.tracks then
       local cnt = 0
       for _ in pairs(mem.tracks) do cnt = cnt + 1 end
@@ -1348,10 +1423,14 @@ local function drawRaceEventsBody()
     end
   end
 
-  -- Rodapé do overlay
+  -- ===== Rodapé: versão + LIVE + atalho p/ o app =====
   if not compact then
     local v = _G.RACEFLOW_VERSION or SCRIPT_VERSION or "?"
     ui.textDisabled("ApexFlow v" .. tostring(v) .. (inSession and " • LIVE" or ""))
+    ui.sameLine(0, 8)
+    if ui.button("⚙ App##hud_open_app", vec2(70, 22)) then
+      if ac.setWindowOpen then pcall(ac.setWindowOpen, "main", true) end
+    end
   end
 end
 
