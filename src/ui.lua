@@ -2035,19 +2035,11 @@ local function drawHudEventsSettings(sim, cfg)
   end
   ui.sameLine()
   helpMarker("Abre a janela overlay. Arraste para reposicionar; redimensione pelas bordas.")
-end
--- ==========================================================
--- v0.17.0: CONSOLE — Activity Rail + Inspector + Status Bar + Wizard.
--- Paradigma trocado por completo (nada de hero/cards/grade):
---   Activity Bar (VS Code): trilho vertical de ícones à esquerda.
---   Inspector: visões numeradas 01..NN com status à direita.
---   Status Bar (VS Code): linha fina de contexto embaixo.
---   Walkthrough (VS Code): assistente de 3 passos no 1º uso.
---   Overlays (RaceLab/iFL03): escaneável num relance, presets por
---   sessão, botões de teste, barras de progresso.
--- Só usa primitivas comprovadas (button/checkbox/slider/text/
--- separator/sameLine/indent/header/inputText/beginChild/endChild/
--- dummy/progressBar com fallback). Tudo temporal via os.clock().
+end-- ==========================================================
+-- v0.19.0: BROADCAST SKIN — mesma engine ImGui, cara de TV.
+-- Faixas coloridas full-width (beginChild + ChildBg, padrão provado),
+-- toggles pill ON/OFF, números herói em fonte Title, selos de status,
+-- trilho + inspetor + status bar mantidos como esqueleto.
 -- ==========================================================
 
 local NAV_RAIL = {
@@ -2151,13 +2143,63 @@ local function animBar(frac, label)
   end
 end
 
--- ---------------- visão numerada (estilo inspector) ----------------
+-- ---------------- peças broadcast ----------------
+-- Faixa full-width colorida (padrão do AC-Engineer: ChildBg + beginChild).
+-- id único obrigatório. Blindada: qualquer erro vira fallback sem faixa
+-- (e desativa faixas p/ o resto da sessão, sem spam de log).
+local bandBroken = false
+local function band(id, r, g, b, h, fn)
+  if bandBroken or not (ui.beginChild and ui.endChild and ui.pushStyleColor and rgbm) then
+    fn()
+    return false
+  end
+  local pushed, begun = false, false
+  local okOpen = pcall(function()
+    ui.pushStyleColor(ui.StyleColor.ChildBg, rgbm(r, g, b, 1.0))
+    pushed = true
+    ui.beginChild(id, vec2(0, h), false)
+    begun = true
+  end)
+  if not okOpen then
+    if pushed then pcall(ui.popStyleColor) end
+    bandBroken = true
+    fn()
+    return false
+  end
+  local okFn = pcall(fn)
+  if begun then pcall(ui.endChild) end
+  if pushed then pcall(ui.popStyleColor) end
+  return okFn
+end
+
+-- Toggle pill ON/OFF (botão primeiro, rótulo depois — sem matemática de cursor).
+-- Retorna o novo valor (ou o mesmo se não clicado).
+local function pillToggle(id, label, val, summary)
+  local w = 84
+  if val and rgbm then
+    ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.12, 0.45, 0.24, 1.00))
+  end
+  local clicked = ui.button((val and "● ON" or "○ OFF") .. "##" .. id, vec2(w, 28))
+  if val and rgbm then ui.popStyleColor() end
+  ui.sameLine(0, 8)
+  ui.text(label)
+  if summary and summary ~= "" then
+    ui.newLine(1)
+    ui.textDisabled("      " .. summary)
+  end
+  if clicked then return not val end
+  return val
+end
+
+-- Linha de visão numerada com barra lateral de acento.
 -- opts = { advanced=false, status="" }
 local function view(cfg, id, num, title, summary, opts, fn, sim)
   opts = opts or {}
   local st = ensureUiState(cfg)
   if isSimple(cfg) and opts.advanced and not st[id .. "_show"] then
-    if ui.button("🔧 " .. num .. " · " .. title .. "  (avançado — mostrar)##adv_" .. id, vec2(-1, 28)) then
+    if rgbm then ui.textColored("▌", C.accent()) else ui.text("|") end
+    ui.sameLine(0, 4)
+    if ui.button("🔧 " .. num .. " · " .. title .. "  (toque p/ abrir — avançado)##adv_" .. id, vec2(-1, 30)) then
       st[id .. "_show"] = true
       trackSection(cfg, id)
     end
@@ -2166,20 +2208,22 @@ local function view(cfg, id, num, title, summary, opts, fn, sim)
   end
   if st[id] == nil then st[id] = true end
   local isOpen = st[id]
-  local chev = isOpen and "∨" or "›"
-  local head = chev .. "  " .. num .. " · " .. title
-  if opts.status and opts.status ~= "" then head = head .. "   —  " .. opts.status end
-  if ui.button(head .. "##view_" .. id, vec2(-1, 30)) then
+  if rgbm then ui.textColored("▌", C.accent()) else ui.text("|") end
+  ui.sameLine(0, 4)
+  ui.setNextItemWidth(math.max(200, ui.windowWidth() - 30))
+  local head = (isOpen and "∨  " or "›  ") .. num .. " · " .. title
+  if opts.status and opts.status ~= "" then head = head .. "     ·  " .. opts.status end
+  if ui.button(head .. "##view_" .. id, vec2(-1, 32)) then
     st[id] = not isOpen
     if not isOpen then trackSection(cfg, id) end
     isOpen = not isOpen
   end
   if summary and summary ~= "" then ui.textDisabled("      " .. summary) end
   if isOpen then
-    ui.indent(10)
+    ui.indent(12)
     ui.newLine(2)
     safeTab(title, fn, sim, cfg)
-    ui.unindent(10)
+    ui.unindent(12)
     ui.newLine(2)
   end
   ui.separator()
@@ -2197,43 +2241,61 @@ local function getSystemStatus(sim, cfg)
   return tl, cs, stt, memCount
 end
 
--- ---------------- barra de comando (paleta) ----------------
+-- Faixa de estado global (verde/amarelo/vermelho) — o cartão-postal do app.
+local function drawStateBand(sim, cfg)
+  local tl, cs = getSystemStatus(sim, cfg)
+  local hasPenalty = tl.penaltyActive and (tonumber(tl.timeLeft) or 0) > 0
+  local r, g, b, txt = 0.10, 0.38, 0.20, "🟢 PISTA VERDE"
+  if hasPenalty then
+    local p = animPulse(5, 0.55, 1.0)
+    r, g, b = 0.55 * p + 0.25, 0.10, 0.12
+    txt = string.format("🛑 PUNIÇÃO %.0fs — BOX + FREIO", tonumber(tl.timeLeft) or 0)
+  elseif cs.active then
+    local p = animPulse(4, 0.55, 1.0)
+    r, g, b = 0.45 * p + 0.2, 0.32 * p + 0.12, 0.05
+    txt = "🟡 " .. tostring(cs.mode or "CAUTION") .. " — PÉ LEVE"
+  end
+  band("##rf_stateband", r, g, b, 40, function()
+    ui.pushFont(ui.Font.Title)
+    if rgbm then ui.textColored(txt, rgbm(1, 1, 1, 1)) else ui.text(txt) end
+    ui.popFont()
+  end)
+end
+
+-- ---------------- barra de comando ----------------
 local function drawCommandBar(sim, cfg)
-  -- power
   local on = cfg.enabled
-  if on and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.14, 0.42, 0.26, 1.00)) end
-  if ui.button((on and "⏻ ON" or "⏻ OFF") .. "##power", vec2(76, 30)) then
+  if on and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.12, 0.45, 0.24, 1.00)) end
+  if ui.button((on and "⏻ ON" or "⏻ OFF") .. "##power", vec2(84, 32)) then
     cfg.enabled = not on
     notifyChange()
     toast(cfg, cfg.enabled and "ok" or "warn", cfg.enabled and "App ligado" or "App pausado", "")
   end
   if on and rgbm then ui.popStyleColor() end
   ui.sameLine(0, 8)
-  -- busca estilo paleta de comando
   if ui.inputText then
-    ui.setNextItemWidth(math.max(140, ui.windowWidth() - 300))
+    ui.setNextItemWidth(math.max(120, ui.windowWidth() - 300))
     local q = cfg._search or ""
     local newQ = ui.inputText("⌨ filtrar…##cmd_search", q)
     if newQ ~= nil and newQ ~= q then cfg._search = newQ end
     ui.sameLine(0, 8)
   end
-  -- modo segmentado
   local simple = isSimple(cfg)
   if simple and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.16, 0.45, 0.30, 1.00)) end
-  if ui.button("😊##mode_s", vec2(40, 30)) then cfg.ui.simpleMode = true notifyChange() end
+  if ui.button("😊##mode_s", vec2(44, 32)) then cfg.ui.simpleMode = true notifyChange() end
   if simple and rgbm then ui.popStyleColor() end
   ui.sameLine(0, 4)
   if (not simple) and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.35, 0.30, 0.55, 1.00)) end
-  if ui.button("🛠️##mode_t", vec2(40, 30)) then cfg.ui.simpleMode = false notifyChange() end
+  if ui.button("🛠️##mode_t", vec2(44, 32)) then cfg.ui.simpleMode = false notifyChange() end
   if (not simple) and rgbm then ui.popStyleColor() end
-  ui.textDisabled("😊 simples (só essencial) · 🛠️ técnico (tudo) · X limpa o filtro")
+  ui.textDisabled("😊 simples · 🛠️ técnico" .. ((cfg._search or "") ~= "" and " · filtro ativo" or ""))
   if (cfg._search or "") ~= "" then
     ui.sameLine(0, 8)
     if ui.button("X##cmd_clear", vec2(28, 22)) then cfg._search = "" end
   end
 end
 
--- ---------------- trilho de atividades ----------------
+-- ---------------- trilho ----------------
 local function railBadges(sim, cfg)
   local tl = RARE2_API.getTrackLimitsState and RARE2_API.getTrackLimitsState() or {}
   local cs = RARE2_API.getCautionState and RARE2_API.getCautionState() or {}
@@ -2287,7 +2349,7 @@ local function drawStatusBar(sim, cfg)
   if live and rgbm then ui.textColored(line, C.ok()) else ui.textDisabled(line) end
 end
 
--- ---------------- presets (lista com descrição) ----------------
+-- ---------------- presets (faixa por preset) ----------------
 local PRESET_ROWS = {
   { key = "gt3",       desc = "Corrida GT equilibrada — comece aqui" },
   { key = "gt4",       desc = "GT de base, mais permissivo" },
@@ -2296,7 +2358,7 @@ local PRESET_ROWS = {
   { key = "lmp",       desc = "Protótipos velozes" },
   { key = "endurance", desc = "Provas longas, tolerante" },
 }
-local function drawPresetList(cfg, compact)
+local function drawPresetList(cfg)
   local presets = RARE2_API.getCategoryPresets and RARE2_API.getCategoryPresets() or {}
   if not next(presets) then return end
   if not matchesSearch(cfg, "preset gt3 f1 tcr categoria corrida") then return end
@@ -2306,73 +2368,78 @@ local function drawPresetList(cfg, compact)
     if pr then
       local isCur = cur == row.key
       if isCur then
-        local glow = animPulse(3, 0.55, 1.0)
-        if rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(1.00*glow, 0.55*glow, 0.15*glow, 1.00)) end
+        band("##pre_" .. row.key, 0.45, 0.22, 0.05, 52, function()
+          ui.pushFont(ui.Font.Title)
+          if rgbm then ui.textColored("● " .. pr.label .. "  EM USO", rgbm(1, 1, 1, 1))
+          else ui.text("● " .. pr.label .. "  EM USO") end
+          ui.popFont()
+          ui.textDisabled("      " .. row.desc)
+        end)
+      else
+        if ui.button("○  " .. pr.label .. "##p_" .. row.key, vec2(-1, 30)) then
+          if RARE2_API.applyCategoryPreset then RARE2_API.applyCategoryPreset(row.key) end
+          notifyChange()
+          if ac.setMessage then pcall(ac.setMessage, "PRESET", pr.label .. " aplicado") end
+          toast(cfg, "ok", "Preset", pr.label .. " aplicado")
+          trackSection(cfg, "preset_" .. row.key)
+        end
+        ui.textDisabled("      " .. row.desc)
       end
-      local w = compact and 120 or 150
-      if ui.button((isCur and "● " or "○ ") .. pr.label .. "##p_" .. row.key, vec2(w, 30)) then
-        if RARE2_API.applyCategoryPreset then RARE2_API.applyCategoryPreset(row.key) end
-        notifyChange()
-        if ac.setMessage then pcall(ac.setMessage, "PRESET", pr.label .. " aplicado") end
-        toast(cfg, "ok", "Preset", pr.label .. " aplicado")
-        trackSection(cfg, "preset_" .. row.key)
-      end
-      if isCur and rgbm then ui.popStyleColor() end
-      ui.sameLine(0, 8)
-      ui.textDisabled(row.desc)
+      ui.newLine(2)
     end
   end
-  ui.newLine(2)
 end
 
--- ---------------- assistente (walkthrough 3 passos) ----------------
+-- ---------------- assistente ----------------
 local function drawWizard(sim, cfg)
   local step = math.max(1, math.min(3, tonumber(cfg._wizStep) or 1))
-  ui.text("🧭 Configuração guiada  —  passo " .. step .. " de 3")
-  animBar(step / 3)
+  band("##wiz_head", 0.10, 0.20, 0.32, 56, function()
+    ui.pushFont(ui.Font.Title)
+    if rgbm then ui.textColored("🧭 Passo " .. step .. " de 3", rgbm(1, 1, 1, 1))
+    else ui.text("Passo " .. step .. " de 3") end
+    ui.popFont()
+    animBar(step / 3)
+  end)
   ui.newLine(4)
   if step == 1 then
-    ui.pushFont(ui.Font.Title)
-    ui.text("1 · Que corrida é essa?")
-    ui.popFont()
-    ui.textDisabled("Isso ajusta limites e bandeiras sozinho. Depois dá p/ mudar tudo.")
+    ui.text("Que corrida é essa?")
+    ui.textDisabled("Ajusta limites e bandeiras sozinho. Depois dá p/ mudar tudo.")
     ui.newLine(4)
-    drawPresetList(cfg, false)
+    drawPresetList(cfg)
     ui.newLine(2)
-    if ui.button("Continuar ›##wiz1", vec2(180, 32)) then cfg._wizStep = 2 end
+    if ui.button("Continuar ›##wiz1", vec2(-1, 34)) then cfg._wizStep = 2 end
   elseif step == 2 then
-    ui.pushFont(ui.Font.Title)
-    ui.text("2 · Ligar a fiscalização?")
-    ui.popFont()
+    ui.text("Ligar a fiscalização?")
     ui.textDisabled("Sem isso o app só observa; com isso ele avisa e pune cortes.")
     ui.newLine(4)
     cfg.tracklimits = cfg.tracklimits or {}
     local tlOn = cfg.tracklimits.enabled == true
-    if ui.checkbox("Fiscalizar cortes de pista", tlOn) then
+    if pillToggle("wiz_tl", "Fiscalizar cortes de pista", tlOn,
+        "Avisos iguais aos do CMRT.") ~= tlOn then
       cfg.tracklimits.enabled = not tlOn; notifyChange()
     end
+    ui.newLine(2)
     cfg.voice = cfg.voice or {}
     if cfg.voice.enabled == nil then cfg.voice.enabled = true end
-    if ui.checkbox("Avisos por voz", cfg.voice.enabled) then
+    if pillToggle("wiz_vc", "Avisos por voz", cfg.voice.enabled,
+        "Fala sem precisar de CrewChief.") ~= cfg.voice.enabled then
       cfg.voice.enabled = not cfg.voice.enabled; notifyChange()
     end
     ui.newLine(4)
-    if ui.button("‹ Voltar##wiz2b", vec2(120, 30)) then cfg._wizStep = 1 end
+    if ui.button("‹ Voltar##wiz2b", vec2(130, 32)) then cfg._wizStep = 1 end
     ui.sameLine(0, 8)
-    if ui.button("Continuar ›##wiz2n", vec2(180, 30)) then cfg._wizStep = 3 end
+    if ui.button("Continuar ›##wiz2n", vec2(-1, 32)) then cfg._wizStep = 3 end
   else
-    ui.pushFont(ui.Font.Title)
-    ui.text("3 · Ver tudo funcionando")
-    ui.popFont()
-    ui.textDisabled("Abra o painel de corrida e entre em pista. Pronto.")
+    ui.text("Pronto para largar")
+    ui.textDisabled("Resumo do que foi ligado. Entre em pista — o resto é automático.")
     ui.newLine(4)
-    if ui.button("📊 Abrir painel de corrida##wiz_open", vec2(230, 32)) then
+    if ui.button("📊 Abrir painel de corrida##wiz_open", vec2(-1, 34)) then
       if ac.setWindowOpen then pcall(ac.setWindowOpen, "events", true) end
     end
     ui.newLine(4)
-    if ui.button("‹ Voltar##wiz3b", vec2(120, 30)) then cfg._wizStep = 2 end
+    if ui.button("‹ Voltar##wiz3b", vec2(130, 32)) then cfg._wizStep = 2 end
     ui.sameLine(0, 8)
-    if ui.button("🏁 Concluir##wiz_done", vec2(180, 30)) then
+    if ui.button("🏁 Concluir##wiz_done", vec2(-1, 32)) then
       cfg._onboarded = true
       cfg.uiNav = "dash"
       notifyChange()
@@ -2382,7 +2449,7 @@ local function drawWizard(sim, cfg)
   ui.newLine(4)
   ui.separator()
   ui.newLine(2)
-  if ui.button("Pular assistente##wiz_skip", vec2(150, 24)) then
+  if ui.button("Pular assistente##wiz_skip", vec2(160, 26)) then
     cfg._onboardHide = true
     notifyChange()
   end
@@ -2394,12 +2461,25 @@ local function crumb(label)
   ui.newLine(2)
 end
 
+local function heroNumbers(sim, cfg)
+  if not (sim and sim.isSessionStarted) then
+    ui.textDisabled("Sem sessão — números vivos aparecem em pista " .. animDots())
+    return
+  end
+  local ok, pcar = pcall(ac.getCar, 0)
+  if not (ok and pcar) then return end
+  band("##hero_num", 0.08, 0.13, 0.22, 54, function()
+    ui.pushFont(ui.Font.Title)
+    local txt = string.format("P%d   ·   V%d   ·   %d km/h",
+      pcar.racePosition or 0, (pcar.lapCount or 0) + 1, math.floor(pcar.speedKmh or 0))
+    if rgbm then ui.textColored(txt, rgbm(1, 1, 1, 1)) else ui.text(txt) end
+    ui.popFont()
+  end)
+end
+
 local function drawDashInspector(sim, cfg)
   crumb("Início")
-  ui.pushFont(ui.Font.Title)
-  if rgbm then ui.textColored("Início", C.accent()) else ui.text("Início") end
-  ui.popFont()
-  ui.textDisabled("Assistente, preset e saúde — o essencial numa tela.")
+  heroNumbers(sim, cfg)
   ui.newLine(4)
   if not cfg._onboarded and not cfg._onboardHide then
     drawWizard(sim, cfg)
@@ -2429,10 +2509,10 @@ local function drawDashInspector(sim, cfg)
   ui.newLine(4)
   ui.text("Preset da corrida")
   ui.newLine(2)
-  drawPresetList(cfg, true)
+  drawPresetList(cfg)
   ui.newLine(2)
   if not cfg._onboarded and cfg._onboardHide then
-    if ui.button("🧭 Reabrir assistente##reopen_wiz", vec2(200, 28)) then
+    if ui.button("🧭 Reabrir assistente##reopen_wiz", vec2(-1, 30)) then
       cfg._onboardHide = false cfg._wizStep = 1
     end
     ui.newLine(2)
@@ -2548,7 +2628,7 @@ local function drawHudInspector(sim, cfg)
       {},
       function(s, c) drawHudEventsSettings(s, c) end, sim)
   end
-  if matchesSearch(cfg, "telemetria csv volta voz fala beep gravar") then
+  if matchesSearch(cfg, "telemetria csv volta documents voz fala beep gravar") then
     view(cfg, "hud_tel", "02", "Gravação e voz",
       "Grava voltas em arquivo + fala os avisos sem CrewChief.",
       {},
@@ -2569,20 +2649,20 @@ local function drawSysInspector(sim, cfg)
   ui.popFont()
   ui.textDisabled("Visual, updates e bastidores. Mexa uma vez e esqueça.")
   ui.newLine(4)
-  if matchesSearch(cfg, "visual cor tema transparencia") then
+  if matchesSearch(cfg, "aparencia tema cor transparencia") then
     view(cfg, "sys_theme", "01", "Visual",
       "Cor de destaque e transparência.",
       {},
       function(s, c) drawAppearanceSection(s, c) end, sim)
   end
-  if matchesSearch(cfg, "atualizacao github versao baixar") then
+  if matchesSearch(cfg, "github update release versao baixar") then
     local gs = RARE2_API.githubGetState and RARE2_API.githubGetState() or {}
     view(cfg, "sys_gh", "02", "Atualizações",
       "Ver se saiu versão nova.",
       { status = gs.hasUpdate and "nova!" or "" },
       function(s, c) drawGitHubUpdateSection(s, c) end, sim)
   end
-  if matchesSearch(cfg, "web remota avancado externo") then
+  if matchesSearch(cfg, "web remota avancado externo painel") then
     view(cfg, "sys_web", "03", "Web remota (painel)",
       "Painel no navegador: ver a corrida e mandar comandos.",
       {},
@@ -2610,6 +2690,8 @@ function M.draw(sim, cfg)
   ensureUiState(cfg)
   if sim and sim.isSessionStarted then cfg._everInSession = true end
 
+  drawStateBand(sim, cfg)
+  ui.newLine(2)
   drawCommandBar(sim, cfg)
   ui.newLine(2)
   drawToasts(cfg)
@@ -2624,7 +2706,6 @@ function M.draw(sim, cfg)
     ui.sameLine(0, 6)
     ui.beginChild("##rf_main", vec2(0, 0), false)
   else
-    -- fallback: trilho horizontal compacto
     for _, cat in ipairs(NAV_RAIL) do
       local active = cfg.uiNav == cat.id
       if active and rgbm then
@@ -2644,23 +2725,23 @@ function M.draw(sim, cfg)
 
   local nav = cfg.uiNav or "dash"
   local flash = (animT() - (cfg._navFlash or -10)) < 0.8
-  if flash and rgbm then
-    for _, cat in ipairs(NAV_RAIL) do
-      if cat.id == nav then ui.textColored(cat.icon .. " " .. cat.label, C.accent()) end
-    end
-  end
   if nav == "dash" then
     safeTab("Início", drawDashInspector, sim, cfg)
   elseif nav == "ai" then
+    if flash and rgbm then ui.textColored("🤖 Pilotos", C.accent()) end
     safeTab("Pilotos", drawAiInspector, sim, cfg)
   elseif nav == "race" then
+    if flash and rgbm then ui.textColored("🏁 Corrida", C.accent()) end
     safeTab("Corrida", drawRaceInspector, sim, cfg)
   elseif nav == "safety" then
+    if flash and rgbm then ui.textColored("🟡 Segurança", C.accent()) end
     safeTab("Segurança", drawSafetyInspector, sim, cfg)
   elseif nav == "hud" then
+    if flash and rgbm then ui.textColored("📡 Tela & Voz", C.accent()) end
     safeTab("Tela & Voz", drawHudInspector, sim, cfg)
   elseif nav == "sys" then
-    safeTab("Ajustes", drawSysInspector, sim, cfg)
+    if flash and rgbm then ui.textColored("⚙️ Ajustes", C.accent()) end
+    safeTab("Sistema", drawSysInspector, sim, cfg)
   else
     cfg.uiNav = "dash"
     safeTab("Início", drawDashInspector, sim, cfg)
