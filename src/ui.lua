@@ -1390,9 +1390,8 @@ end
 local function drawWebUISection(sim, cfg)
   cfg.webui = cfg.webui or {}
 
-  ui.text("Web UI Remota (legado)")
-  ui.textDisabled("Deprecada: mantida por compatibilidade. Prefira o app + HUD nativos.")
-  ui.textDisabled("Exemplo Python oculto por padrão (ver wiki do repositório).")
+  ui.text("Web UI Remota (painel pronto em web/)")
+  ui.textDisabled("Rode web/panel_server.py e abra panel.html (PC, celular ou OBS).")
   helpMarker("Interface remota via arquivos JSON compartilhados. Ferramenta externa lê status e escreve comandos.\nStatus: Documents/Assetto Corsa/RaceFlow_webui_status.json\nComandos: Documents/Assetto Corsa/RaceFlow_webui_cmd.json")
 
   local wState = RARE2_API.webuiGetState and RARE2_API.webuiGetState() or {
@@ -2584,9 +2583,9 @@ local function drawSysInspector(sim, cfg)
       function(s, c) drawGitHubUpdateSection(s, c) end, sim)
   end
   if matchesSearch(cfg, "web remota avancado externo") then
-    view(cfg, "sys_web", "03", "Web remota (legado)",
-      "Recurso antigo p/ ferramentas externas. Pode ignorar.",
-      { advanced = true },
+    view(cfg, "sys_web", "03", "Web remota (painel)",
+      "Painel no navegador: ver a corrida e mandar comandos.",
+      {},
       function(s, c) drawWebUISection(s, c) end, sim)
   end
   if matchesSearch(cfg, "ajuda sobre como funciona") then

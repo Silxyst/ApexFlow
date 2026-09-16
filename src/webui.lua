@@ -155,6 +155,43 @@ local function buildStatus(sim, cfg)
       tracksCount = 0,
       totalCorners = 0,
     },
+    -- v0.18.0: snapshots p/ o painel remoto (tudo com pcall, nunca quebra)
+    caution = (function()
+      local ok, cs = pcall(function()
+        return _G.RARE2_API and RARE2_API.getCautionState and RARE2_API.getCautionState() or {}
+      end)
+      if not ok or type(cs) ~= "table" then return { active = false } end
+      return {
+        active = cs.active == true,
+        mode = cs.mode or "",
+        timer = cs.timer or 0,
+        duration = cs.duration or 0,
+        reason = cs.reason or "",
+      }
+    end)(),
+    tracklimits = (function()
+      local ok, ts = pcall(function()
+        return _G.RARE2_API and RARE2_API.getTrackLimitsState and RARE2_API.getTrackLimitsState() or {}
+      end)
+      if not ok or type(ts) ~= "table" then return { warn = 0 } end
+      return {
+        warn = ts.warn or 0,
+        maxWarn = ts.maxWarn or 4,
+        penaltyActive = ts.penaltyActive == true,
+        timeLeft = ts.timeLeft or 0,
+        serving = ts.serving == true,
+        lastEvent = ts.lastEvent or "",
+        pitAlert = ts.pitAlert == true,
+      }
+    end)(),
+    voice = (function()
+      local ok, vs = pcall(function()
+        return _G.RARE2_API and RARE2_API.voiceGetState and RARE2_API.voiceGetState() or {}
+      end)
+      if not ok or type(vs) ~= "table" then return { busy = false } end
+      return { busy = vs.busy == true, queue = vs.queue or 0, available = vs.available == true }
+    end)(),
+    preset = (cfg.categoryPreset or "custom"),
     config = {
       aggression = cfg.aggression,
       paceStrength = cfg.paceStrength,
@@ -200,6 +237,22 @@ local function processCommands(sim, cfg)
         elseif action == "set_difficulty" then
           cfg.difficultyBoost = tonumber(params.value) or cfg.difficultyBoost
           RARE2_API.markConfigDirty()
+        elseif action == "apply_preset" then
+          -- v0.18.0: aplica preset de categoria (gt3/gt4/tcr/f1/lmp/endurance)
+          if RARE2_API.applyCategoryPreset and params.key then
+            RARE2_API.applyCategoryPreset(tostring(params.key))
+            RARE2_API.markConfigDirty()
+          end
+        elseif action == "caution_trigger" then
+          -- v0.18.0: força/encerra caution manual (teste)
+          if RARE2_API.cautionManualTrigger then
+            RARE2_API.cautionManualTrigger(sim, cfg)
+          end
+        elseif action == "voice_test" then
+          -- v0.18.0: testa a voz (limits/pit/caution/penalty)
+          if RARE2_API.voiceTest and params.kind then
+            RARE2_API.voiceTest(tostring(params.kind))
+          end
         elseif action == "github_check" then
           if RARE2_API.githubCheckUpdates then
             RARE2_API.githubCheckUpdates(cfg, true)
