@@ -1867,6 +1867,11 @@ local function drawHudEventsSettings(sim, cfg)
   if ui.checkbox("Piscar alertas críticos", h.blink) then
     h.blink = not h.blink; notifyChange()
   end
+  if h.hideInPits == nil then h.hideInPits = true end
+  if ui.checkbox("Esconder parado no box (+10s)", h.hideInPits) then
+    h.hideInPits = not h.hideInPits; notifyChange()
+  end
+  helpMarker("Leigo: no box parado o painel dorme sozinho e volta na pista.\nTécnico: gate por isInPitlane/isInPit + speed < 5 por 10s.")
 
   ui.newLine(2)
   local newScale = sliderBlock("Escala do HUD", "hud_scale", h.scale, 0.7, 1.5, "%.2f",
@@ -1881,7 +1886,11 @@ local function drawHudEventsSettings(sim, cfg)
     if ac.setWindowOpen then pcall(ac.setWindowOpen, "events", true) end
   end
   ui.sameLine()
-  helpMarker("Abre a janela overlay. Arraste para reposicionar; redimensione pelas bordas.")
+  if ui.button("👁 Testar HUD", vec2(150, 28)) then
+    if RARE2_API.hudPreviewStart then RARE2_API.hudPreviewStart(10) end
+  end
+  ui.sameLine()
+  helpMarker("Abre a janela overlay. O botão 👁 injeta 10s de FCY + punição fake (com tag PREVIEW) p/ ver o layout sem correr.")
 end-- ==========================================================
 -- v0.19.0: BROADCAST SKIN — mesma engine ImGui, cara de TV.
 -- Faixas coloridas full-width (beginChild + ChildBg, padrão provado),
