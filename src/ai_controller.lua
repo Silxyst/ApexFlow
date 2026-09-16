@@ -22,6 +22,10 @@ local drivers = {}
 local lastSessionIndex = -1
 local lastCarsCount    = -1
 local lastAggression   = -1
+-- v0.15.1 (Sug3): throttle da aplicacao do mix de perfis no physics
+local profilePushTimer = 99
+local lastProfileAggr = -1
+local lastProfilePushSess = -1
 
 local memory = nil
 local memoryDirty = false
@@ -54,12 +58,11 @@ local function getTrackId(sim)
   return sim and sim.trackName or "unknown"
 end
 
-local function clamp
-
 -- RARE2_API guard
 _G.RARE2_API = _G.RARE2_API or {}
 local RARE2_API = _G.RARE2_API
-(v, minV, maxV)
+
+local function clamp(v, minV, maxV)
   if v < minV then return minV end
   if v > maxV then return maxV end
   return v
@@ -1026,6 +1029,25 @@ local function classAggression(class, sliderNorm)
   end
 end
 
+-- v0.15.1 (Sug3): aplica o mix de perfis no physics AQUI (update),
+-- nunca no draw. Retorna nº de IAs tocadas.
+function M.applyProfileAggression(cfg)
+  if not cfg then return 0 end
+  if physics == nil or physics.setAIAggression == nil then return 0 end
+  local a = clamp((cfg.aggression or 50) / 100.0, 0, 1)
+  local n = 0
+  for idx, d in pairs(drivers) do
+    local cls = (d and d.class) or "normal"
+    local v = classAggression(cls, a)
+    local ok, car = pcall(ac.getCar, idx)
+    if ok and car and car.isAIControlled then
+      pcall(physics.setAIAggression, idx, v)
+      n = n + 1
+    end
+  end
+  return n
+end
+
 -- -------------------------------------------------------------------
 -- Pack context (ahead, side-by-side, blue flags)
 -- -------------------------------------------------------------------
@@ -1459,6 +1481,20 @@ then
   lastSessionIndex = sessionIndex
   lastCarsCount    = carsCount
   lastAggression   = aggression
+end
+
+-- v0.15.1 (Sug3): push do mix de perfis com throttle (2s ou on-change),
+-- para o draw nunca precisar escrever no physics.
+profilePushTimer = (profilePushTimer or 99) + dt
+do
+  local curAggr = cfg.aggression or 50
+  if profilePushTimer >= 2.0 or curAggr ~= (lastProfileAggr or -1)
+      or sessionIndex ~= (lastProfilePushSess or -1) then
+    profilePushTimer = 0
+    lastProfileAggr = curAggr
+    lastProfilePushSess = sessionIndex
+    pcall(M.applyProfileAggression, cfg)
+  end
 end
 
 --- ==========================================================

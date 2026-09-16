@@ -289,11 +289,8 @@ local function computeAggressionStats(sim, cfg)
 
     stats[class] = stats[class] + 1
     stats.total  = stats.total + 1
-
-    if physics and physics.setAIAggression then
-      local aggr = classAggression(class, a)
-      physics.setAIAggression(info.index, aggr)
-    end
+    -- v0.15.1 (Sug3): leitura PURA — a escrita no physics vive em
+    -- ai_controller.M.applyProfileAggression (update, com throttle).
   end
 
   stats.pChill  = pChill
@@ -588,7 +585,136 @@ local function drawPaceSection(sim, cfg)
 end
 
 -- ==========================================================
+-- v0.15.1 (Sug1): cards unificados
+--  * Ritmo & Dificuldade = Difficulty + Physics Intensity + Pace
+--  * Pit Real & Falhas = pitSpeedReal + failures (sai telemetria/voz daqui)
+--  * Telemetria & Voz = CSV + modulo de voz (fonte unica, so no HUD)
+-- ==========================================================
+local function drawRhythmSection(sim, cfg)
+  drawDifficultyBoostSection(sim, cfg)
+  drawPhysicsIntensitySection(sim, cfg)
+  drawPaceSection(sim, cfg)
+end
+
+local function drawPitFailuresSection(sim, cfg)
+  ui.text("Pit Real & Falhas da IA")
+  helpMarker("Leigo: limite real da pista + IAs que podem quebrar.\nTécnico: override do pitLimitKmh por pista + chance/hora por IA.")
+  cfg.pitSpeedReal = cfg.pitSpeedReal or {}
+  if cfg.pitSpeedReal.enabled == nil then cfg.pitSpeedReal.enabled = true end
+  if ui.checkbox("Pit Real (auto)##pitreal_only", cfg.pitSpeedReal.enabled) then
+    cfg.pitSpeedReal.enabled = not cfg.pitSpeedReal.enabled; notifyChange()
+  end
+  helpMarker("Leigo: ON = pega o limite verdadeiro da pista (60/80/100).\nTécnico: tenta ac.getPitSpeedLimit() etc., senão usa manual.")
+  cfg.failures = cfg.failures or {}
+  if cfg.failures.enabled == nil then cfg.failures.enabled = false end
+  if ui.checkbox("Falhas mecânicas da IA##fail_only", cfg.failures.enabled) then
+    cfg.failures.enabled = not cfg.failures.enabled; notifyChange()
+  end
+  helpMarker("Leigo: IA pode quebrar e ir ao box.\nTécnico: chance/hora por IA após minLap.")
+  if cfg.failures.enabled then
+    cfg.failures.chancePerHour = tonumber(cfg.failures.chancePerHour) or 0.08
+    local newCh = sliderBlock("Chance por hora", "fail_ch", cfg.failures.chancePerHour, 0, 1, "%.2f",
+      "Leigo: 0.08 = ~8% por hora por IA.\nTécnico: probabilidade/hora convertida por frame.")
+    if newCh ~= nil then
+      local val = clamp(newCh, 0, 1)
+      if math.abs(val - cfg.failures.chancePerHour) > 0.0005 then cfg.failures.chancePerHour = val; notifyChange() end
+    end
+  end
+end
+
+-- Voz (v0.15.1, Sug5): fila por eventos inspirada no AC-Engineer-Spotter-Audio
+-- (cooldown por grupo, prioridade, clips opcionais em sfx/voice/<CAT>/).
+local function drawVoiceSection(sim, cfg)
+  cfg.voice = cfg.voice or {}
+  if cfg.voice.enabled == nil then cfg.voice.enabled = true end
+  if ui.checkbox("Ativar voz##voice_en", cfg.voice.enabled) then
+    cfg.voice.enabled = not cfg.voice.enabled; notifyChange()
+  end
+  helpMarker("Leigo: avisos falados/beep sem CrewChief.\nTécnico: fila FIFO com cooldown por grupo + prioridade; clips opcionais em sfx/voice/.")
+  if not cfg.voice.enabled then
+    ui.textDisabled("Voz desligada — só mensagens de texto.")
+    return
+  end
+  cfg.voice.volume = tonumber(cfg.voice.volume) or 0.8
+  local newV = sliderBlock("Volume", "voice_vol", cfg.voice.volume, 0, 1, "%.2f",
+    "Leigo: altura do aviso.\nTécnico: ganho aplicado ao AudioEvent/beep.")
+  if newV ~= nil then
+    local val = clamp(newV, 0, 1)
+    if math.abs(val - cfg.voice.volume) > 0.001 then cfg.voice.volume = val; notifyChange() end
+  end
+  cfg.voice.speed = tonumber(cfg.voice.speed) or 1.0
+  local newS = sliderBlock("Velocidade da fala", "voice_spd", cfg.voice.speed, 0.75, 1.5, "%.2f",
+    "Leigo: mais rápido/devagar.\nTécnico: pitch do AudioEvent (beeps não mudam).")
+  if newS ~= nil then
+    local val = clamp(newS, 0.75, 1.5)
+    if math.abs(val - cfg.voice.speed) > 0.001 then cfg.voice.speed = val; notifyChange() end
+  end
+  cfg.voice.categories = cfg.voice.categories or {}
+  local cats = {
+    { id = "limits",  label = "Track limits" },
+    { id = "pit",     label = "Pit speed" },
+    { id = "caution", label = "Caution" },
+    { id = "penalty", label = "Punições" },
+  }
+  ui.textDisabled("Categorias avisadas:")
+  for _, c in ipairs(cats) do
+    if cfg.voice.categories[c.id] == nil then cfg.voice.categories[c.id] = true end
+    if ui.checkbox(c.label .. "##voice_cat_" .. c.id, cfg.voice.categories[c.id]) then
+      cfg.voice.categories[c.id] = not cfg.voice.categories[c.id]; notifyChange()
+    end
+    ui.sameLine(0, 8)
+  end
+  ui.newLine(4)
+  ui.textDisabled("Testar (ignora cooldown):")
+  for _, c in ipairs(cats) do
+    if ui.button("▶ " .. c.label .. "##voice_test_" .. c.id, vec2(120, 24)) then
+      if RARE2_API.voiceTest then RARE2_API.voiceTest(c.id) end
+    end
+    ui.sameLine(0, 6)
+  end
+  ui.newLine(4)
+  local vs = RARE2_API.voiceGetState and RARE2_API.voiceGetState() or {}
+  if vs.available then
+    local parts = {}
+    for _, c in ipairs(cats) do
+      parts[#parts + 1] = c.id .. ":" .. tostring((vs.clips or {})[c.id] or 0)
+    end
+    ui.textDisabled("Áudio: API ok • clips (" .. table.concat(parts, " ") .. ")")
+    ui.textDisabled("Para voz falada, coloque .mp3/.wav/.ogg em sfx/voice/LIMITS|PIT|CAUTION|PENALTY.")
+  else
+    ui.textDisabled("Áudio: ac.AudioEvent indisponível — usando beep + mensagem.")
+  end
+  if vs.busy then ui.textDisabled("Fila: ocupada (" .. tostring(vs.queue or 0) .. " pendentes)") end
+end
+
+local function drawTelemetryVoiceSection(sim, cfg)
+  ui.text("Telemetria & Voz")
+  helpMarker("Leigo: grava voltas em CSV + avisos por voz.\nTécnico: CSV em Documents + fila de áudio por eventos.")
+  cfg.telemetryCSV = cfg.telemetryCSV or {}
+  if cfg.telemetryCSV.enabled == nil then cfg.telemetryCSV.enabled = false end
+  if ui.checkbox("Gravar telemetria CSV##tel_en", cfg.telemetryCSV.enabled) then
+    cfg.telemetryCSV.enabled = not cfg.telemetryCSV.enabled; notifyChange()
+  end
+  helpMarker("Leigo: um CSV por volta em Documents/Assetto Corsa.\nTécnico: lap, posição, combustível, pneus, tempos.")
+  if cfg.telemetryCSV.enabled then
+    cfg.telemetryCSV.maxLaps = tonumber(cfg.telemetryCSV.maxLaps) or 500
+    local newM = sliderBlock("Máximo de voltas no arquivo", "tel_max", cfg.telemetryCSV.maxLaps, 50, 2000, "%.0f",
+      "Leigo: limite do arquivo atual.\nTécnico: rotação simples por sessão.")
+    if newM ~= nil then
+      local val = math.floor(clamp(newM, 50, 2000) + 0.5)
+      if val ~= cfg.telemetryCSV.maxLaps then cfg.telemetryCSV.maxLaps = val; notifyChange() end
+    end
+  end
+  ui.newLine(4)
+  ui.separator()
+  ui.newLine(4)
+  drawVoiceSection(sim, cfg)
+end
+
+-- ==========================================================
 -- New systems (v0.14.0) — quick toggles
+-- DEPRECADO em v0.15.1 (Sug1): mantido por compatibilidade; os cards
+-- oficiais agora são Pit Real & Falhas (IA) e Telemetria & Voz (HUD).
 -- ==========================================================
 local function drawNewSystemsSection(sim, cfg)
   ui.separator()
@@ -1264,7 +1390,9 @@ end
 local function drawWebUISection(sim, cfg)
   cfg.webui = cfg.webui or {}
 
-  ui.text("Web UI Remota (File-based Polling)")
+  ui.text("Web UI Remota (legado)")
+  ui.textDisabled("Deprecada: mantida por compatibilidade. Prefira o app + HUD nativos.")
+  ui.textDisabled("Exemplo Python oculto por padrão (ver wiki do repositório).")
   helpMarker("Interface remota via arquivos JSON compartilhados. Ferramenta externa lê status e escreve comandos.\nStatus: Documents/Assetto Corsa/RaceFlow_webui_status.json\nComandos: Documents/Assetto Corsa/RaceFlow_webui_cmd.json")
 
   local wState = RARE2_API.webuiGetState and RARE2_API.webuiGetState() or {
@@ -1332,7 +1460,12 @@ local function drawWebUISection(sim, cfg)
   ui.newLine(3)
   ui.separator()
 
-  -- Example client code
+  -- Example client code (v0.15.1 Sug4: oculto por padrão)
+  cfg._ui_state = cfg._ui_state or {}
+  if ui.button(((cfg._ui_state["sys_web_ex"] and "▼ ") or "▶ ") .. "Exemplo de Cliente (Python)##web_ex", vec2(-1, 28)) then
+    cfg._ui_state["sys_web_ex"] = not cfg._ui_state["sys_web_ex"]
+  end
+  if cfg._ui_state["sys_web_ex"] then
   ui.text("Exemplo de Cliente (Python):")
   ui.separator()
   ui.textWrapped([[
@@ -1365,6 +1498,7 @@ while True:
 
     time.sleep(0.5)
 ]])
+  end
 end
 
 
@@ -2198,14 +2332,13 @@ end
 local function drawAICategory(sim, cfg)
   cardTitle("🤖 IA & Pilotos", "Quem corre, como briga, quem aprende")
   if matchesSearch(cfg, "preset categoria gt3 f1") then drawPresetStrip(cfg) end
-  if matchesSearch(cfg, "agressividade perfis chill normal attack pace difficulty boost") then
-    collapsibleCard(cfg, "ai_profiles", "🎚️", "Perfis & Ritmo", "Mix Chill/Normal/Attack + Pace + Difficulty", true,
-      function(s, c)
-        drawDifficultyBoostSection(s, c)
-        drawAggressionSection(s, c)
-        drawPaceSection(s, c)
-        drawPhysicsIntensitySection(s, c)
-      end, sim)
+  if matchesSearch(cfg, "agressividade perfis chill normal attack") then
+    collapsibleCard(cfg, "ai_profiles", "👥", "Perfis & Agressividade", "Mix Chill/Normal/Attack (leitura; aplica no update)", true,
+      function(s, c) drawAggressionSection(s, c) end, sim)
+  end
+  if matchesSearch(cfg, "ritmo pace difficulty boost physics intensity") then
+    collapsibleCard(cfg, "ai_rhythm", "🎚️", "Ritmo & Dificuldade", "Pace + intensidade da física + boost (Sug1)", true,
+      function(s, c) drawRhythmSection(s, c) end, sim)
   end
   if matchesSearch(cfg, "racecraft brigas ultrapassagens stuck draft tiger") then
     collapsibleCard(cfg, "ai_racecraft", "⚔️", "Racecraft", "Brigas lado a lado, mergulhos, volta voadora", true,
@@ -2219,9 +2352,9 @@ local function drawAICategory(sim, cfg)
     collapsibleCard(cfg, "ai_lowdf", "💨", "Low-Downforce", "Extra de reta para pistas rápidas", false,
       function(s, c) drawLowDownforceAISection(s, c) end, sim)
   end
-  if matchesSearch(cfg, "novidades pit real telemetria voz falhas") then
-    collapsibleCard(cfg, "ai_newsys", "✨", "Sistemas v0.14", "Pit real, CSV, voz, falhas IA", false,
-      function(s, c) drawNewSystemsSection(s, c) end, sim)
+  if matchesSearch(cfg, "pit real falhas mecanicas") then
+    collapsibleCard(cfg, "ai_pitfail", "🔧", "Pit Real & Falhas", "Limite real da pista + quebras da IA", false,
+      function(s, c) drawPitFailuresSection(s, c) end, sim)
   end
   if matchesSearch(cfg, "learning memoria corners danger") then
     collapsibleCard(cfg, "ai_learn", "🧠", "Learning", "Memória adaptativa por curva", false,
@@ -2259,9 +2392,9 @@ local function drawHudCategory(sim, cfg)
     collapsibleCard(cfg, "hud_events", "📊", "Race Events HUD", "Overlay vivo, o que mostrar, estilo", true,
       function(s, c) drawHudEventsSettings(s, c) end, sim)
   end
-  if matchesSearch(cfg, "telemetria csv volta documents") then
-    collapsibleCard(cfg, "hud_tel", "💾", "Telemetria & Voz", "CSV por volta + beeps sem CrewChief", false,
-      function(s, c) drawNewSystemsSection(s, c) end, sim)
+  if matchesSearch(cfg, "telemetria csv volta documents voz fala") then
+    collapsibleCard(cfg, "hud_tel", "💾", "Telemetria & Voz", "CSV por volta + voz por eventos (fonte única)", false,
+      function(s, c) drawTelemetryVoiceSection(s, c) end, sim)
   end
   if matchesSearch(cfg, "learning memoria") then
     collapsibleCard(cfg, "hud_learn", "🧠", "Learning (resumo)", "Ver/limpar memória sem sair do HUD", false,
