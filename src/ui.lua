@@ -2037,27 +2037,30 @@ local function drawHudEventsSettings(sim, cfg)
   ui.sameLine()
   helpMarker("Abre a janela overlay. Arraste para reposicionar; redimensione pelas bordas.")
 end
-
 -- ==========================================================
--- v0.16.0: INTERFACE REIMAGINADA — hero animado + modo Leigo/Técnico
--- + resumos de 1 linha + onboarding + toasts + dashboard com barras.
--- Referências: Dear ImGui best practices (collapsing sections, summary
--- row, progress bars, stable IDs) + overlays sim-racing (RaceLab/MRT:
--- glanceable, minimal, session-aware presets, test buttons).
--- Tudo temporal via os.clock() — a janela redesenha todo frame, então
--- pulsar/piscar/deslizar sai de graça e sem custo de estado.
+-- v0.17.0: CONSOLE — Activity Rail + Inspector + Status Bar + Wizard.
+-- Paradigma trocado por completo (nada de hero/cards/grade):
+--   Activity Bar (VS Code): trilho vertical de ícones à esquerda.
+--   Inspector: visões numeradas 01..NN com status à direita.
+--   Status Bar (VS Code): linha fina de contexto embaixo.
+--   Walkthrough (VS Code): assistente de 3 passos no 1º uso.
+--   Overlays (RaceLab/iFL03): escaneável num relance, presets por
+--   sessão, botões de teste, barras de progresso.
+-- Só usa primitivas comprovadas (button/checkbox/slider/text/
+-- separator/sameLine/indent/header/inputText/beginChild/endChild/
+-- dummy/progressBar com fallback). Tudo temporal via os.clock().
 -- ==========================================================
 
-local NAV_CATS = {
-  { id = "dash",   label = "Início",       icon = "🏠", desc = "Saúde do sistema e por onde começar" },
-  { id = "ai",     label = "Pilotos",      icon = "🤖", desc = "Quem pilota, como briga, quem aprende" },
-  { id = "race",   label = "Corrida",      icon = "🏁", desc = "Duração, pits, pneus e largada" },
-  { id = "safety", label = "Segurança",    icon = "🟡", desc = "Bandeiras, cortes de pista e box" },
-  { id = "hud",    label = "Tela & Voz",   icon = "📡", desc = "O que você vê na tela e o que ouve" },
-  { id = "sys",    label = "Ajustes",      icon = "⚙️", desc = "Visual, atualizações e bastidores" },
+local NAV_RAIL = {
+  { id = "dash",   icon = "🏠", label = "Início",   desc = "Assistente, preset e saúde do sistema" },
+  { id = "ai",     icon = "🤖", label = "Pilotos",  desc = "Personalidade, brigas e aprendizado da IA" },
+  { id = "race",   icon = "🏁", label = "Corrida",  desc = "Duração, pits, pneus e largada" },
+  { id = "safety", icon = "🟡", label = "Segurança", desc = "Bandeiras, cortes de pista e box" },
+  { id = "hud",    icon = "📡", label = "Tela&Voz", desc = "Painel na tela, telemetria e voz" },
+  { id = "sys",    icon = "⚙️", label = "Ajustes",  desc = "Visual, atualizações e bastidores" },
 }
 
--- ---------------- Animação (tudo função de os.clock) ----------------
+-- ---------------- tempo / animação ----------------
 local function animT() return os.clock() or 0 end
 local function animPulse(speed, lo, hi)
   local s = (math.sin(animT() * (speed or 3)) + 1) / 2
@@ -2068,7 +2071,7 @@ local function animDots()
   if f == 0 then return "●○○" elseif f == 1 then return "○●○" else return "○○●" end
 end
 
--- ---------------- Toasts animados (deslizam + somem) ----------------
+-- ---------------- toasts ----------------
 local function toast(cfg, kind, title, msg)
   cfg._toasts = cfg._toasts or {}
   table.insert(cfg._toasts, { kind = kind or "info", title = title or "", msg = msg or "", t0 = animT() })
@@ -2079,37 +2082,26 @@ local function drawToasts(cfg)
   local now = animT()
   local keep = {}
   for _, t in ipairs(list) do
-    local age = now - (t.t0 or 0)
-    if age < 4 then
+    if (now - (t.t0 or 0)) < 4 then
       keep[#keep + 1] = t
-      local p = math.min(1, age * 3)            -- 0→1 entrada
-      local alpha = age > 3 and math.max(0, 4 - age) or 1  -- fade saída
-      local pad = string.rep(" ", math.floor((1 - p) * 8))
-      local col = C.ok()
-      if t.kind == "warn" then col = C.warn()
-      elseif t.kind == "danger" then col = C.danger()
-      elseif t.kind == "info" then col = C.accent() end
-      if rgbm then
-        -- recria a cor com alfa animado (C.* retorna rgbm; multiplica o alfa)
-        ui.text(pad .. (t.title ~= "" and (t.title .. ": ") or "") .. t.msg)
-      else
-        ui.text((t.title ~= "" and (t.title .. ": ") or "") .. t.msg)
-      end
-      -- marcador colorido (cor = único sinal + texto, nunca só cor)
-      ui.sameLine(0, 6)
-      if rgbm then ui.textColored(alpha > 0.5 and "⬤" or "◯", col) else ui.text("*") end
+      local mark = "■"
+      if t.kind == "ok" then mark = "✅"
+      elseif t.kind == "warn" then mark = "⚠️"
+      elseif t.kind == "danger" then mark = "🛑"
+      else mark = "ℹ️" end
+      ui.text(mark .. " " .. (t.title ~= "" and (t.title .. " — ") or "") .. t.msg)
     end
   end
   cfg._toasts = keep
-  if #keep > 0 then ui.newLine(2) ui.separator() ui.newLine(2) end
+  if #keep > 0 then ui.separator() ui.newLine(2) end
 end
 
--- ---------------- Estado / modo ----------------
+-- ---------------- estado ----------------
 local function ensureUiState(cfg)
   cfg._ui_state = cfg._ui_state or {}
   cfg._usage = cfg._usage or { nav = {}, sections = {} }
   cfg.ui = cfg.ui or {}
-  if cfg.ui.simpleMode == nil then cfg.ui.simpleMode = true end -- padrão: Leigo
+  if cfg.ui.simpleMode == nil then cfg.ui.simpleMode = true end
   cfg.uiNav = cfg.uiNav or "dash"
   local migrate = {
     aggr = "ai", multiclass = "ai",
@@ -2123,6 +2115,7 @@ local function ensureUiState(cfg)
     if cfg.uiTab and migrate[cfg.uiTab] then cfg.uiNav = migrate[cfg.uiTab]
     else cfg.uiNav = "dash" end
   end
+  if cfg._wizStep == nil then cfg._wizStep = 1 end
   return cfg._ui_state
 end
 
@@ -2141,64 +2134,12 @@ local function trackSection(cfg, secId)
   cfg._usage.sections[secId] = (cfg._usage.sections[secId] or 0) + 1
 end
 
--- ---------------- Card v2: resumo leigo + selo técnico + colapso ----------------
--- opts = { defaultOpen=true, advanced=false }
-local function sectionCard(cfg, id, icon, title, summary, opts, fn, sim)
-  opts = opts or {}
-  local st = ensureUiState(cfg)
-  -- Modo Simples esconde cards avançados atrás de 1 expansor por card
-  if isSimple(cfg) and opts.advanced and not st[id .. "_show"] then
-    if ui.button("🔧 Avançado: " .. title .. "  (toque para mostrar)##adv_" .. id, vec2(-1, 28)) then
-      st[id .. "_show"] = true
-      trackSection(cfg, id)
-    end
-    ui.textDisabled("      " .. (summary or ""))
-    ui.newLine(2)
-    return
-  end
-  if st[id] == nil then
-    if isSimple(cfg) and opts.advanced then st[id] = false
-    else st[id] = (opts.defaultOpen ~= false) end
-  end
-  local isOpen = st[id]
-  local arrow = isOpen and "▼" or "▶"
-  if ui.button(arrow .. "  " .. icon .. "  " .. title .. "##card_" .. id, vec2(-1, 30)) then
-    st[id] = not isOpen
-    if not isOpen then trackSection(cfg, id) end
-    isOpen = not isOpen
-  end
-  -- Linha-resumo (leigo) + selo de nível
-  if summary and summary ~= "" then
-    ui.textDisabled("      " .. summary)
-  end
-  if opts.advanced then
-    ui.sameLine(0, 8)
-    ui.textDisabled("🔧 técnico")
-  end
-  if isOpen then
-    ui.newLine(2)
-    ui.separator()
-    ui.newLine(2)
-    ui.indent(8)
-    safeTab(title, fn, sim, cfg)
-    ui.unindent(8)
-    ui.newLine(4)
-  else
-    ui.newLine(2)
-  end
-  ui.separator()
-  ui.newLine(4)
-end
-
 local function matchesSearch(cfg, haystack)
   local q = cfg._search or ""
   if q == "" then return true end
-  q = q:lower()
-  haystack = (haystack or ""):lower()
-  return haystack:find(q, 1, true) ~= nil
+  return (haystack or ""):lower():find(q:lower(), 1, true) ~= nil
 end
 
--- ---------------- Barra de progresso com fallback ----------------
 local function animBar(frac, label)
   frac = math.max(0, math.min(1, tonumber(frac) or 0))
   local ok = false
@@ -2211,193 +2152,42 @@ local function animBar(frac, label)
   end
 end
 
--- ---------------- Hero animado ----------------
-local function drawHero(sim, cfg)
-  -- Faixa de acento pulsante (chama atenção p/ lançamento)
-  if rgbm then
-    ui.textColored("━━━━━━━━━━━━━━━━━━━━━━━━━━━━", C.accent())
-  end
-  ui.pushFont(ui.Font.Title)
-  if rgbm then ui.textColored("APEXFLOW", C.accent()) else ui.text("APEXFLOW") end
-  ui.popFont()
-  ui.sameLine(0, 10)
-  ui.textDisabled("v" .. (SCRIPT_VERSION or _G.RACEFLOW_VERSION or "?"))
-  ui.sameLine(0, 10)
-  -- Pílula AO VIVO com ponto pulsante
-  local inSession = sim and sim.isSessionStarted
-  if inSession then
-    local a = animPulse(4, 0.55, 1.0)
-    if rgbm then ui.textColored("● AO VIVO", C.ok()) else ui.text("● AO VIVO") end
-    ui.sameLine(0, 6)
-    ui.textDisabled(animDots())
-  else
-    ui.textDisabled("○ no box")
-  end
-  ui.sameLine(0, 12)
-  local enabled = cfg.enabled
-  if ui.checkbox("Ativo", enabled) then
-    cfg.enabled = not enabled
-    notifyChange()
-    toast(cfg, cfg.enabled and "ok" or "warn", "App", cfg.enabled and "ativado — bom race!" or "pausado")
-  end
-  -- Linha de sessão
-  local sessName, trackName, carsN = "", "", 0
-  if sim then
-    if ac.getSessionName then
-      local ok, n = pcall(ac.getSessionName, sim.currentSessionIndex)
-      if ok and n then sessName = tostring(n) end
+-- ---------------- visão numerada (estilo inspector) ----------------
+-- opts = { advanced=false, status="" }
+local function view(cfg, id, num, title, summary, opts, fn, sim)
+  opts = opts or {}
+  local st = ensureUiState(cfg)
+  if isSimple(cfg) and opts.advanced and not st[id .. "_show"] then
+    if ui.button("🔧 " .. num .. " · " .. title .. "  (avançado — mostrar)##adv_" .. id, vec2(-1, 28)) then
+      st[id .. "_show"] = true
+      trackSection(cfg, id)
     end
-    if ac.getTrackName then
-      local ok2, tn = pcall(ac.getTrackName)
-      if ok2 and tn then trackName = tostring(tn) end
-    end
-    carsN = tonumber(sim.carsCount) or 0
-    if inSession then cfg._everInSession = true end
+    ui.newLine(2)
+    return
   end
-  if inSession then
-    local info = sessName
-    if trackName ~= "" then info = info .. "  •  " .. trackName end
-    if carsN > 0 then info = info .. string.format("  •  %d carros", carsN) end
-    ui.textDisabled(info ~= "" and info or "Em sessão")
-    local gs = RARE2_API.githubGetState and RARE2_API.githubGetState() or {}
-    if gs.hasUpdate then
-      if rgbm then ui.textColored("☁ Atualização disponível: v" .. tostring(gs.latestVersion or "?"), C.ok())
-      else ui.text("Atualização disponível") end
-    end
-  else
-    ui.textDisabled("No box — ajuste à vontade; os dados vivos aparecem em pista.")
+  if st[id] == nil then st[id] = true end
+  local isOpen = st[id]
+  local chev = isOpen and "∨" or "›"
+  local head = chev .. "  " .. num .. " · " .. title
+  if opts.status and opts.status ~= "" then head = head .. "   —  " .. opts.status end
+  if ui.button(head .. "##view_" .. id, vec2(-1, 30)) then
+    st[id] = not isOpen
+    if not isOpen then trackSection(cfg, id) end
+    isOpen = not isOpen
   end
-end
-
--- ---------------- Seletor de modo Leigo/Técnico ----------------
-local function drawModeSwitch(cfg)
-  ui.text("Como você quer usar?")
-  ui.textDisabled(isSimple(cfg)
-    and "😊 Modo Simples: só o essencial, tudo explicado em 1 linha."
-    or "🛠️ Modo Técnico: todos os ajustes, sem filtro.")
-  ui.newLine(2)
-  local simple = isSimple(cfg)
-  if simple and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.16, 0.45, 0.30, 1.00)) end
-  if ui.button("😊  Simples##mode_simple", vec2(150, 32)) then
-    cfg.ui.simpleMode = true; notifyChange()
-    toast(cfg, "ok", "Modo Simples", "só o essencial visível")
+  if summary and summary ~= "" then ui.textDisabled("      " .. summary) end
+  if isOpen then
+    ui.indent(10)
+    ui.newLine(2)
+    safeTab(title, fn, sim, cfg)
+    ui.unindent(10)
+    ui.newLine(2)
   end
-  if simple and rgbm then ui.popStyleColor() end
-  ui.sameLine(0, 8)
-  if (not simple) and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.35, 0.30, 0.55, 1.00)) end
-  if ui.button("🛠️  Técnico##mode_tech", vec2(150, 32)) then
-    cfg.ui.simpleMode = false; notifyChange()
-    toast(cfg, "info", "Modo Técnico", "todos os ajustes liberados")
-  end
-  if (not simple) and rgbm then ui.popStyleColor() end
-end
-
-local function drawSearchBar(cfg)
-  if not ui.inputText then return end
-  ui.setNextItemWidth(-1)
-  local q = cfg._search or ""
-  local newQ = ui.inputText("##ui_search", q)
-  if newQ ~= nil and newQ ~= q then cfg._search = newQ end
-  if (cfg._search or "") ~= "" then
-    ui.sameLine(0, 6)
-    if ui.button("X##clear_search", vec2(28, 22)) then cfg._search = "" end
-  else
-    ui.textDisabled("🔍 Buscar: “pit”, “voz”, “multiclass”… filtra os cartões.")
-  end
-end
-
--- ---------------- Navegação: grade viva ----------------
-local function drawCategoryGrid(cfg, sim)
-  local avail = math.max(300, ui.windowWidth() - 20)
-  local bw = (avail - 2 * 8) / 3
-  -- Conta o que está ligado por domínio (selo de status, não só cor)
-  local tl_on = cfg.tracklimits and cfg.tracklimits.enabled
-  local cau_on = cfg.caution and cfg.caution.enabled
-  local counts = {
-    dash = nil,
-    ai = (cfg.multiclassEnabled and "+multi" or ""),
-    race = (cfg.strategy and cfg.strategy.enabled and "pits on" or "manual"),
-    safety = ((tl_on and 1 or 0) + (cau_on and 1 or 0)) .. "/2 ativos",
-    hud = nil,
-    sys = nil,
-  }
-  for i, cat in ipairs(NAV_CATS) do
-    if i > 1 and ((i - 1) % 3 ~= 0) then ui.sameLine(0, 8) end
-    local active = cfg.uiNav == cat.id
-    if active then
-      local glow = animPulse(3, 0.30, 0.55)
-      if rgbm then
-        local at = ACCENTS[THEME.accent] or ACCENTS.cyan
-        ui.pushStyleColor(ui.StyleColor.Button, rgbm(at[1] * glow * 2, at[2] * glow * 2, at[3] * glow * 2, 1.00))
-      end
-    end
-    if ui.button(cat.icon .. " " .. cat.label .. "##nav_" .. cat.id, vec2(bw, 40)) then
-      if cfg.uiNav ~= cat.id then
-        cfg.uiNav = cat.id
-        trackNav(cfg, cat.id)
-      end
-    end
-    if active and rgbm then ui.popStyleColor() end
-  end
-  for _, cat in ipairs(NAV_CATS) do
-    if cfg.uiNav == cat.id then
-      local extra = counts[cat.id]
-      ui.textDisabled(cat.icon .. " " .. cat.desc .. (extra and ("  •  " .. extra) or ""))
-      break
-    end
-  end
-end
-
--- ---------------- Presets como cartões ----------------
-local PRESET_INFO = {
-  gt3 = "Equilibrado p/ GT — o mais usado",
-  gt4 = "GT de base, permissivo",
-  tcr = "Tração dianteira, box 60",
-  f1 = "Rigoroso, 2 avisos e pune",
-  lmp = "Protótipos rápidos",
-  endurance = "Longas, 5 avisos",
-}
-local function drawPresetCards(cfg)
-  local presets = RARE2_API.getCategoryPresets and RARE2_API.getCategoryPresets() or {}
-  if not next(presets) then return end
-  if not matchesSearch(cfg, "preset gt3 f1 tcr gt4 lmp endurance categoria corrida") then return end
-  ui.text("⚡ 1 toque e pronto — escolha sua corrida")
-  ui.textDisabled("Ajusta limites + bandeiras sozinho e já liga a fiscalização.")
-  ui.newLine(2)
-  local order = { "gt3", "gt4", "tcr", "f1", "lmp", "endurance" }
-  local cur = cfg.categoryPreset or "custom"
-  for _, key in ipairs(order) do
-    local pr = presets[key]
-    if pr then
-      local isCur = cur == key
-      if isCur then
-        local glow = animPulse(3, 0.55, 1.0)
-        if rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(1.00 * glow, 0.55 * glow, 0.15 * glow, 1.00)) end
-      end
-      if ui.button((isCur and "● " or "○ ") .. pr.label .. "##preset_" .. key, vec2(104, 28)) then
-        if RARE2_API.applyCategoryPreset then RARE2_API.applyCategoryPreset(key) end
-        notifyChange()
-        cfg._presetFlash = animT()
-        if ac.setMessage then pcall(ac.setMessage, "PRESET", pr.label .. " aplicado") end
-        toast(cfg, "ok", "Preset", pr.label .. " aplicado!")
-        trackSection(cfg, "preset_" .. key)
-      end
-      if isCur and rgbm then ui.popStyleColor() end
-      ui.sameLine(0, 4)
-      ui.textDisabled(PRESET_INFO[key] or "")
-    end
-  end
-  ui.newLine(2)
-  if ui.button("↩ Voltar ao Custom##preset_custom", vec2(170, 24)) then
-    cfg.categoryPreset = "custom"
-    notifyChange()
-  end
-  ui.newLine(2)
   ui.separator()
-  ui.newLine(2)
+  ui.newLine(4)
 end
 
--- ---------------- Status do sistema ----------------
+-- ---------------- status do sistema ----------------
 local function getSystemStatus(sim, cfg)
   local tl = RARE2_API.getTrackLimitsState and RARE2_API.getTrackLimitsState() or {}
   local cs = RARE2_API.getCautionState and RARE2_API.getCautionState() or {}
@@ -2408,241 +2198,406 @@ local function getSystemStatus(sim, cfg)
   return tl, cs, stt, memCount
 end
 
--- ---------------- Onboarding 3 passos ----------------
-local function drawOnboarding(sim, cfg)
-  if cfg._onboarded then return end
-  if cfg._onboardHide then return end
-  ui.text("👋 Bem-vindo! Em 3 toques você corre:")
-  ui.newLine(2)
-  local s1 = (cfg.categoryPreset or "custom") ~= "custom"
-  local s2 = cfg.enabled == true
-  local s3 = cfg._everInSession == true
-  ui.text((s1 and "✅ " or "1️⃣ ") .. "Escolha um preset acima (ex: GT3)")
-  ui.text((s2 and "✅ " or "2️⃣ ") .. "Deixe o app Ativo (☑ no topo)")
-  ui.text((s3 and "✅ " or "3️⃣ ") .. "Entre em pista — o resto é automático" .. (s3 and "" or ("  " .. animDots())))
-  ui.newLine(2)
-  if s1 and s2 and s3 then
-    if ui.button("🏁 Pronto, esconder guia##onb_done", vec2(220, 30)) then
-      cfg._onboarded = true
-      notifyChange()
-      toast(cfg, "ok", "Boa corrida!", "guia concluído")
+-- ---------------- barra de comando (paleta) ----------------
+local function drawCommandBar(sim, cfg)
+  -- power
+  local on = cfg.enabled
+  if on and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.14, 0.42, 0.26, 1.00)) end
+  if ui.button((on and "⏻ ON" or "⏻ OFF") .. "##power", vec2(76, 30)) then
+    cfg.enabled = not on
+    notifyChange()
+    toast(cfg, cfg.enabled and "ok" or "warn", cfg.enabled and "App ligado" or "App pausado", "")
+  end
+  if on and rgbm then ui.popStyleColor() end
+  ui.sameLine(0, 8)
+  -- busca estilo paleta de comando
+  if ui.inputText then
+    ui.setNextItemWidth(math.max(140, ui.windowWidth() - 300))
+    local q = cfg._search or ""
+    local newQ = ui.inputText("⌨ filtrar…##cmd_search", q)
+    if newQ ~= nil and newQ ~= q then cfg._search = newQ end
+    ui.sameLine(0, 8)
+  end
+  -- modo segmentado
+  local simple = isSimple(cfg)
+  if simple and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.16, 0.45, 0.30, 1.00)) end
+  if ui.button("😊##mode_s", vec2(40, 30)) then cfg.ui.simpleMode = true notifyChange() end
+  if simple and rgbm then ui.popStyleColor() end
+  ui.sameLine(0, 4)
+  if (not simple) and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.35, 0.30, 0.55, 1.00)) end
+  if ui.button("🛠️##mode_t", vec2(40, 30)) then cfg.ui.simpleMode = false notifyChange() end
+  if (not simple) and rgbm then ui.popStyleColor() end
+  ui.textDisabled("😊 simples (só essencial) · 🛠️ técnico (tudo) · X limpa o filtro")
+  if (cfg._search or "") ~= "" then
+    ui.sameLine(0, 8)
+    if ui.button("X##cmd_clear", vec2(28, 22)) then cfg._search = "" end
+  end
+end
+
+-- ---------------- trilho de atividades ----------------
+local function railBadges(sim, cfg)
+  local tl = RARE2_API.getTrackLimitsState and RARE2_API.getTrackLimitsState() or {}
+  local cs = RARE2_API.getCautionState and RARE2_API.getCautionState() or {}
+  local gs = RARE2_API.githubGetState and RARE2_API.githubGetState() or {}
+  return {
+    dash = false,
+    ai = (cfg.multiclassEnabled == true),
+    race = (cfg.strategy and cfg.strategy.enabled == true),
+    safety = ((cfg.tracklimits and cfg.tracklimits.enabled) or (cfg.caution and cfg.caution.enabled)),
+    hud = ((tonumber(tl.warn) or 0) > 0 or tl.penaltyActive or cs.active),
+    sys = (gs.hasUpdate == true),
+  }
+end
+
+local function drawRail(cfg, badges)
+  ui.textDisabled("RF")
+  ui.separator()
+  for _, cat in ipairs(NAV_RAIL) do
+    local active = cfg.uiNav == cat.id
+    if active then
+      local glow = animPulse(3, 0.30, 0.55)
+      if rgbm then
+        local at = ACCENTS[THEME.accent] or ACCENTS.cyan
+        ui.pushStyleColor(ui.StyleColor.Button, rgbm(at[1]*glow*2, at[2]*glow*2, at[3]*glow*2, 1.00))
+      end
     end
+    local dot = (badges and badges[cat.id]) and "•" or " "
+    if ui.button(cat.icon .. dot .. "##rail_" .. cat.id, vec2(48, 44)) then
+      if cfg.uiNav ~= cat.id then cfg.uiNav = cat.id trackNav(cfg, cat.id) end
+    end
+    if active and rgbm then ui.popStyleColor() end
+    if ui.setTooltip and ui.itemHovered and ui.itemHovered() then ui.setTooltip(cat.label .. " — " .. cat.desc) end
+  end
+end
+
+-- ---------------- barra de status ----------------
+local function drawStatusBar(sim, cfg)
+  local tl, cs = getSystemStatus(sim, cfg)
+  local live = sim and sim.isSessionStarted
+  local parts = {}
+  parts[#parts + 1] = live and "● LIVE" or "○ box"
+  local w = tonumber(tl.warn) or 0
+  if cfg.tracklimits and cfg.tracklimits.enabled then
+    parts[#parts + 1] = string.format("⚖ %d/%d", w, tonumber(tl.maxWarn) or 4)
+  end
+  if tl.penaltyActive then parts[#parts + 1] = string.format("🛑 %.0fs", tl.timeLeft or 0) end
+  if cs.active then parts[#parts + 1] = "🟡 " .. tostring(cs.mode or "FCY") end
+  parts[#parts + 1] = "💾 auto"
+  parts[#parts + 1] = "v" .. (SCRIPT_VERSION or "?")
+  local line = table.concat(parts, "   ")
+  if live and rgbm then ui.textColored(line, C.ok()) else ui.textDisabled(line) end
+end
+
+-- ---------------- presets (lista com descrição) ----------------
+local PRESET_ROWS = {
+  { key = "gt3",       desc = "Corrida GT equilibrada — comece aqui" },
+  { key = "gt4",       desc = "GT de base, mais permissivo" },
+  { key = "tcr",       desc = "Turismo tração dianteira" },
+  { key = "f1",        desc = "Fórmula: rigoroso, pune rápido" },
+  { key = "lmp",       desc = "Protótipos velozes" },
+  { key = "endurance", desc = "Provas longas, tolerante" },
+}
+local function drawPresetList(cfg, compact)
+  local presets = RARE2_API.getCategoryPresets and RARE2_API.getCategoryPresets() or {}
+  if not next(presets) then return end
+  if not matchesSearch(cfg, "preset gt3 f1 tcr categoria corrida") then return end
+  local cur = cfg.categoryPreset or "custom"
+  for _, row in ipairs(PRESET_ROWS) do
+    local pr = presets[row.key]
+    if pr then
+      local isCur = cur == row.key
+      if isCur then
+        local glow = animPulse(3, 0.55, 1.0)
+        if rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(1.00*glow, 0.55*glow, 0.15*glow, 1.00)) end
+      end
+      local w = compact and 120 or 150
+      if ui.button((isCur and "● " or "○ ") .. pr.label .. "##p_" .. row.key, vec2(w, 30)) then
+        if RARE2_API.applyCategoryPreset then RARE2_API.applyCategoryPreset(row.key) end
+        notifyChange()
+        if ac.setMessage then pcall(ac.setMessage, "PRESET", pr.label .. " aplicado") end
+        toast(cfg, "ok", "Preset", pr.label .. " aplicado")
+        trackSection(cfg, "preset_" .. row.key)
+      end
+      if isCur and rgbm then ui.popStyleColor() end
+      ui.sameLine(0, 8)
+      ui.textDisabled(row.desc)
+    end
+  end
+  ui.newLine(2)
+end
+
+-- ---------------- assistente (walkthrough 3 passos) ----------------
+local function drawWizard(sim, cfg)
+  local step = math.max(1, math.min(3, tonumber(cfg._wizStep) or 1))
+  ui.text("🧭 Configuração guiada  —  passo " .. step .. " de 3")
+  animBar(step / 3)
+  ui.newLine(4)
+  if step == 1 then
+    ui.pushFont(ui.Font.Title)
+    ui.text("1 · Que corrida é essa?")
+    ui.popFont()
+    ui.textDisabled("Isso ajusta limites e bandeiras sozinho. Depois dá p/ mudar tudo.")
+    ui.newLine(4)
+    drawPresetList(cfg, false)
+    ui.newLine(2)
+    if ui.button("Continuar ›##wiz1", vec2(180, 32)) then cfg._wizStep = 2 end
+  elseif step == 2 then
+    ui.pushFont(ui.Font.Title)
+    ui.text("2 · Ligar a fiscalização?")
+    ui.popFont()
+    ui.textDisabled("Sem isso o app só observa; com isso ele avisa e pune cortes.")
+    ui.newLine(4)
+    cfg.tracklimits = cfg.tracklimits or {}
+    local tlOn = cfg.tracklimits.enabled == true
+    if ui.checkbox("Fiscalizar cortes de pista", tlOn) then
+      cfg.tracklimits.enabled = not tlOn; notifyChange()
+    end
+    cfg.voice = cfg.voice or {}
+    if cfg.voice.enabled == nil then cfg.voice.enabled = true end
+    if ui.checkbox("Avisos por voz", cfg.voice.enabled) then
+      cfg.voice.enabled = not cfg.voice.enabled; notifyChange()
+    end
+    ui.newLine(4)
+    if ui.button("‹ Voltar##wiz2b", vec2(120, 30)) then cfg._wizStep = 1 end
+    ui.sameLine(0, 8)
+    if ui.button("Continuar ›##wiz2n", vec2(180, 30)) then cfg._wizStep = 3 end
   else
-    if ui.button("Depois##onb_later", vec2(120, 26)) then cfg._onboardHide = true end
+    ui.pushFont(ui.Font.Title)
+    ui.text("3 · Ver tudo funcionando")
+    ui.popFont()
+    ui.textDisabled("Abra o painel de corrida e entre em pista. Pronto.")
+    ui.newLine(4)
+    if ui.button("📊 Abrir painel de corrida##wiz_open", vec2(230, 32)) then
+      if ac.setWindowOpen then pcall(ac.setWindowOpen, "events", true) end
+    end
+    ui.newLine(4)
+    if ui.button("‹ Voltar##wiz3b", vec2(120, 30)) then cfg._wizStep = 2 end
+    ui.sameLine(0, 8)
+    if ui.button("🏁 Concluir##wiz_done", vec2(180, 30)) then
+      cfg._onboarded = true
+      cfg.uiNav = "dash"
+      notifyChange()
+      toast(cfg, "ok", "Tudo pronto", "boa corrida!")
+    end
   end
   ui.newLine(4)
   ui.separator()
-  ui.newLine(4)
+  ui.newLine(2)
+  if ui.button("Pular assistente##wiz_skip", vec2(150, 24)) then
+    cfg._onboardHide = true
+    notifyChange()
+  end
 end
 
--- ---------------- Dashboard ----------------
-local function drawDashboard(sim, cfg)
-  cardTitle("🏠 Início", "Resumo vivo • siga o guia • 1 toque e pronto")
-  drawOnboarding(sim, cfg)
-  local tl, cs, stt, memCount = getSystemStatus(sim, cfg)
-  ui.text("Saúde do sistema agora")
+-- ---------------- inspetores ----------------
+local function crumb(label)
+  ui.textDisabled("APEXFLOW › " .. label)
   ui.newLine(2)
-  -- Avisos (barra animada)
-  local w, mw = tonumber(tl.warn) or 0, tonumber(tl.maxWarn) or 4
-  if (cfg.tracklimits and cfg.tracklimits.enabled) then
-    ui.text(w > 0 and ("⚖ Avisos: " .. w .. "/" .. mw) or "⚖ Sem avisos — pista limpa")
+end
+
+local function drawDashInspector(sim, cfg)
+  crumb("Início")
+  ui.pushFont(ui.Font.Title)
+  if rgbm then ui.textColored("Início", C.accent()) else ui.text("Início") end
+  ui.popFont()
+  ui.textDisabled("Assistente, preset e saúde — o essencial numa tela.")
+  ui.newLine(4)
+  if not cfg._onboarded and not cfg._onboardHide then
+    drawWizard(sim, cfg)
+    ui.newLine(2)
+  end
+  local tl, cs, stt, memCount = getSystemStatus(sim, cfg)
+  ui.text("Saúde agora")
+  ui.newLine(2)
+  if cfg.tracklimits and cfg.tracklimits.enabled then
+    local w, mw = tonumber(tl.warn) or 0, tonumber(tl.maxWarn) or 4
+    ui.text(w > 0 and ("⚖ Avisos: " .. w .. "/" .. mw) or "⚖ Sem avisos")
     animBar(mw > 0 and (w / mw) or 0)
   else
-    ui.textDisabled("⚖ Fiscalização desligada — ative via preset ou Segurança.")
+    ui.textDisabled("⚖ Fiscalização desligada (passo 2 do assistente liga)")
   end
   ui.newLine(2)
   if tl.penaltyActive and (tonumber(tl.timeLeft) or 0) > 0 then
-    ui.text(string.format("🛑 Punição: %.0fs — pare no box de freio puxado", tl.timeLeft))
+    ui.text(string.format("🛑 Punição %.0fs — box + freio", tl.timeLeft))
     animBar((tl.origTime or 0) > 0 and (tl.timeLeft / tl.origTime) or 0)
     ui.newLine(2)
   end
-  if cs.active then
-    ui.text("🟡 " .. tostring(cs.mode or "CAUTION") .. " ativa — pé leve")
-    animBar((cs.duration or 0) > 0 and (1 - (cs.timer or 0) / cs.duration) or 0.5)
-    ui.newLine(2)
-  else
-    ui.textDisabled("🟢 Pista verde")
-  end
-  ui.textDisabled(string.format("🧠 Memória: %d pista(s) aprendida(s)", memCount))
-  if (tl.lastEvent or "") ~= "" then ui.textDisabled("↳ Último: " .. tostring(tl.lastEvent)) end
+  ui.text(cs.active and ("🟡 " .. tostring(cs.mode or "Caution") .. " ativa") or "🟢 Pista verde")
+  ui.textDisabled(string.format("🧠 %d pista(s) na memória", memCount))
+  if (tl.lastEvent or "") ~= "" then ui.textDisabled("↳ " .. tostring(tl.lastEvent)) end
   ui.newLine(4)
   ui.separator()
   ui.newLine(4)
-  drawPresetCards(cfg)
-  ui.text("Para onde ir?")
+  ui.text("Preset da corrida")
   ui.newLine(2)
-  local shortcuts = {
-    { nav = "ai",     btn = "🤖 Ver pilotos",   hint = "perfis, brigas, multiclasse" },
-    { nav = "race",   btn = "🏁 Preparar prova", hint = "pits, pneus, largada" },
-    { nav = "safety", btn = "🟡 Segurança",      hint = "bandeiras, cortes, box" },
-  }
-  for _, sc in ipairs(shortcuts) do
-    if ui.button(sc.btn .. "##go_" .. sc.nav, vec2(170, 30)) then
-      cfg.uiNav = sc.nav
-      trackNav(cfg, sc.nav)
+  drawPresetList(cfg, true)
+  ui.newLine(2)
+  if not cfg._onboarded and cfg._onboardHide then
+    if ui.button("🧭 Reabrir assistente##reopen_wiz", vec2(200, 28)) then
+      cfg._onboardHide = false cfg._wizStep = 1
     end
-    ui.sameLine(0, 8)
-    ui.textDisabled(sc.hint)
+    ui.newLine(2)
   end
-  ui.newLine(4)
 end
 
--- ---------------- Categorias (cards com resumo + selo) ----------------
-local function drawAICategory(sim, cfg)
-  cardTitle("🤖 Pilotos", "Personalidade da IA em cartões de 1 linha")
-  if matchesSearch(cfg, "preset categoria gt3 f1") then drawPresetCards(cfg) end
-  if matchesSearch(cfg, "agressividade perfis chill normal attack briga") then
-    sectionCard(cfg, "ai_profiles", "👥", "Perfis & Agressividade",
-      "O quanto o grid briga: calmo ↔ agressivo. Padrão 50 serve p/ quase tudo.",
-      { defaultOpen = true }, function(s, c) drawAggressionSection(s, c) end, sim)
+local function drawAiInspector(sim, cfg)
+  crumb("Pilotos")
+  ui.pushFont(ui.Font.Title)
+  if rgbm then ui.textColored("Pilotos", C.accent()) else ui.text("Pilotos") end
+  ui.popFont()
+  ui.textDisabled("Dê personalidade à IA. Padrões servem p/ quase tudo.")
+  ui.newLine(4)
+  if matchesSearch(cfg, "agressividade perfis calmo briga") then
+    view(cfg, "ai_profiles", "01", "Quanto o grid briga",
+      "0 = desfile calmo · 100 = todo mundo atacando. 50 é o meio-termo.",
+      { status = tostring(cfg.aggression or 50) },
+      function(s, c) drawAggressionSection(s, c) end, sim)
   end
-  if matchesSearch(cfg, "ritmo pace difficulty boost physics intensidade") then
-    sectionCard(cfg, "ai_rhythm", "🎚️", "Ritmo & Dificuldade",
-      "Deixa a IA mais rápida/devagar no geral. 100% = jogo original.",
-      { defaultOpen = true }, function(s, c) drawRhythmSection(s, c) end, sim)
+  if matchesSearch(cfg, "ritmo pace dificuldade rapido devagar") then
+    view(cfg, "ai_rhythm", "02", "Ritmo e dificuldade",
+      "Deixa a IA mais rápida ou devagar no geral. 100% = jogo original.",
+      {},
+      function(s, c) drawRhythmSection(s, c) end, sim)
   end
-  if matchesSearch(cfg, "racecraft brigas ultrapassagens mergulho volta voadora") then
-    sectionCard(cfg, "ai_racecraft", "⚔️", "Brigas & Ultrapassagens",
-      "IA tenta passar de verdade em vez de andar em fila.",
-      { defaultOpen = true }, function(s, c) drawRacecraftSection(s, c) end, sim)
+  if matchesSearch(cfg, "ultrapassagem mergulho lado a lado fila") then
+    view(cfg, "ai_racecraft", "03", "Ultrapassagens de verdade",
+      "A IA tenta passar em vez de andar em fila.",
+      {},
+      function(s, c) drawRacecraftSection(s, c) end, sim)
   end
-  if matchesSearch(cfg, "multiclass classe lmp gt3 yield push categoria") then
-    sectionCard(cfg, "ai_multi", "🏎️", "Multiclasse",
-      "Carros diferentes na pista (ex: LMP + GT). Classe 1 = mais rápida.",
-      { defaultOpen = false, advanced = true }, function(s, c) drawMultiClassTab(s, c, aiController) end, sim)
+  if matchesSearch(cfg, "multiclasse categoria lmp gt classe") then
+    view(cfg, "ai_multi", "04", "Várias categorias juntas",
+      "Ex: protótipos + GT. Classe 1 = mais rápida.",
+      { advanced = true },
+      function(s, c) drawMultiClassTab(s, c, aiController) end, sim)
   end
-  if matchesSearch(cfg, "low downforce monza reta velocidade") then
-    sectionCard(cfg, "ai_lowdf", "💨", "Retas longas (Monza)",
-      "Só p/ pistas de alta: mais velocidade final da IA.",
-      { defaultOpen = false, advanced = true }, function(s, c) drawLowDownforceAISection(s, c) end, sim)
+  if matchesSearch(cfg, "reta monza velocidade final downforce") then
+    view(cfg, "ai_lowdf", "05", "Pistas de reta (Monza)",
+      "Só mexa p/ pistas de alta velocidade.",
+      { advanced = true },
+      function(s, c) drawLowDownforceAISection(s, c) end, sim)
   end
-  if matchesSearch(cfg, "pit real falhas mecanicas quebra") then
-    sectionCard(cfg, "ai_pitfail", "🔧", "Pit Real & Falhas",
+  if matchesSearch(cfg, "pit box limite real quebra falha") then
+    view(cfg, "ai_pitfail", "06", "Box e quebras",
       "Limite de box da pista de verdade + IA que pode quebrar.",
-      { defaultOpen = false }, function(s, c) drawPitFailuresSection(s, c) end, sim)
+      {},
+      function(s, c) drawPitFailuresSection(s, c) end, sim)
   end
-  if matchesSearch(cfg, "learning memoria curva perigo") then
-    sectionCard(cfg, "ai_learn", "🧠", "Aprendizado por curva",
-      "A IA lembra onde erra e melhora com o tempo.",
-      { defaultOpen = false, advanced = true }, function(s, c) drawLearningModuleSection(s, c) end, sim)
-  end
-end
-
-local function drawRaceCategory(sim, cfg)
-  cardTitle("🏁 Corrida", "Antes de largar: quanto dura, quando parar")
-  if matchesSearch(cfg, "estrategia endurance combustivel pit stops voltas pneus") then
-    sectionCard(cfg, "race_fuel", "⛽", "Combustível & Pits",
-      "Diga as voltas; a IA calcula paradas e troca pneu sozinha.",
-      { defaultOpen = true }, function(s, c) drawFuelStrategySection(s, c) end, sim)
-  end
-  if matchesSearch(cfg, "rolling largada movimento formacao pace car fila") then
-    sectionCard(cfg, "race_rolling", "🚦", "Largada em movimento",
-      "Volta de apresentação em fila 2x2 antes da verde. Desligado por padrão.",
-      { defaultOpen = false, advanced = true }, function(s, c) drawRollingStartSection(s, c) end, sim)
+  if matchesSearch(cfg, "aprende memoria curva erro") then
+    view(cfg, "ai_learn", "07", "IA que aprende",
+      "Lembra onde erra e melhora com o tempo.",
+      { advanced = true },
+      function(s, c) drawLearningModuleSection(s, c) end, sim)
   end
 end
 
-local function drawSafetyCategory(sim, cfg)
-  cardTitle("🟡 Segurança", "O que te pune e o que te protege")
-  if isSimple(cfg) then
-    ui.textDisabled("Modo Simples: use o preset + “Ativar” abaixo. Padrões já valem p/ CMRT.")
-    ui.newLine(2)
-  end
-  if matchesSearch(cfg, "caution fcy yellow bandeira incidente devolver posicao") then
-    sectionCard(cfg, "sf_caution", "🟡", "Bandeiras (Caution)",
-      "Bateu e parou? Todo mundo reduz até liberar. Só Player recebe aviso.",
-      { defaultOpen = true }, function(s, c) drawCautionSection(s, c) end, sim)
-  end
-  if matchesSearch(cfg, "track limits corte aviso punicao box freio zebra") then
-    sectionCard(cfg, "sf_limits", "⚖️", "Cortes de pista",
-      "Cortou demais = avisos e depois seconds parado no box. Espelha o CMRT.",
-      { defaultOpen = true }, function(s, c) drawTrackLimitsSection(s, c) end, sim)
-  end
-end
-
-local function drawHudCategory(sim, cfg)
-  cardTitle("📡 Tela & Voz", "O que aparece e o que você escuta")
-  if matchesSearch(cfg, "hud overlay events caution warnings tela mostrar") then
-    sectionCard(cfg, "hud_events", "📊", "Painel na tela (HUD)",
-      "Escolha o que o overlay mostra durante a corrida.",
-      { defaultOpen = true }, function(s, c) drawHudEventsSettings(s, c) end, sim)
-  end
-  if matchesSearch(cfg, "telemetria csv volta documents voz fala beep") then
-    sectionCard(cfg, "hud_tel", "💾", "Telemetria & Voz",
-      "Grava suas voltas + fala os avisos (sem CrewChief).",
-      { defaultOpen = false }, function(s, c) drawTelemetryVoiceSection(s, c) end, sim)
-  end
-  if matchesSearch(cfg, "learning memoria limpar") then
-    sectionCard(cfg, "hud_learn", "🧠", "Memória aprendida",
-      "Ver e apagar o que a IA aprendeu por pista.",
-      { defaultOpen = false, advanced = true }, function(s, c) drawLearningModuleSection(s, c) end, sim)
-  end
-end
-
-local function drawSysCategory(sim, cfg)
-  cardTitle("⚙️ Ajustes", "Visual, updates e bastidores")
-  if matchesSearch(cfg, "aparencia tema cor transparencia canto visual") then
-    sectionCard(cfg, "sys_theme", "🎨", "Visual",
-      "Cor de destaque e transparência do app.",
-      { defaultOpen = true }, function(s, c) drawAppearanceSection(s, c) end, sim)
-  end
-  if matchesSearch(cfg, "github update release versao changelog baixar") then
-    sectionCard(cfg, "sys_gh", "☁️", "Atualizações",
-      "Ver se saiu versão nova no GitHub.",
-      { defaultOpen = false }, function(s, c) drawGitHubUpdateSection(s, c) end, sim)
-  end
-  if matchesSearch(cfg, "web ui remota polling json comando avancado") then
-    sectionCard(cfg, "sys_web", "🌐", "Web remota (legado)",
-      "Recurso antigo p/ ferramentas externas. Pode ignorar.",
-      { defaultOpen = false, advanced = true }, function(s, c) drawWebUISection(s, c) end, sim)
-  end
-  if matchesSearch(cfg, "sobre ajuda como funciona modulos") then
-    sectionCard(cfg, "sys_about", "ℹ️", "Ajuda & Sobre",
-      "O que cada parte do app faz, em linguagem simples.",
-      { defaultOpen = false }, function(s, c) drawAboutSection(s, c) end, sim)
-  end
-end
-
--- ---------------- Rodapé ----------------
-local function drawBottomBar(cfg)
+local function drawRaceInspector(sim, cfg)
+  crumb("Corrida")
+  ui.pushFont(ui.Font.Title)
+  if rgbm then ui.textColored("Corrida", C.accent()) else ui.text("Corrida") end
+  ui.popFont()
+  ui.textDisabled("Antes de largar: duração, paradas e formação.")
   ui.newLine(4)
-  ui.separator()
-  ui.newLine(2)
-  if ui.button("💾 Salvar agora", vec2(150, 28)) then
-    if RARE2_API.saveConfig then
-      RARE2_API.saveConfig()
-      cfg._savedFeedback = 180
-      toast(cfg, "ok", "Salvo", "configuração guardada")
-    end
+  if matchesSearch(cfg, "combustivel pit pneu volta endurance") then
+    local st = "manual"
+    if cfg.strategy and cfg.strategy.enabled then st = tostring(cfg.strategy.manualRaceLaps or 20) .. "v/" .. tostring(cfg.strategy.forcedStops or 1) .. " pits" end
+    view(cfg, "race_fuel", "01", "Combustível e pits",
+      "Diga as voltas; a IA calcula paradas e pneus sozinha.",
+      { status = st },
+      function(s, c) drawFuelStrategySection(s, c) end, sim)
   end
-  ui.sameLine(0, 8)
-  if ui.button("🔄 Padrões", vec2(130, 28)) then
-    if RARE2_API.resetToDefaults then
-      RARE2_API.resetToDefaults()
-      cfg._resetFeedback = 180
-      toast(cfg, "warn", "Padrões", "valores de fábrica de volta")
-    end
-  end
-  ui.sameLine(0, 8)
-  if ui.button("📊 Abrir painel de corrida", vec2(210, 28)) then
-    if ac.setWindowOpen then pcall(ac.setWindowOpen, "events", true) end
-  end
-  if (cfg._savedFeedback or 0) > 0 then
-    cfg._savedFeedback = cfg._savedFeedback - 1
-    ui.newLine(2)
-    if rgbm then ui.textColored("✓ Salvo! " .. animDots(), rgbm(0.2, 0.9, 0.4, animPulse(4, 0.6, 1.0)))
-    else ui.text("✓ Salvo!") end
-  elseif (cfg._resetFeedback or 0) > 0 then
-    cfg._resetFeedback = cfg._resetFeedback - 1
-    ui.newLine(2)
-    ui.textDisabled("✓ Padrões restaurados")
-  else
-    ui.sameLine(0, 10)
-    ui.textDisabled("Auto-save: ligado")
+  if matchesSearch(cfg, "largada movimento fila formacao") then
+    view(cfg, "race_rolling", "02", "Largada em movimento",
+      "Volta de apresentação em fila antes da verde. Vem desligado.",
+      { advanced = true, status = (cfg.rollingStart and cfg.rollingStart.enabled) and "armado" or "off" },
+      function(s, c) drawRollingStartSection(s, c) end, sim)
   end
 end
 
--- ---------------- Draw principal ----------------
+local function drawSafetyInspector(sim, cfg)
+  crumb("Segurança")
+  ui.pushFont(ui.Font.Title)
+  if rgbm then ui.textColored("Segurança", C.accent()) else ui.text("Segurança") end
+  ui.popFont()
+  ui.textDisabled("O que te pune e o que te protege. Padrões valem p/ CMRT.")
+  ui.newLine(4)
+  if matchesSearch(cfg, "bandeira caution fcy amarela acidente devolver") then
+    view(cfg, "sf_caution", "01", "Bandeiras",
+      "Acidente com carro parado: todo mundo reduz até liberar.",
+      { status = (cfg.caution and cfg.caution.enabled) and "on" or "off" },
+      function(s, c) drawCautionSection(s, c) end, sim)
+  end
+  if matchesSearch(cfg, "corte zebra aviso punicao box freio limite") then
+    local tl = RARE2_API.getTrackLimitsState and RARE2_API.getTrackLimitsState() or {}
+    view(cfg, "sf_limits", "02", "Cortes de pista",
+      "Cortou demais = avisos, depois seconds parado no box. Igual ao CMRT.",
+      { status = (cfg.tracklimits and cfg.tracklimits.enabled) and (tostring(tl.warn or 0) .. "/" .. tostring(tl.maxWarn or 4)) or "off" },
+      function(s, c) drawTrackLimitsSection(s, c) end, sim)
+  end
+end
+
+local function drawHudInspector(sim, cfg)
+  crumb("Tela & Voz")
+  ui.pushFont(ui.Font.Title)
+  if rgbm then ui.textColored("Tela & Voz", C.accent()) else ui.text("Tela & Voz") end
+  ui.popFont()
+  ui.textDisabled("O que aparece correndo e o que você escuta.")
+  ui.newLine(4)
+  if matchesSearch(cfg, "painel hud overlay mostrar tela") then
+    view(cfg, "hud_events", "01", "Painel na tela",
+      "Escolha o que o overlay mostra na corrida.",
+      {},
+      function(s, c) drawHudEventsSettings(s, c) end, sim)
+  end
+  if matchesSearch(cfg, "telemetria csv volta voz fala beep gravar") then
+    view(cfg, "hud_tel", "02", "Gravação e voz",
+      "Grava voltas em arquivo + fala os avisos sem CrewChief.",
+      {},
+      function(s, c) drawTelemetryVoiceSection(s, c) end, sim)
+  end
+  if matchesSearch(cfg, "memoria aprender limpar pista") then
+    view(cfg, "hud_learn", "03", "Memória",
+      "Ver e apagar o que a IA aprendeu por pista.",
+      { advanced = true },
+      function(s, c) drawLearningModuleSection(s, c) end, sim)
+  end
+end
+
+local function drawSysInspector(sim, cfg)
+  crumb("Ajustes")
+  ui.pushFont(ui.Font.Title)
+  if rgbm then ui.textColored("Ajustes", C.accent()) else ui.text("Ajustes") end
+  ui.popFont()
+  ui.textDisabled("Visual, updates e bastidores. Mexa uma vez e esqueça.")
+  ui.newLine(4)
+  if matchesSearch(cfg, "visual cor tema transparencia") then
+    view(cfg, "sys_theme", "01", "Visual",
+      "Cor de destaque e transparência.",
+      {},
+      function(s, c) drawAppearanceSection(s, c) end, sim)
+  end
+  if matchesSearch(cfg, "atualizacao github versao baixar") then
+    local gs = RARE2_API.githubGetState and RARE2_API.githubGetState() or {}
+    view(cfg, "sys_gh", "02", "Atualizações",
+      "Ver se saiu versão nova.",
+      { status = gs.hasUpdate and "nova!" or "" },
+      function(s, c) drawGitHubUpdateSection(s, c) end, sim)
+  end
+  if matchesSearch(cfg, "web remota avancado externo") then
+    view(cfg, "sys_web", "03", "Web remota (legado)",
+      "Recurso antigo p/ ferramentas externas. Pode ignorar.",
+      { advanced = true },
+      function(s, c) drawWebUISection(s, c) end, sim)
+  end
+  if matchesSearch(cfg, "ajuda sobre como funciona") then
+    view(cfg, "sys_about", "04", "Ajuda",
+      "O que cada parte faz, em linguagem simples.",
+      {},
+      function(s, c) drawAboutSection(s, c) end, sim)
+  end
+end
+
+-- ---------------- moldura principal ----------------
 function M.draw(sim, cfg)
   cfg.ui = cfg.ui or {}
   local acc = cfg.ui.accent
@@ -2654,64 +2609,109 @@ function M.draw(sim, cfg)
   THEME.compactHeaders = (cfg.ui.compactHeaders == true)
   pushDarkTheme()
   ensureUiState(cfg)
+  if sim and sim.isSessionStarted then cfg._everInSession = true end
 
-  drawHero(sim, cfg)
-  ui.newLine(4)
+  drawCommandBar(sim, cfg)
+  ui.newLine(2)
   drawToasts(cfg)
   ui.separator()
-  ui.newLine(4)
 
-  -- Modo + busca lado a lado no conceito (empilhado p/ janela estreita)
-  drawModeSwitch(cfg)
-  ui.newLine(4)
-  ui.separator()
-  ui.newLine(4)
-  drawSearchBar(cfg)
-  ui.newLine(4)
-
-  if not cfg.enabled then
-    ui.textDisabled("App pausado — o Início continua visível para consulta.")
+  local badges = railBadges(sim, cfg)
+  local hasChild = ui.beginChild ~= nil and ui.endChild ~= nil
+  if hasChild then
+    ui.beginChild("##rf_rail", vec2(60, 0), false)
+    drawRail(cfg, badges)
+    ui.endChild()
+    ui.sameLine(0, 6)
+    ui.beginChild("##rf_main", vec2(0, 0), false)
+  else
+    -- fallback: trilho horizontal compacto
+    for _, cat in ipairs(NAV_RAIL) do
+      local active = cfg.uiNav == cat.id
+      if active and rgbm then
+        local at = ACCENTS[THEME.accent] or ACCENTS.cyan
+        ui.pushStyleColor(ui.StyleColor.Button, rgbm(at[1]*0.4, at[2]*0.4, at[3]*0.4, 1.00))
+      end
+      if ui.button(cat.icon .. "##rail_" .. cat.id, vec2(44, 30)) then
+        if cfg.uiNav ~= cat.id then cfg.uiNav = cat.id trackNav(cfg, cat.id) end
+      end
+      if active and rgbm then ui.popStyleColor() end
+      ui.sameLine(0, 4)
+    end
     ui.newLine(4)
-    drawCategoryGrid(cfg, sim)
-    ui.newLine(4)
-    if cfg.uiNav == "dash" then drawDashboard(sim, cfg) end
-    popDarkTheme()
-    return
+    ui.separator()
+    ui.newLine(2)
   end
 
-  ui.text("Para onde?")
-  ui.newLine(2)
-  drawCategoryGrid(cfg, sim)
-  ui.newLine(4)
-  ui.separator()
-  ui.newLine(4)
-
-  -- Flash de transição: título da categoria pulsa 1s após a troca
-  local flash = (animT() - (cfg._navFlash or -10)) < 1.0
   local nav = cfg.uiNav or "dash"
+  local flash = (animT() - (cfg._navFlash or -10)) < 0.8
+  if flash and rgbm then
+    for _, cat in ipairs(NAV_RAIL) do
+      if cat.id == nav then ui.textColored(cat.icon .. " " .. cat.label, C.accent()) end
+    end
+  end
   if nav == "dash" then
-    safeTab("Início", drawDashboard, sim, cfg)
+    safeTab("Início", drawDashInspector, sim, cfg)
   elseif nav == "ai" then
-    if flash and rgbm then ui.textColored("🤖 Pilotos", C.accent()) end
-    safeTab("Pilotos", drawAICategory, sim, cfg)
+    safeTab("Pilotos", drawAiInspector, sim, cfg)
   elseif nav == "race" then
-    if flash and rgbm then ui.textColored("🏁 Corrida", C.accent()) end
-    safeTab("Corrida", drawRaceCategory, sim, cfg)
+    safeTab("Corrida", drawRaceInspector, sim, cfg)
   elseif nav == "safety" then
-    if flash and rgbm then ui.textColored("🟡 Segurança", C.accent()) end
-    safeTab("Segurança", drawSafetyCategory, sim, cfg)
+    safeTab("Segurança", drawSafetyInspector, sim, cfg)
   elseif nav == "hud" then
-    if flash and rgbm then ui.textColored("📡 Tela & Voz", C.accent()) end
-    safeTab("Tela & Voz", drawHudCategory, sim, cfg)
+    safeTab("Tela & Voz", drawHudInspector, sim, cfg)
   elseif nav == "sys" then
-    if flash and rgbm then ui.textColored("⚙️ Ajustes", C.accent()) end
-    safeTab("Sistema", drawSysCategory, sim, cfg)
+    safeTab("Ajustes", drawSysInspector, sim, cfg)
   else
     cfg.uiNav = "dash"
-    safeTab("Início", drawDashboard, sim, cfg)
+    safeTab("Início", drawDashInspector, sim, cfg)
   end
 
-  drawBottomBar(cfg)
+  ui.newLine(4)
+  ui.separator()
+  ui.newLine(2)
+  if ui.button("💾 Salvar", vec2(110, 26)) then
+    if RARE2_API.saveConfig then
+      RARE2_API.saveConfig()
+      cfg._savedFeedback = 180
+      toast(cfg, "ok", "Salvo", "")
+    end
+  end
+  ui.sameLine(0, 8)
+  if ui.button("🔄 Padrões", vec2(110, 26)) then
+    if RARE2_API.resetToDefaults then
+      RARE2_API.resetToDefaults()
+      cfg._resetFeedback = 180
+      toast(cfg, "warn", "Padrões de volta", "")
+    end
+  end
+  ui.sameLine(0, 8)
+  if ui.button("📊 Painel", vec2(100, 26)) then
+    if ac.setWindowOpen then pcall(ac.setWindowOpen, "events", true) end
+  end
+  if (cfg._savedFeedback or 0) > 0 then
+    cfg._savedFeedback = cfg._savedFeedback - 1
+    ui.sameLine(0, 8)
+    if rgbm then ui.textColored("✓ " .. animDots(), rgbm(0.2, 0.9, 0.4, animPulse(4, 0.6, 1.0)))
+    else ui.text("✓") end
+  elseif (cfg._resetFeedback or 0) > 0 then
+    cfg._resetFeedback = cfg._resetFeedback - 1
+    ui.sameLine(0, 8)
+    ui.textDisabled("✓ padrões")
+  end
+
+  if hasChild then
+    ui.endChild()
+    ui.separator()
+    ui.beginChild("##rf_status", vec2(0, 24), false)
+    drawStatusBar(sim, cfg)
+    ui.endChild()
+  else
+    ui.newLine(2)
+    ui.separator()
+    drawStatusBar(sim, cfg)
+  end
+
   popDarkTheme()
 end
 
