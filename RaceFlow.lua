@@ -1,10 +1,10 @@
 -- ApexFlow — Independent race suite for Assetto Corsa (v0.13.0)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.20.0"
+SCRIPT_VERSION = "0.20.1"
 
 _G.RARE2_API = _G.RARE2_API or {}
 local RARE2_API = _G.RARE2_API
-_G.RACEFLOW_VERSION = "0.20.0"
+_G.RACEFLOW_VERSION = "0.20.1"
 _G.APEXFLOW_VERSION = "0.13.1"
 
 -- Per-module load status, shown in the fallback window so a future
@@ -28,7 +28,7 @@ local strategy     = safeRequire("src.race_strategy")
 local caution      = safeRequire("src.caution")       -- v0.6.0: FCY + sector yellow
 local tracklimits  = safeRequire("src.tracklimits")   -- v0.7.0: warnings -> time penalty
 local webui        = safeRequire("src.webui")         -- Remote Web UI (file polling)
-local voice        = safeRequire("src.voice")          -- v0.20.0 (Sug5): fila de voz por eventos
+local voice        = safeRequire("src.voice")          -- v0.20.1 (Sug5): fila de voz por eventos
 -- NOTE v0.5.0+: src/vsc + src/github_update modules are DEPRECATED and no
 -- longer required. GitHub check lives in this file (single source of truth)
 -- to avoid dual-state bugs.
@@ -83,7 +83,7 @@ local RARE2_CFG = {
     penaltiesEnabled = true,
     maxWarnings = 4,
     penaltyTime = 5,
-    cooldown = 3, -- v0.20.0: 3s (sync CMRT)
+    cooldown = 3, -- v0.20.1: 3s (sync CMRT)
     extraTime = 10,
     strictPit = false,
     waitTime = 1.9,
@@ -92,9 +92,9 @@ local RARE2_CFG = {
     aiServe = false,
     qualiReset = true,
     finishAdd = true,
-    gamePenaltyCompat = false, -- v0.20.0: OFF (independente do jogo, nao pausa aviso)
-    syncWithCMRT = true,      -- v0.20.0: ON (espelha CMRT, fixa 1 vs 11)
-    minOffTime = 0.15,        -- v0.20.0: more sensitive (was 0.25)
+    gamePenaltyCompat = false, -- v0.20.1: OFF (independente do jogo, nao pausa aviso)
+    syncWithCMRT = true,      -- v0.20.1: ON (espelha CMRT, fixa 1 vs 11)
+    minOffTime = 0.15,        -- v0.20.1: more sensitive (was 0.25)
     pitSpeedEnabled = true,   -- v0.10.0: punish pit-lane speeding
     pitLimitKmh = 80,
     pitGraceSec = 1.0,
@@ -146,7 +146,7 @@ local RARE2_CFG = {
   -- v0.14.0: New systems
   pitSpeedReal = { enabled = true }, -- use track's real limit when available
   telemetryCSV = { enabled = false, maxLaps = 500 },
-  voice = { enabled = true, volume = 0.8, speed = 1.0, -- v0.20.0 (Sug5): fila estilo AC-Engineer
+  voice = { enabled = true, volume = 0.8, speed = 1.0, -- v0.20.1 (Sug5): fila estilo AC-Engineer
     categories = { limits = true, pit = true, caution = true, penalty = true } },
   failures = { enabled = false, chancePerHour = 0.08, minLap = 3 },
 }
@@ -194,7 +194,7 @@ local function applyCategoryPreset(catKey)
   local p = CATEGORY_PRESETS[catKey]
   if not p then return false end
   RARE2_CFG.categoryPreset = catKey
-  -- v0.20.0: preset ativa o sistema para feedback imediato
+  -- v0.20.1: preset ativa o sistema para feedback imediato
   if RARE2_CFG.tracklimits then RARE2_CFG.tracklimits.enabled = true end
   if p.tracklimits then
     for k, v in pairs(p.tracklimits) do
@@ -324,7 +324,7 @@ end
 -- ----------------------------------------------------------
 -- Voice warnings without CrewChief (v0.14.0) — beeps + messages
 -- ----------------------------------------------------------
--- v0.20.0 (Sug5): roteia para o modulo de voz (fila + cooldown + clips).
+-- v0.20.1 (Sug5): roteia para o modulo de voz (fila + cooldown + clips).
 -- Mapeia kinds legados ("tracklimits"/"pitSpeed") para o modulo.
 local function playVoiceWarning(kind, opts)
   if voice and voice.say then
@@ -990,7 +990,7 @@ function script.update(dt)
     if not okT then ac.log("[RaceFlow] tracklimits.update: " .. tostring(errT)) end
   end
 
-  -- Voz (v0.20.0 Sug5): avanca a fila + dispara por borda de subida
+  -- Voz (v0.20.1 Sug5): avanca a fila + dispara por borda de subida
   -- (novo aviso, nova punicao, pit-alert, caution). Leitura pura de estado.
   if voice and voice.update then pcall(voice.update, dt) end
   if not rollingActive and RARE2_CFG.voice and RARE2_CFG.voice.enabled then
@@ -1176,7 +1176,7 @@ local function animBarPlaceholder(fuel, maxF)
 end
 
 local function drawRaceEventsBody()
-  -- v0.20.0: visual de TRANSMISSÃO — faixa de bandeira + herói + pips.
+  -- v0.20.1: visual de TRANSMISSÃO — faixa de bandeira + herói + pips.
   -- Referências: overlays RaceLab/MRT/iFL03 (faixa de flag em 2 tons,
   -- LED de bandeira, tudo legível a 200 km/h).
   local sim = ac.getSim()

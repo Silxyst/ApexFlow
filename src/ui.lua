@@ -2174,6 +2174,48 @@ end
 
 -- Toggle pill ON/OFF (botão primeiro, rótulo depois — sem matemática de cursor).
 -- Retorna o novo valor (ou o mesmo se não clicado).
+-- Helpers puros (declarados cedo: usados por view()/pills — evita forward-ref).
+-- Raiz do app p/ assets (mesmo truque do AC-Engineer: ScriptOrigin).
+local function appRoot()
+  if not (ac and ac.getFolder and ac.FolderID) then return nil end
+  local ok, dir = pcall(ac.getFolder, ac.FolderID.ScriptOrigin)
+  if ok and dir and dir ~= "" then return tostring(dir) end
+  return nil
+end
+
+-- Título com Segoe UI Bold quando existir (pcall, como o Dream faz);
+-- senão cai para a fonte Title. Nunca quebra.
+local function titleText(txt, color)
+  if ui.pushDWriteFont and ui.popDWriteFont then
+    local ok = pcall(ui.pushDWriteFont, "Segoe UI;Weight=Bold")
+    if ok then
+      if color and rgbm then ui.textColored(txt, color) else ui.text(txt) end
+      pcall(ui.popDWriteFont)
+      return
+    end
+  end
+  ui.pushFont(ui.Font.Title)
+  if color and rgbm then ui.textColored(txt, color) else ui.text(txt) end
+  ui.popFont()
+end
+
+-- Cursor de mão sobre o último widget (tudo guardado).
+local function hand()
+  if ui.setMouseCursor and ui.MouseCursor and ui.MouseCursor.Hand and ui.itemHovered then
+    local ok, hov = pcall(ui.itemHovered)
+    if ok and hov then pcall(ui.setMouseCursor, ui.MouseCursor.Hand) end
+  end
+end
+
+-- Largura útil (responsivo como o Dream: availableSpaceX com fallback).
+local function contentWidth()
+  if ui.availableSpaceX then
+    local ok, w = pcall(ui.availableSpaceX)
+    if ok and tonumber(w) and tonumber(w) > 100 then return tonumber(w) end
+  end
+  return math.max(300, ui.windowWidth() - 20)
+end
+
 local function pillToggle(id, label, val, summary)
   local w = 84
   if val and rgbm then
@@ -2221,14 +2263,13 @@ local function view(cfg, id, num, title, summary, opts, fn, sim)
   hand()
   if summary and summary ~= "" then ui.textDisabled("      " .. summary) end
   if isOpen then
-    ui.indent(12)
-    ui.newLine(2)
+    ui.indent(8)
     safeTab(title, fn, sim, cfg)
-    ui.unindent(12)
+    ui.unindent(8)
     ui.newLine(2)
   end
   ui.separator()
-  ui.newLine(4)
+  ui.newLine(2)
 end
 
 -- ---------------- status do sistema ----------------
@@ -2297,46 +2338,7 @@ local function drawCommandBar(sim, cfg)
 end
 
 -- ---------------- peças classe-Dream (v0.20.0) ----------------
--- Raiz do app p/ assets (mesmo truque do AC-Engineer: ScriptOrigin).
-local function appRoot()
-  if not (ac and ac.getFolder and ac.FolderID) then return nil end
-  local ok, dir = pcall(ac.getFolder, ac.FolderID.ScriptOrigin)
-  if ok and dir and dir ~= "" then return tostring(dir) end
-  return nil
-end
 
--- Título com Segoe UI Bold quando existir (pcall, como o Dream faz);
--- senão cai para a fonte Title. Nunca quebra.
-local function titleText(txt, color)
-  if ui.pushDWriteFont and ui.popDWriteFont then
-    local ok = pcall(ui.pushDWriteFont, "Segoe UI;Weight=Bold")
-    if ok then
-      if color and rgbm then ui.textColored(txt, color) else ui.text(txt) end
-      pcall(ui.popDWriteFont)
-      return
-    end
-  end
-  ui.pushFont(ui.Font.Title)
-  if color and rgbm then ui.textColored(txt, color) else ui.text(txt) end
-  ui.popFont()
-end
-
--- Cursor de mão sobre o último widget (tudo guardado).
-local function hand()
-  if ui.setMouseCursor and ui.MouseCursor and ui.MouseCursor.Hand and ui.itemHovered then
-    local ok, hov = pcall(ui.itemHovered)
-    if ok and hov then pcall(ui.setMouseCursor, ui.MouseCursor.Hand) end
-  end
-end
-
--- Largura útil (responsivo como o Dream: availableSpaceX com fallback).
-local function contentWidth()
-  if ui.availableSpaceX then
-    local ok, w = pcall(ui.availableSpaceX)
-    if ok and tonumber(w) and tonumber(w) > 100 then return tonumber(w) end
-  end
-  return math.max(300, ui.windowWidth() - 20)
-end
 
 -- Cabeçalho com logo (icon.png) à esquerda, estilo Dream.
 local function drawLogoHeader()
@@ -2365,35 +2367,6 @@ local function drawLogoHeader()
   ui.textDisabled("v" .. (SCRIPT_VERSION or "?"))
   ui.newLine(1)
   ui.textDisabled(" central de IA, estratégia e direção de prova ")
-end
-
--- Splash de lançamento (1x por versão, pulável, sem espera forçada).
-local function drawSplash(cfg)
-  drawLogoHeader()
-  ui.newLine(6)
-  titleText("Bem-vindo ao ApexFlow", nil)
-  ui.textDisabled("Sua central de IA, estratégia e direção de prova.")
-  ui.newLine(4)
-  ui.text("✅  1 · Escolha um preset de corrida")
-  ui.text("✅  2 · Ative a fiscalização e a voz")
-  ui.text("✅  3 · Entre em pista — o resto é automático")
-  ui.newLine(6)
-  if ui.button("🏁 Começar##splash_go", vec2(-1, 36)) then
-    cfg._splashSeen = (SCRIPT_VERSION or "?")
-    cfg._onboardHide = false
-    cfg._wizStep = 1
-    notifyChange()
-  end
-  hand()
-  ui.newLine(2)
-  if ui.button("Não mostrar de novo##splash_hide", vec2(-1, 28)) then
-    cfg._splashSeen = (SCRIPT_VERSION or "?")
-    cfg._splashHide = true
-    notifyChange()
-  end
-  hand()
-  ui.newLine(2)
-  ui.textDisabled("Aparece 1x por versão. O assistente completo está no Início.")
 end
 
 -- Tab-strip superior estilo Dream (pills + micro-label + badge).
@@ -2507,76 +2480,7 @@ local function drawPresetList(cfg)
 end
 
 -- ---------------- assistente ----------------
-local function drawWizard(sim, cfg)
-  local step = math.max(1, math.min(3, tonumber(cfg._wizStep) or 1))
-  band("##wiz_head", 0.10, 0.20, 0.32, 56, function()
-    ui.pushFont(ui.Font.Title)
-    if rgbm then ui.textColored("🧭 Passo " .. step .. " de 3", rgbm(1, 1, 1, 1))
-    else ui.text("Passo " .. step .. " de 3") end
-    ui.popFont()
-    animBar(step / 3)
-  end)
-  ui.newLine(4)
-  if step == 1 then
-    ui.text("Que corrida é essa?")
-    ui.textDisabled("Ajusta limites e bandeiras sozinho. Depois dá p/ mudar tudo.")
-    ui.newLine(4)
-    drawPresetList(cfg)
-    ui.newLine(2)
-    if ui.button("Continuar ›##wiz1", vec2(-1, 34)) then cfg._wizStep = 2 end
-  elseif step == 2 then
-    ui.text("Ligar a fiscalização?")
-    ui.textDisabled("Sem isso o app só observa; com isso ele avisa e pune cortes.")
-    ui.newLine(4)
-    cfg.tracklimits = cfg.tracklimits or {}
-    local tlOn = cfg.tracklimits.enabled == true
-    if pillToggle("wiz_tl", "Fiscalizar cortes de pista", tlOn,
-        "Avisos iguais aos do CMRT.") ~= tlOn then
-      cfg.tracklimits.enabled = not tlOn; notifyChange()
-    end
-    ui.newLine(2)
-    cfg.voice = cfg.voice or {}
-    if cfg.voice.enabled == nil then cfg.voice.enabled = true end
-    if pillToggle("wiz_vc", "Avisos por voz", cfg.voice.enabled,
-        "Fala sem precisar de CrewChief.") ~= cfg.voice.enabled then
-      cfg.voice.enabled = not cfg.voice.enabled; notifyChange()
-    end
-    ui.newLine(4)
-    if ui.button("‹ Voltar##wiz2b", vec2(130, 32)) then cfg._wizStep = 1 end
-    ui.sameLine(0, 8)
-    if ui.button("Continuar ›##wiz2n", vec2(-1, 32)) then cfg._wizStep = 3 end
-  else
-    ui.text("Pronto para largar")
-    ui.textDisabled("Resumo do que foi ligado. Entre em pista — o resto é automático.")
-    ui.newLine(4)
-    if ui.button("📊 Abrir painel de corrida##wiz_open", vec2(-1, 34)) then
-      if ac.setWindowOpen then pcall(ac.setWindowOpen, "events", true) end
-    end
-    ui.newLine(4)
-    if ui.button("‹ Voltar##wiz3b", vec2(130, 32)) then cfg._wizStep = 2 end
-    ui.sameLine(0, 8)
-    if ui.button("🏁 Concluir##wiz_done", vec2(-1, 32)) then
-      cfg._onboarded = true
-      cfg.uiNav = "dash"
-      notifyChange()
-      toast(cfg, "ok", "Tudo pronto", "boa corrida!")
-    end
-  end
-  ui.newLine(4)
-  ui.separator()
-  ui.newLine(2)
-  if ui.button("Pular assistente##wiz_skip", vec2(160, 26)) then
-    cfg._onboardHide = true
-    notifyChange()
-  end
-end
-
 -- ---------------- inspetores ----------------
-local function crumb(label)
-  ui.textDisabled(("APEXFLOW › " .. label):upper())
-  ui.newLine(2)
-end
-
 local function heroNumbers(sim, cfg)
   if not (sim and sim.isSessionStarted) then
     ui.textDisabled("Sem sessão — números vivos aparecem em pista " .. animDots())
@@ -2594,13 +2498,8 @@ local function heroNumbers(sim, cfg)
 end
 
 local function drawDashInspector(sim, cfg)
-  crumb("Início")
   heroNumbers(sim, cfg)
   ui.newLine(4)
-  if not cfg._onboarded and not cfg._onboardHide then
-    drawWizard(sim, cfg)
-    ui.newLine(2)
-  end
   local tl, cs, stt, memCount = getSystemStatus(sim, cfg)
   ui.text("Saúde agora")
   ui.newLine(2)
@@ -2627,19 +2526,9 @@ local function drawDashInspector(sim, cfg)
   ui.newLine(2)
   drawPresetList(cfg)
   ui.newLine(2)
-  if not cfg._onboarded and cfg._onboardHide then
-    if ui.button("🧭 Reabrir assistente##reopen_wiz", vec2(-1, 30)) then
-      cfg._onboardHide = false cfg._wizStep = 1
-    end
-    ui.newLine(2)
-  end
 end
 
 local function drawAiInspector(sim, cfg)
-  crumb("Pilotos")
-  ui.pushFont(ui.Font.Title)
-  if rgbm then ui.textColored("Pilotos", C.accent()) else ui.text("Pilotos") end
-  ui.popFont()
   ui.textDisabled("Dê personalidade à IA. Padrões servem p/ quase tudo.")
   ui.newLine(4)
   if matchesSearch(cfg, "agressividade perfis calmo briga") then
@@ -2687,10 +2576,6 @@ local function drawAiInspector(sim, cfg)
 end
 
 local function drawRaceInspector(sim, cfg)
-  crumb("Corrida")
-  ui.pushFont(ui.Font.Title)
-  if rgbm then ui.textColored("Corrida", C.accent()) else ui.text("Corrida") end
-  ui.popFont()
   ui.textDisabled("Antes de largar: duração, paradas e formação.")
   ui.newLine(4)
   if matchesSearch(cfg, "combustivel pit pneu volta endurance") then
@@ -2710,10 +2595,6 @@ local function drawRaceInspector(sim, cfg)
 end
 
 local function drawSafetyInspector(sim, cfg)
-  crumb("Segurança")
-  ui.pushFont(ui.Font.Title)
-  if rgbm then ui.textColored("Segurança", C.accent()) else ui.text("Segurança") end
-  ui.popFont()
   ui.textDisabled("O que te pune e o que te protege. Padrões valem p/ CMRT.")
   ui.newLine(4)
   if matchesSearch(cfg, "bandeira caution fcy amarela acidente devolver") then
@@ -2732,10 +2613,6 @@ local function drawSafetyInspector(sim, cfg)
 end
 
 local function drawHudInspector(sim, cfg)
-  crumb("Tela & Voz")
-  ui.pushFont(ui.Font.Title)
-  if rgbm then ui.textColored("Tela & Voz", C.accent()) else ui.text("Tela & Voz") end
-  ui.popFont()
   ui.textDisabled("O que aparece correndo e o que você escuta.")
   ui.newLine(4)
   if matchesSearch(cfg, "painel hud overlay mostrar tela") then
@@ -2759,10 +2636,6 @@ local function drawHudInspector(sim, cfg)
 end
 
 local function drawSysInspector(sim, cfg)
-  crumb("Ajustes")
-  ui.pushFont(ui.Font.Title)
-  if rgbm then ui.textColored("Ajustes", C.accent()) else ui.text("Ajustes") end
-  ui.popFont()
   ui.textDisabled("Visual, updates e bastidores. Mexa uma vez e esqueça.")
   ui.newLine(4)
   if matchesSearch(cfg, "aparencia tema cor transparencia") then
@@ -2805,12 +2678,6 @@ function M.draw(sim, cfg)
   pushDarkTheme()
   ensureUiState(cfg)
   if sim and sim.isSessionStarted then cfg._everInSession = true end
-
-  if cfg._splashSeen ~= (SCRIPT_VERSION or "?") and not cfg._splashHide then
-    drawSplash(cfg)
-    popDarkTheme()
-    return
-  end
 
   drawLogoHeader()
   ui.newLine(4)
