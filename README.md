@@ -6,14 +6,14 @@
 
 <p align="center">
   <strong>Independent AI & Race Control for Assetto Corsa</strong><br/>
-  Profiles • Learning • Rolling Start • Strategy • Caution FCY • Track Limits • HUD
+  2 Apps: Principal (IA/Corrida/Gaps/PP) + Events HUD — leve, sem bandeira/corte (AC nativo)
 </p>
 
 <p align="center">
   <a href="https://github.com/Silxyst/RaceFlow-V2/releases/latest">
     <img src="https://img.shields.io/github/v/release/Silxyst/RaceFlow-V2?style=for-the-badge&label=Latest%20Release&color=ff6a15" alt="Latest Release"/>
   </a>
-  <img src="https://img.shields.io/badge/Version-v0.13.0-ff6a15?style=for-the-badge" alt="App Version"/>
+  <img src="https://img.shields.io/badge/Version-v0.28.1-ff6a15?style=for-the-badge" alt="App Version"/>
   <a href="https://github.com/Silxyst/RaceFlow-V2/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/Silxyst/RaceFlow-V2?style=for-the-badge&color=8b5cf6" alt="License"/>
   </a>

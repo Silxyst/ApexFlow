@@ -22,10 +22,11 @@ local drivers = {}
 local lastSessionIndex = -1
 local lastCarsCount    = -1
 local lastAggression   = -1
--- v0.15.1 (Sug3): throttle da aplicacao do mix de perfis no physics
+-- v0.28.2 extrema: IA ultra-precisa — throttle + blue flag + multiclass + racecraft refinado
 local profilePushTimer = 99
 local lastProfileAggr = -1
 local lastProfilePushSess = -1
+local blueFlagCooldown = {} -- per AI cooldown para não spamar lift
 
 local memory = nil
 local memoryDirty = false
@@ -686,7 +687,7 @@ local function classifyDriversByHP(drivers, k)
   local carRefs = {}
   for i = 1, #drivers do
     local d = drivers[i]
-    local car = ac.getCar(d.index)
+    local ok, car = pcall(ac.getCar, d.index); if not ok then car = nil end
     local hp = estimateHPFromCar(car)
     if hp then
       values[#values+1] = hp
@@ -1076,7 +1077,7 @@ local function getAheadInfo(myIndex, myCar)
 
   for otherIndex, _ in pairs(drivers) do
     if otherIndex ~= myIndex then
-      local oc = ac.getCar(otherIndex)
+      local okOc, oc = pcall(ac.getCar, otherIndex); if not okOc then oc = nil end
       if oc and oc.isAIControlled then
         if safeNumber(function() return oc.lapCount end, 0) == myLap then
           local diff = splineDeltaForward(safeNumber(function() return oc.splinePosition end, 0), mySpline)
@@ -1108,7 +1109,7 @@ local function getBehindInfo(myIndex, myCar)
 
   for otherIndex, _ in pairs(drivers) do
     if otherIndex ~= myIndex then
-      local oc = ac.getCar(otherIndex)
+      local okOc, oc = pcall(ac.getCar, otherIndex); if not okOc then oc = nil end
       if oc and oc.isAIControlled then
         if safeNumber(function() return oc.lapCount end, 0) == myLap then
           local oSpline = safeNumber(function() return oc.splinePosition end, 0)
@@ -1142,7 +1143,7 @@ local function getSideBySideFactor(myIndex, myCar)
 
   for otherIndex, _ in pairs(drivers) do
     if otherIndex ~= myIndex then
-      local oc = ac.getCar(otherIndex)
+      local okOc, oc = pcall(ac.getCar, otherIndex); if not okOc then oc = nil end
       if oc and oc.isAIControlled then
         if safeNumber(function() return oc.lapCount end, 0) == myLap then
           local diff = math.abs(splineDeltaSigned(safeNumber(function() return oc.splinePosition end, 0), mySpline))
@@ -1166,7 +1167,7 @@ local function getBlueFlagState(myIndex, myCar)
 
   for otherIndex, _ in pairs(drivers) do
     if otherIndex ~= myIndex then
-      local oc = ac.getCar(otherIndex)
+      local okOc, oc = pcall(ac.getCar, otherIndex); if not okOc then oc = nil end
       if oc and oc.isAIControlled then
         local oLap    = safeNumber(function() return oc.lapCount end, 0)
         local oSpline = safeNumber(function() return oc.splinePosition end, 0)
@@ -1195,7 +1196,7 @@ end
 -- Find a faster-tier car behind (same lap) within distance (meters-ish along spline)
 local function findFasterCarBehind(sim, d, distWindowM)
   if not sim or not sim.carsCount then return nil end
-  local myCar = ac.getCar(d.index)
+  local okM, myCar = pcall(ac.getCar, d.index); if not okM then myCar = nil end
   if not myCar then return nil end
   local myPos = safeNumber(function() return myCar.splinePosition end, 0)
   local myLap = safeNumber(function() return myCar.lapCount end, 0)
@@ -1206,7 +1207,7 @@ local function findFasterCarBehind(sim, d, distWindowM)
 
   for otherIndex, _ in pairs(drivers) do
     if otherIndex ~= d.index then
-      local oc = ac.getCar(otherIndex)
+      local okOc, oc = pcall(ac.getCar, otherIndex); if not okOc then oc = nil end
       if oc and oc.isAIControlled then
         local oLap = safeNumber(function() return oc.lapCount end, 0)
         if oLap == myLap then
@@ -1230,7 +1231,7 @@ end
 
 local function findSlowerCarAhead(sim, d, distWindowM)
   if not sim or not sim.carsCount then return nil end
-  local myCar = ac.getCar(d.index)
+  local okM, myCar = pcall(ac.getCar, d.index); if not okM then myCar = nil end
   if not myCar then return nil end
   local myPos = safeNumber(function() return myCar.splinePosition end, 0)
   local myLap = safeNumber(function() return myCar.lapCount end, 0)
@@ -1241,7 +1242,7 @@ local function findSlowerCarAhead(sim, d, distWindowM)
 
   for otherIndex, _ in pairs(drivers) do
     if otherIndex ~= d.index then
-      local oc = ac.getCar(otherIndex)
+      local okOc, oc = pcall(ac.getCar, otherIndex); if not okOc then oc = nil end
       if oc and oc.isAIControlled then
         local oLap = safeNumber(function() return oc.lapCount end, 0)
         if oLap == myLap then
@@ -1327,7 +1328,7 @@ local function rebuildDrivers(sim, cfg)
       jitter = 0.0
     end
 
-    local carRef      = ac.getCar(info.index)
+    local okR, carRef = pcall(ac.getCar, info.index); if not okR then carRef = nil end
     local hpEstimate = 0
     local classTier = 1
 
@@ -1413,20 +1414,30 @@ local function computeTurnPhase(turn)
   end
 end
 
--- Basic "grip alarm" (best-effort; uses slipAngle if available, otherwise speed drops)
+-- v0.29.3: grip alarm com compensação chuva — menos sensível no molhado
 local function updateGripAlarm(d, car, dt)
-  -- CSP probe confirmed: only angularVelocity.y and splinePosition available on AI cars.
   local speed = car.speedKmh or 0
   local alarm = d.gripAlarm or 0
   local target = 0.0
+  -- Detecta chuva via AC sim (rainIntensity/trackWetness/isRaining)
+  local rainComp = 1.0
+  do
+    local okS, sim = pcall(ac.getSim)
+    if okS and sim then
+      local rain = tonumber(sim.rainIntensity) or tonumber(sim.trackWetness) or 0
+      if sim.isRaining then rain = math.max(rain, 0.5) end
+      if rain > 0.3 then rainComp = 0.55 -- 45% menos sensível na chuva forte
+      elseif rain > 0.05 then rainComp = 0.75 -- chuva leve
+      end
+    end
+  end
 
-  -- Signal 1: yaw rate (angularVelocity.y) - primary spin/slide detector
   do
     local ok, av = pcall(function() return car.angularVelocity end)
     if ok and av ~= nil and speed > 30 then
       local ok2, yv = pcall(function() return av.y end)
       if ok2 and type(yv) == "number" then
-        local yaw = math.abs(yv)
+        local yaw = math.abs(yv) * rainComp -- chuva reduz yaw alarm
         if    yaw > 2.5 then target = math.max(target, 1.0)
         elseif yaw > 1.5 then target = math.max(target, 0.7)
         elseif yaw > 0.8 then target = math.max(target, 0.4) end
@@ -1529,7 +1540,8 @@ if cfg.multiclassEnabled and cfg._multiclassClassForIndex then
     local tier = tonumber(d.classTier or 1) or 1
     tier = clamp(tier, 1, maxTier)
 
-    local c = ac.getCar(idx)
+    local okC, c = pcall(ac.getCar, idx)
+    if not okC or not c then return end
     if c and c.isAIControlled then
       local spline = safeNumber(function() return c.splinePosition end, 0)
       local lap    = safeNumber(function() return c.lapCount end, 0)
@@ -1564,7 +1576,8 @@ local overallSize = 0
 do
   local items = {}
   for idx, _ in pairs(drivers) do
-    local c = ac.getCar(idx)
+    local okC, c = pcall(ac.getCar, idx)
+    if not okC or not c then return end
     if c and c.isAIControlled then
       local spline = safeNumber(function() return c.splinePosition end, 0)
       local lap    = safeNumber(function() return c.lapCount end, 0)
@@ -1621,7 +1634,7 @@ end
 
   local patch   = ac.getPatchVersionCode and ac.getPatchVersionCode() or 0
   for idx, d in pairs(drivers) do
-  local car = ac.getCar(d.index)
+  local ok, car = pcall(ac.getCar, d.index); if not ok then car = nil end
   if car and car.isAIControlled then
     -- ✅ PROBE init/reset (per AI car, per frame)
     M._implProbe[d.index] = M._implProbe[d.index] or {}
@@ -2146,10 +2159,20 @@ if turnX and turnX > 5 then
         -- class commitment: Attack tolerates more, Chill less
         local classCommit = (class == "attack") and 1.00 or (class == "normal" and 0.85 or 0.70)
 
-        -- Grip alarm already updated above; read it here for corner shaping
+        -- v0.29.3 chuva: corta só 2-4% no molhado (era 8%), mantém ritmo
         local gripAlarm = d.gripAlarm or 0
-        local gripMin = cfg.gripAssistThrottleMin or 0.92
-        local gripCut   = lerp(1.0, gripMin, gripAlarm * gripAssistNorm) -- reduce throttle when sliding
+        local rainMin = 0.96
+        do
+          local okS, sim = pcall(ac.getSim)
+          if okS and sim then
+            local rain = tonumber(sim.rainIntensity) or tonumber(sim.trackWetness) or 0
+            if sim.isRaining then rain = math.max(rain, 0.5) end
+            if rain > 0.3 then rainMin = 0.98 elseif rain > 0.05 then rainMin = 0.96 end
+          end
+        end
+        local gripMin = cfg.gripAssistThrottleMin or rainMin
+        if gripMin < rainMin then gripMin = rainMin end
+        local gripCut   = lerp(1.0, gripMin, gripAlarm * gripAssistNorm)
 
         -- ✅ Confidence mode: if stable, allow a bit more pace without losing safety
         -- Gated off at danger corners so it doesn't fight the danger system
@@ -2684,10 +2707,13 @@ do
 end
 
   if st == "follow" then
+  -- v0.29.1 pensada: só ataca se reta, gap 8-120m e +0.5 m/s mais rápido
+  local gapOk = gap > 0.002 and gap < 0.030 -- 8m a 120m (4km)
+  local relOk = rel > 0.8
   if d.draft.cooldown <= 0.0
-    and inDraftWindow
+    and inDraftWindow and gapOk and relOk
     and (not noPassActive)
-    and (d.draft.stuckRamp or 0.0) > (cfg.draftCommitRampGate or 0.35)
+    and (d.draft.stuckRamp or 0.0) > (cfg.draftCommitRampGate or 0.20)
     and rel > (cfg.draftCommitRelSpeedMin or -1.0)
   then
     d.draft.state = "commit"
@@ -3010,9 +3036,9 @@ local refKmh = (d.approachSpeed or 0) > 60 and d.approachSpeed or 300
   -- ✅ FINAL SANITY CLAMPS (no learning enforcement here)
   -- ==========================================================
   -- Keep values in safe bounds, but do NOT override behaviour based on learned data.
-  targetThrottle = math.clamp(targetThrottle, 0.0, 1.0)
-  targetLevel    = math.clamp(targetLevel,    0.0, 1.0)
-  d.brakeHint    = math.clamp(d.brakeHint or 0.0, 0.0, 1.0)
+  targetThrottle = clamp(targetThrottle, 0.0, 1.0)
+  targetLevel    = clamp(targetLevel,    0.0, 1.0)
+  d.brakeHint    = clamp(d.brakeHint or 0.0, 0.0, 1.0)
 
 -- ✅ APPLY TARGETS TO CSP / PHYSICS
 -- ==========================================================

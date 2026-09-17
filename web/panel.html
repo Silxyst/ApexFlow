@@ -70,8 +70,13 @@
         <div><b id="hFuel">–</b><span>combustível</span></div>
       </div>
     </section>
-    <section class="card"><h2>⚖ Fiscalização</h2><p class="sub" id="tlSub">Track limits do jogador.</p>
-      <div class="row"><span id="tlPips" style="font-size:18px;letter-spacing:2px"></span><span id="tlTxt"></span></div>
+    <!-- Fiscalização removida v0.29.0 (tracklimits 4 — AC nativo) -->
+    <section class="card"><h2>🧭 Conformidade</h2><p class="sub" id="compSub">Gaps e PP — regulamento vivo.</p>
+      <div class="row" style="gap:12px;flex-wrap:wrap">
+        <span id="compGapBehind" style="background:var(--bg3);border-radius:8px;padding:6px 10px">↩ atrás: –</span>
+        <span id="compSector" style="background:var(--bg3);border-radius:8px;padding:6px 10px">⏱ setor: –</span>
+        <span id="compPP" style="background:var(--bg3);border-radius:8px;padding:6px 10px">⚖ PP: 0</span>
+      </div>
     </section>
     <section class="card"><h2>⚡ Preset da corrida</h2><p class="sub">Um toque ajusta limites + bandeiras.</p>
       <div class="row" id="presets"></div>
@@ -88,16 +93,13 @@
       <div class="row" style="margin-top:10px">
         <button id="bRoll">Largada em movimento</button>
         <button id="bStrat">Estratégia/pits</button>
-        <button id="bCau">🟡 Forçar caution</button>
       </div>
     </section>
     <section class="card"><h2>📊 Classificação <small class="hint">(top 10)</small></h2>
       <table><thead><tr><th>P</th><th>Piloto</th><th>Volta</th><th>Melhor</th><th>Comb.</th></tr></thead>
       <tbody id="lb"></tbody></table>
     </section>
-    <section class="card"><h2>🔔 Voz</h2><p class="sub">Testa os avisos falados.</p>
-      <div class="row" id="voiceBtns"></div>
-    </section>
+    <!-- Voz removida v0.29.0 (voice 6 — peso morto) -->
     <section class="card"><h2>⚙️ Sistema</h2>
       <div class="row">
         <button id="bSave">💾 Salvar config</button>
@@ -147,15 +149,8 @@ PRESETS.forEach(([k,label])=>{
   b.onclick = () => cmd('apply_preset', {key:k});
   $('presets').appendChild(b);
 });
-[['limits','Limites'],['pit','Box'],['caution','Caution'],['penalty','Punição']].forEach(([k,label])=>{
-  const b = document.createElement('button');
-  b.textContent = '▶ ' + label;
-  b.onclick = () => cmd('voice_test', {kind:k});
-  $('voiceBtns').appendChild(b);
-});
 $('bRoll').onclick = () => cmd('rolling_toggle');
 $('bStrat').onclick = () => cmd('strategy_toggle');
-$('bCau').onclick = () => cmd('caution_trigger');
 $('bSave').onclick = () => cmd('save_config');
 $('bReset').onclick = () => { if(confirm('Voltar aos padrões?')) cmd('reset_defaults'); };
 $('bGh').onclick = () => cmd('github_check');
@@ -181,21 +176,15 @@ function render(s){
   $('hSpd').textContent = Math.round(me.speedKmh||0);
   $('hFuel').textContent = (me.fuel!=null? me.fuel.toFixed(1)+'L' : '–');
 
-  // faixa
+  // faixa — limpa v0.29.0: sempre verde (caution/track removidos, AC nativo)
   const b = $('banner');
-  const pen = s.tracklimits && s.tracklimits.penaltyActive;
-  const cau = s.caution && s.caution.active;
-  if(pen){ b.className='red'; b.textContent = '🛑 PUNIÇÃO ' + Math.ceil(s.tracklimits.timeLeft||0) + 's — BOX + FREIO'; }
-  else if(cau){ b.className='yellow'; b.textContent = '🟡 ' + (s.caution.mode||'CAUTION') + ' — PÉ LEVE'; }
-  else { b.className='green'; b.textContent = '🟢 PISTA VERDE'; }
+  b.className='green'; b.textContent = '🟢 PISTA VERDE';
 
-  // fiscalização
-  const tl = s.tracklimits || {warn:0, maxWarn:4};
-  let pips = '';
-  for(let i=1;i<=(tl.maxWarn||4);i++) pips += i<=(tl.warn||0) ? '●' : '○';
-  $('tlPips').textContent = pips;
-  $('tlPips').style.color = (tl.warn||0) > 0 ? 'var(--warn)' : 'var(--dim)';
-  $('tlTxt').textContent = `${tl.warn||0}/${tl.maxWarn||4}` + (tl.lastEvent ? ' · ' + tl.lastEvent : '');
+  // conformidade — só gaps/PP (box/safety removidos)
+  const gb = s.gapBehind || {}; const sg = s.sectorGaps || {}; const ps = s.penaltySeverity || {};
+  $('compGapBehind').textContent = gb.gapBehindM ? `↩ atrás: ${Math.round(gb.gapBehindM)}m (P${gb.carBehindPos||"?"})` : '↩ atrás: –';
+  $('compSector').textContent = sg.gapSectorS ? `⏱ S${sg.currentSector||0}: +${(sg.gapSectorS||0).toFixed(2)}s` : '⏱ setor: –';
+  $('compPP').textContent = `⚖ PP: ${ps.totalPP||0}${ps.level? " L"+ps.level:""}`;
 
   // presets ativos
   PRESETS.forEach(([k])=>{ const el=$('pr_'+k); if(el) el.classList.toggle('on', s.preset===k); });
@@ -219,8 +208,8 @@ function render(s){
     tb.appendChild(tr);
   });
 
-  $('sysLine').textContent = 'voz: ' + (s.voice && s.voice.busy ? 'falando…' : 'livre') +
-    ' · clips: ' + (s.voice && s.voice.available ? 'áudio ok' : 'só beep');
+  $('sysLine').textContent = 'gaps: ' + (gb && gb.gapBehindM ? Math.round(gb.gapBehindM)+'m' : '–') +
+    ' · PP: ' + (ps && ps.totalPP || 0);
 }
 async function poll(){
   try{ render(await api('/api/status')); }

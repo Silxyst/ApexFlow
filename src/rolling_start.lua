@@ -152,14 +152,15 @@ local function getCarSpeedKmh(i)
 end
 
 local function requiredPhysicsOk()
-  return physics
-    and type(physics.setAIThrottleLimit) == "function"
-    and type(physics.setAITopSpeed) == "function"
-    and type(physics.setAISplineOffset) == "function"
-    and type(physics.addForce) == "function"
-    and type(physics.setAILevel) == "function"
-    and type(physics.setAIAggression) == "function"
-    and type(physics.setAIBrakeHint) == "function"
+  local phys = (ac and ac.physics) or rawget(_G, "physics")
+  return phys
+    and type(phys.setAIThrottleLimit) == "function"
+    and type(phys.setAITopSpeed) == "function"
+    and type(phys.setAISplineOffset) == "function"
+    and type(phys.addForce) == "function"
+    and type(phys.setAILevel) == "function"
+    and type(phys.setAIAggression) == "function"
+    and type(phys.setAIBrakeHint) == "function"
 end
 
 -- Snapshot lane (left/right) and stable "car ahead" order at the start of rolling phase.
@@ -535,11 +536,10 @@ if not isRolling then
   state.snapFCI = {}
 end
 
-  -- Formation logic + per-car control
+  -- v0.29.2: fila dupla ultra-alinhada — paridade + snapshot + gap 3.5m + pelotão colado
   for i = 0, carcount do
     local car = safeCar(i)
     if car then
-  -- Latch lane once to prevent flips if racePosition changes in rolling
     if state.gridposition[i] == nil then
       state.gridposition[i] = math.fmod(car.racePosition or 0, 2)
     end

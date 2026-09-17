@@ -255,7 +255,8 @@ local function computeAggressionStats(sim, cfg)
   for i = 0, carsCount - 1 do
     local ok, car = pcall(ac.getCar, i) if not ok then car = nil end
     if car and car.isAIControlled then
-      local name = (pcall(ac.getDriverName, i) or "") or ("AI" .. i)
+      local okN,name = pcall(ac.getDriverName, i)
+      name = (okN and name and tostring(name) ~= "") and tostring(name) or ("AI" .. i)
       local key  = tostring(i) .. "|" .. name
       table.insert(aiCars, { index = i, r = hash01(key) })
     end
@@ -923,114 +924,10 @@ local function drawRhythmSection(sim, cfg)
   drawPaceSection(sim, cfg)
 end
 
-local function drawFailuresSection(sim, cfg)
-  ui.text("Falhas mecânicas da IA")
-  helpMarker("Leigo: a IA pode quebrar e ir ao box.\nTécnico: chance/hora por IA após minLap.")
-  cfg.failures = cfg.failures or {}
-  if cfg.failures.enabled == nil then cfg.failures.enabled = false end
-  if ui.checkbox("Falhas mecânicas da IA##fail_only", cfg.failures.enabled) then
-    cfg.failures.enabled = not cfg.failures.enabled; notifyChange()
-  end
-  helpMarker("Leigo: IA pode quebrar e ir ao box.\nTécnico: chance/hora por IA após minLap.")
-  if cfg.failures.enabled then
-    cfg.failures.chancePerHour = tonumber(cfg.failures.chancePerHour) or 0.08
-    local newCh = sliderBlock("Chance por hora", "fail_ch", cfg.failures.chancePerHour, 0, 1, "%.2f",
-      "Leigo: 0.08 = ~8% por hora por IA.\nTécnico: probabilidade/hora convertida por frame.")
-    if newCh ~= nil then
-      local val = clamp(newCh, 0, 1)
-      if math.abs(val - cfg.failures.chancePerHour) > 0.0005 then cfg.failures.chancePerHour = val; notifyChange() end
-    end
-  end
-end
-
--- Voz (v0.15.1, Sug5): fila por eventos inspirada no AC-Engineer-Spotter-Audio
--- (cooldown por grupo, prioridade, clips opcionais em sfx/voice/<CAT>/).
-local function drawVoiceSection(sim, cfg)
-  cfg.voice = cfg.voice or {}
-  if cfg.voice.enabled == nil then cfg.voice.enabled = true end
-  if ui.checkbox("Ativar voz##voice_en", cfg.voice.enabled) then
-    cfg.voice.enabled = not cfg.voice.enabled; notifyChange()
-  end
-  helpMarker("Leigo: avisos falados/beep sem CrewChief.\nTécnico: fila FIFO com cooldown por grupo + prioridade; clips opcionais em sfx/voice/.")
-  if not cfg.voice.enabled then
-    ui.textDisabled("Voz desligada — só mensagens de texto.")
-    return
-  end
-  cfg.voice.volume = tonumber(cfg.voice.volume) or 0.8
-  local newV = sliderBlock("Volume", "voice_vol", cfg.voice.volume, 0, 1, "%.2f",
-    "Leigo: altura do aviso.\nTécnico: ganho aplicado ao AudioEvent/beep.")
-  if newV ~= nil then
-    local val = clamp(newV, 0, 1)
-    if math.abs(val - cfg.voice.volume) > 0.001 then cfg.voice.volume = val; notifyChange() end
-  end
-  cfg.voice.speed = tonumber(cfg.voice.speed) or 1.0
-  local newS = sliderBlock("Velocidade da fala", "voice_spd", cfg.voice.speed, 0.75, 1.5, "%.2f",
-    "Leigo: mais rápido/devagar.\nTécnico: pitch do AudioEvent (beeps não mudam).")
-  if newS ~= nil then
-    local val = clamp(newS, 0.75, 1.5)
-    if math.abs(val - cfg.voice.speed) > 0.001 then cfg.voice.speed = val; notifyChange() end
-  end
-  cfg.voice.categories = cfg.voice.categories or {}
-  local cats = {
-    { id = "limits",  label = "Track limits" },
-    { id = "pit",     label = "Pit speed" },
-    { id = "caution", label = "Caution" },
-    { id = "penalty", label = "Punições" },
-  }
-  ui.textDisabled("Categorias avisadas:")
-  for _, c in ipairs(cats) do
-    if cfg.voice.categories[c.id] == nil then cfg.voice.categories[c.id] = true end
-    if ui.checkbox(c.label .. "##voice_cat_" .. c.id, cfg.voice.categories[c.id]) then
-      cfg.voice.categories[c.id] = not cfg.voice.categories[c.id]; notifyChange()
-    end
-    ui.sameLine(0, 8)
-  end
-  ui.newLine(4)
-  ui.textDisabled("Testar (ignora cooldown):")
-  for _, c in ipairs(cats) do
-    if ui.button("▶ " .. c.label .. "##voice_test_" .. c.id, vec2(120, 24)) then
-      if RARE2_API.voiceTest then RARE2_API.voiceTest(c.id) end
-    end
-    ui.sameLine(0, 6)
-  end
-  ui.newLine(4)
-  local vs = RARE2_API.voiceGetState and RARE2_API.voiceGetState() or {}
-  if vs.available then
-    local parts = {}
-    for _, c in ipairs(cats) do
-      parts[#parts + 1] = c.id .. ":" .. tostring((vs.clips or {})[c.id] or 0)
-    end
-    ui.textDisabled("Áudio: API ok • clips (" .. table.concat(parts, " ") .. ")")
-    ui.textDisabled("Para voz falada, coloque .mp3/.wav/.ogg em sfx/voice/LIMITS|PIT|CAUTION|PENALTY.")
-  else
-    ui.textDisabled("Áudio: ac.AudioEvent indisponível — usando beep + mensagem.")
-  end
-  if vs.busy then ui.textDisabled("Fila: ocupada (" .. tostring(vs.queue or 0) .. " pendentes)") end
-end
-
-local function drawTelemetryVoiceSection(sim, cfg)
-  ui.text("Telemetria & Voz")
-  helpMarker("Leigo: grava voltas em CSV + avisos por voz.\nTécnico: CSV em Documents + fila de áudio por eventos.")
-  cfg.telemetryCSV = cfg.telemetryCSV or {}
-  if cfg.telemetryCSV.enabled == nil then cfg.telemetryCSV.enabled = false end
-  if ui.checkbox("Gravar telemetria CSV##tel_en", cfg.telemetryCSV.enabled) then
-    cfg.telemetryCSV.enabled = not cfg.telemetryCSV.enabled; notifyChange()
-  end
-  helpMarker("Leigo: um CSV por volta em Documents/Assetto Corsa.\nTécnico: lap, posição, combustível, pneus, tempos.")
-  if cfg.telemetryCSV.enabled then
-    cfg.telemetryCSV.maxLaps = tonumber(cfg.telemetryCSV.maxLaps) or 500
-    local newM = sliderBlock("Máximo de voltas no arquivo", "tel_max", cfg.telemetryCSV.maxLaps, 50, 2000, "%.0f",
-      "Leigo: limite do arquivo atual.\nTécnico: rotação simples por sessão.")
-    if newM ~= nil then
-      local val = math.floor(clamp(newM, 50, 2000) + 0.5)
-      if val ~= cfg.telemetryCSV.maxLaps then cfg.telemetryCSV.maxLaps = val; notifyChange() end
-    end
-  end
-  ui.newLine(4)
-  ui.separator()
-  ui.newLine(4)
-  drawVoiceSection(sim, cfg)
-end
+-- v0.29.0 limpo extremo: drawFailuresSection removido (3,4,6 peso morto — falhas genéricas, não usado)
+-- v0.29.0 limpo extremo: drawVoiceSection removido (voice 6 removido)
+-- v0.29.0 limpo extremo: drawTelemetryVoiceSection removido (telemetria + voz removidos)
+-- Stubs removidos para peso morto zero (mantido só comentário)
 
 -------------------------------------------------------
 -- TAB: ABOUT
@@ -1347,356 +1244,12 @@ local function drawGitHubUpdateSection(sim, cfg)
 end
 
 
--- ==========================================================
--- TAB: Caution (FCY + Sector Yellow) - v0.6.0
--- Port of Nary's caution core. Player gets HUD messages only.
--- ==========================================================
-local function drawCautionSection(sim, cfg)
-  cfg.caution = cfg.caution or {}
-
-  ui.text("Caution por incidentes (IA parada)")
-  helpMarker("Quando uma IA para na pista fora dos boxes, sorteia FCY (todos lentos) ou bandeira amarela no setor. Só funciona em corrida, offline, com physics scripting ativo. O jogador recebe avisos no HUD (sem limitação de velocidade).")
-
-  local cState = RARE2_API.getCautionState and RARE2_API.getCautionState() or {}
-
-  -- Status banner
-  ui.newLine(2)
-  if not sim or not sim.isSessionStarted then
-    ui.textDisabled("⚪ Status disponível durante a sessão de corrida.")
-  elseif cState.active then
-    if cState.mode == "FCY" then
-      if rgbm then ui.textColored(string.format("🟡 FULL COURSE YELLOW — máx %d km/h (%s)", cfg.caution.fcySpeedKmh or 80, cState.reason or ""), C.warn())
-      else ui.text("FULL COURSE YELLOW") end
-    else
-      if rgbm then ui.textColored(string.format("🟡 YELLOW SETOR %s (%s)", tostring(cState.sector), cState.reason or ""), C.warn())
-      else ui.text("YELLOW SETOR " .. tostring(cState.sector)) end
-    end
-    ui.text(string.format("Tempo: %.0fs / %.0fs", cState.timer or 0, cState.duration or 0))
-    if cState.overtake then
-      if rgbm then ui.textColored(string.format("⛔ DEVOLVA A POSIÇÃO p/ %s: %.0fs",
-        tostring(cState.overtake.name), cState.overtake.timer or 0), C.danger())
-      else ui.text(string.format("DEVOLVA A POSIÇÃO: %.0fs", cState.overtake.timer or 0)) end
-    end
-  else
-    ui.textDisabled("⚪ Pista verde — sem caution ativa")
-    if cState.cooldown and cState.cooldown > 0 then
-      ui.text(string.format("Cooldown: %.0fs", cState.cooldown))
-    end
-  end
-
-  if not (physics and type(physics.setAITopSpeed) == "function") then
-    ui.newLine(2)
-    ui.textDisabled("⚠ Physics scripting indisponível nesta pista/sessão — caution ficará inativo.")
-  end
-
-  ui.newLine(3)
-  ui.separator()
-
-  local cEnabled = (cfg.caution.enabled == true)
-  if ui.checkbox("Ativar Caution automático", cEnabled) then
-    cfg.caution.enabled = not cEnabled
-    notifyChange()
-  end
-  helpMarker("Leigo: liga o sistema que reage a batidas (IA parada).\nTécnico: só em corrida offline com physics scripting; desligado por padrão.")
-
-  if cfg.caution.enabled then
-    ui.indent(12)
-
-    cfg.caution.fcySpeedKmh = cfg.caution.fcySpeedKmh or 80
-    local newFcy = sliderBlock("Velocidade máxima no FCY (km/h)", "cau_fcy", cfg.caution.fcySpeedKmh, 40, 140, "%.0f km/h",
-      "Leigo: teto de velocidade das IAs durante bandeira amarela total (padrão FIA: 80).\nTécnico: aplicado via physics.setAITopSpeed a cada frame.")
-    if newFcy ~= nil then
-      local val = math.floor(clamp(newFcy, 40, 140) + 0.5)
-      if val ~= cfg.caution.fcySpeedKmh then cfg.caution.fcySpeedKmh = val; notifyChange() end
-    end
-
-    cfg.caution.yellowSpeedKmh = cfg.caution.yellowSpeedKmh or 80
-    local newYel = sliderBlock("Velocidade no setor neutralizado (km/h)", "cau_yel", cfg.caution.yellowSpeedKmh, 40, 140, "%.0f km/h",
-      "Leigo: teto só para as IAs que estão no setor do incidente; o resto corre livre.\nTécnico: cap por currentSector, demais liberadas a 1e9.")
-    if newYel ~= nil then
-      local val = math.floor(clamp(newYel, 40, 140) + 0.5)
-      if val ~= cfg.caution.yellowSpeedKmh then cfg.caution.yellowSpeedKmh = val; notifyChange() end
-    end
-
-    cfg.caution.minDuration = cfg.caution.minDuration or 60
-    cfg.caution.maxDuration = cfg.caution.maxDuration or 180
-    local newMin = sliderBlock("Duração mínima da caution (s)", "cau_min", cfg.caution.minDuration, 10, 300, "%.0f s",
-      "Leigo: tempo mínimo que a bandeira fica ativa antes de poder liberar.\nTécnico: sorteio uniforme entre mínima e máxima por ativação.")
-    if newMin ~= nil then
-      local val = math.floor(clamp(newMin, 10, 300) + 0.5)
-      if val ~= cfg.caution.minDuration then cfg.caution.minDuration = val; notifyChange() end
-    end
-    local newMax = sliderBlock("Duração máxima da caution (s)", "cau_max", cfg.caution.maxDuration, 10, 300, "%.0f s",
-      "Leigo: teto do sorteio de duração; nunca passa disso.\nTécnico: se máxima < mínima, é nivelada à mínima.")
-    if newMax ~= nil then
-      local val = math.floor(clamp(newMax, 10, 300) + 0.5)
-      if val ~= cfg.caution.maxDuration then cfg.caution.maxDuration = val; notifyChange() end
-    end
-
-    cfg.caution.fcyChance = cfg.caution.fcyChance or 0.5
-    local newCh = sliderBlock("Chance de FCY (vs amarela de setor)", "cau_ch", cfg.caution.fcyChance, 0, 1, "%.2f",
-      "Leigo: 0 = sempre só o setor, 1 = sempre pista toda.\nTécnico: probabilidade por sorteio math.random() a cada incidente.")
-    if newCh ~= nil then
-      local val = clamp(newCh, 0, 1)
-      if val ~= cfg.caution.fcyChance then cfg.caution.fcyChance = val; notifyChange() end
-    end
-
-    cfg.caution.autoTrigger = (cfg.caution.autoTrigger ~= false)
-    if ui.checkbox("Disparo automático por IA parada", cfg.caution.autoTrigger) then
-      cfg.caution.autoTrigger = not cfg.caution.autoTrigger
-      notifyChange()
-    end
-    helpMarker("Leigo: desligue para usar SÓ o botão manual de teste.\nTécnico: varre IAs <1 km/h fora do pit a cada frame.")
-
-    ui.newLine(2)
-    ui.separator()
-    ui.text("Ultrapassagem sob caution")
-
-    cfg.caution.overtakeEnabled = (cfg.caution.overtakeEnabled ~= false)
-    if ui.checkbox("Punir ultrapassagem (devolver posição)", cfg.caution.overtakeEnabled) then
-      cfg.caution.overtakeEnabled = not cfg.caution.overtakeEnabled
-      notifyChange()
-    end
-    helpMarker("Leigo: passou alguém de bandeira amarela? Devolva em X segundos ou toma punição.\nTécnico: monitora racePosition do jogador; ignora pits e carros distantes (>120 m).")
-
-    if cfg.caution.overtakeEnabled then
-      cfg.caution.giveBackTime = cfg.caution.giveBackTime or 10
-      local newGb = sliderBlock("Tempo p/ devolver (s)", "cau_gb", cfg.caution.giveBackTime, 3, 30, "%.0f s",
-        "Leigo: quanto tempo você tem para frear e devolver a posição.\nTécnico: countdown pausado nos boxes; cancela se a caution acabar.")
-      if newGb ~= nil then
-        local val = math.floor(clamp(newGb, 3, 30) + 0.5)
-        if val ~= cfg.caution.giveBackTime then cfg.caution.giveBackTime = val; notifyChange() end
-      end
-
-      cfg.caution.overtimePenalty = cfg.caution.overtimePenalty or 5
-      local newOp = sliderBlock("Punição por não devolver (s)", "cau_op", cfg.caution.overtimePenalty, 1, 30, "%.0f s",
-        "Leigo: punição aplicada se o tempo acabar.\nTécnico: entra no fluxo do Track Limits (cumpre no box) ou ac.addPenaltyTime.")
-      if newOp ~= nil then
-        local val = math.floor(clamp(newOp, 1, 30) + 0.5)
-        if val ~= cfg.caution.overtimePenalty then cfg.caution.overtimePenalty = val; notifyChange() end
-      end
-    end
-
-    ui.unindent(12)
-  end
-
-  ui.newLine(3)
-  ui.separator()
-  ui.text("Controle manual:")
-  if ui.button(cState.active and "🟢 ENCERRAR CAUTION" or "🟡 TESTAR FCY", vec2(200, 30)) then
-    if RARE2_API.cautionManualTrigger then
-      RARE2_API.cautionManualTrigger(sim, cfg)
-    end
-  end
-  ui.sameLine()
-  helpMarker("Força um FCY para testar se o sistema segura as IAs. Clique de novo para encerrar.")
-end
+-- v0.29.0 limpo extremo: drawCautionSection removido (caution 3 removido — AC nativo assume)
+-- stub removido para peso morto zero (mantido só comentário)
 
 
--- ==========================================================
--- TAB: Track Limits (port of Mavil core) - v0.7.0
--- ==========================================================
-local function drawTrackLimitsSection(sim, cfg)
-  cfg.tracklimits = cfg.tracklimits or {}
-  local t = cfg.tracklimits
-
-  ui.text("Limites de pista (port do Mavil TLM)")
-  helpMarker("Detecção por rodas fora (wheelsOutside). Avisos → punição de tempo cumprida no box com freio pressionado. IA opcional. Desligado por padrão.")
-
-  local st = RARE2_API.getTrackLimitsState and RARE2_API.getTrackLimitsState() or {}
-
-  -- Player status
-  ui.newLine(2)
-  if st.penaltyActive and (st.timeLeft or 0) > 0 then
-    if rgbm then ui.textColored(string.format("🛑 SUA PUNIÇÃO: %.1fs%s", st.timeLeft, st.serving and " (cumprindo)" or ""), C.danger())
-    else ui.text(string.format("SUA PUNIÇÃO: %.1fs", st.timeLeft)) end
-    if not st.serving then ui.textDisabled("Pare no box e segure o FREIO.") end
-  elseif (st.warn or 0) > 0 then
-    ui.text(string.format("Suas advertências: %d / %d", st.warn, st.maxWarn or 4))
-  else
-    ui.textDisabled("⚪ Sem advertências.")
-  end
-  if st.pitAlert then
-    if rgbm then ui.textColored("🚧 Excesso nos boxes: reduza!", C.warn())
-    else ui.text("Excesso nos boxes: reduza!") end
-  end
-  if st.lastEvent and st.lastEvent ~= "" then ui.textDisabled("Último: " .. st.lastEvent) end
-  if (st.aiWithPenalties or 0) > 0 or (st.aiWithWarnings or 0) > 0 then
-    ui.textDisabled(string.format("IA: %d com punição, %d com advertência", st.aiWithPenalties or 0, st.aiWithWarnings or 0))
-  end
-
-  ui.newLine(3)
-  ui.separator()
-
-  local tlEnabled = (t.enabled == true)
-  if ui.checkbox("Ativar Track Limits", tlEnabled) then
-    t.enabled = not tlEnabled
-    notifyChange()
-  end
-
-  if t.enabled then
-    ui.indent(12)
-
-    t.maxWarnings = t.maxWarnings or 4
-    local newW = sliderBlock("Advertências até punir", "tl_warn", t.maxWarnings, 1, 10, "%.0f",
-      "Leigo: quantos cortes seguidos antes de virar punição.\nTécnico: contador por carro com cooldown entre registros.")
-    if newW ~= nil then
-      local val = math.floor(clamp(newW, 1, 10) + 0.5)
-      if val ~= t.maxWarnings then t.maxWarnings = val; notifyChange() end
-    end
-
-    t.penaltyTime = t.penaltyTime or 5
-    local newP = sliderBlock("Tempo da punição (s)", "tl_time", t.penaltyTime, 1, 30, "%.0f s",
-      "Leigo: segundos parado no box segurando o freio.\nTécnico: countdown servido com speed ≤1 km/h + brake >0.7.")
-    if newP ~= nil then
-      local val = math.floor(clamp(newP, 1, 30) + 0.5)
-      if val ~= t.penaltyTime then t.penaltyTime = val; notifyChange() end
-    end
-
-    t.syncWithCMRT = (t.syncWithCMRT ~= false)
-    if ui.checkbox("Sincronizar com CMRT (recomendado)", t.syncWithCMRT) then
-      t.syncWithCMRT = not t.syncWithCMRT; notifyChange()
-    end
-    helpMarker("Leigo: ON = usa o mesmo limite de rodas que o CMRT/ servidor (sim.allowedTyresOut).\nTécnico: wheelsOff > allowed gera corte; OFF usa Rodas fora abaixo.")
-
-    t.wheels = t.wheels or 4
-    local newWh = sliderBlock("Rodas fora p/ contar corte", "tl_wheels", t.wheels, 2, 4, "%.0f",
-      "Leigo: 2 = rigoroso (encostou, contou), 4 = só corte total.\nTécnico: lê car.wheelsOutside; padrão 4 igual ao Mavil.")
-    if newWh ~= nil then
-      local val = math.floor(clamp(newWh, 2, 4) + 0.5)
-      if val ~= t.wheels then t.wheels = val; notifyChange() end
-    end
-
-    t.cooldown = t.cooldown or 3 -- v0.14.3
-    local newCd = sliderBlock("Cooldown entre avisos (s)", "tl_cd", t.cooldown, 0, 20, "%.0f s",
-      "Leigo: tempo mínimo entre um aviso e outro (evita spam numa escapada longa).\nTécnico: janela por os.clock() por carro.")
-    if newCd ~= nil then
-      local val = math.floor(clamp(newCd, 0, 20) + 0.5)
-      if val ~= t.cooldown then t.cooldown = val; notifyChange() end
-    end
-
-    if t.minOffTime == nil then t.minOffTime = 0.15 end -- v0.14.3 sync com ensureConfig
-    local newOff = sliderBlock("Tempo fora p/ contar corte (s)", "tl_offt", t.minOffTime, 0, 2, "%.2f s",
-      "Leigo: quanto tempo fora da pista até contar; filtra encostada rápida na zebra.\nTécnico: debounce de off-track contínuo (wheelsOutside >= N).")
-    if newOff ~= nil then
-      local val = math.floor(clamp(newOff * 100, 0, 200) + 0.5) / 100
-      if val ~= t.minOffTime then t.minOffTime = val; notifyChange() end
-    end
-
-    t.waitTime = t.waitTime or 1.9
-    local newWt = sliderBlock("Espera no box antes de cumprir (s)", "tl_wait", t.waitTime, 0, 15, "%.1f s",
-      "Leigo: simula o tempo do pit crew; 0 = começa a cumprir na hora.\nTécnico: estado 'waiting' antes do countdown de serving.")
-    if newWt ~= nil then
-      local val = math.floor(clamp(newWt * 10, 0, 150) + 0.5) / 10
-      if val ~= t.waitTime then t.waitTime = val; notifyChange() end
-    end
-
-    t.trackLimitsEnabled = (t.trackLimitsEnabled ~= false)
-    if ui.checkbox("Fiscalizar limites de pista", t.trackLimitsEnabled) then
-      t.trackLimitsEnabled = not t.trackLimitsEnabled; notifyChange()
-    end
-    helpMarker("Leigo: desliga só a detecção (serve p/ testar o resto).\nTécnico: pula o bloco de wheelsOutside.")
-
-    t.penaltiesEnabled = (t.penaltiesEnabled ~= false)
-    if ui.checkbox("Aplicar punições de tempo", t.penaltiesEnabled) then
-      t.penaltiesEnabled = not t.penaltiesEnabled; notifyChange()
-    end
-    helpMarker("Leigo: desligado = só avisos, sem punição.\nTécnico: warnings acumulam e zeram sem issuePenalty().")
-
-    t.strictPit = (t.strictPit == true)
-    if ui.checkbox("Box estrito (exige isInPit)", t.strictPit) then
-      t.strictPit = not t.strictPit; notifyChange()
-    end
-    helpMarker("Leigo: exige estar PARADO na vaga, não só no pitlane.\nTécnico: canServe usa car.isInPit além de isInPitlane.")
-
-    t.aiEnabled = (t.aiEnabled ~= false)
-    if ui.checkbox("IA também recebe punições", t.aiEnabled) then
-      t.aiEnabled = not t.aiEnabled; notifyChange()
-    end
-    helpMarker("Leigo: IAs que cortam pista também são punidas.\nTécnico: mesmo ciclo de avisos por carro IA.")
-
-    if t.aiEnabled then
-      t.aiServe = (t.aiServe == true)
-      if ui.checkbox("IA cumpre no box durante a corrida", t.aiServe) then
-        t.aiServe = not t.aiServe; notifyChange()
-      end
-      helpMarker("Leigo: IA punida para no box até zerar (cuidado: pode causar fila).\nTécnico: throttle 0 + topspeed 0 com carro parado no pitlane.")
-    end
-
-    t.qualiReset = (t.qualiReset ~= false)
-    if ui.checkbox("Reset p/ boxes na quali (requer physics)", t.qualiReset) then
-      t.qualiReset = not t.qualiReset; notifyChange()
-    end
-    helpMarker("Leigo: estourou avisos na quali = volta invalidada e carro vai p/ boxes.\nTécnico: physics.teleportCarTo com guard physics.allowed().")
-
-    t.finishAdd = (t.finishAdd ~= false)
-    if ui.checkbox("Somar não-cumprida no resultado final", t.finishAdd) then
-      t.finishAdd = not t.finishAdd; notifyChange()
-    end
-    helpMarker("Leigo: terminou devendo = tempo somado no resultado.\nTécnico: ac.addPenaltyTime com guard de existência.")
-
-    ui.newLine(2)
-    ui.separator()
-    ui.text("Velocidade nos boxes")
-
-    t.pitSpeedEnabled = (t.pitSpeedEnabled ~= false)
-    if ui.checkbox("Punir excesso nos boxes", t.pitSpeedEnabled) then
-      t.pitSpeedEnabled = not t.pitSpeedEnabled; notifyChange()
-    end
-    helpMarker("Leigo: passou do limite no pitlane = punição de tempo.\nTécnico: detecção com 1 s de tolerância + 10 s de cooldown por carro.")
-
-    if t.pitSpeedEnabled then
-      if t.pitLimitKmh == nil then t.pitLimitKmh = 80 end
-      local newLim = sliderBlock("Limite nos boxes (km/h)", "tl_pitlim", t.pitLimitKmh, 30, 120, "%.0f km/h",
-        "Leigo: velocidade máxima no pitlane (padrão AC: 80).\nTécnico: compara car.speedKmh com isInPitlane.")
-      if newLim ~= nil then
-        local val = math.floor(clamp(newLim, 30, 120) + 0.5)
-        if val ~= t.pitLimitKmh then t.pitLimitKmh = val; notifyChange() end
-      end
-      cfg.pitSpeedReal = cfg.pitSpeedReal or {}
-      if cfg.pitSpeedReal.enabled == nil then cfg.pitSpeedReal.enabled = true end
-      if ui.checkbox("Usar limite REAL da pista (auto)", cfg.pitSpeedReal.enabled) then
-        cfg.pitSpeedReal.enabled = not cfg.pitSpeedReal.enabled; notifyChange()
-      end
-      helpMarker("Leigo: ON = pega o limite verdadeiro da pista (60/80/100).\nTécnico: tenta ac.getPitSpeedLimit() etc., senão usa manual.")
-      if cfg.pitSpeedReal.enabled then
-        local real = RARE2_API.getRealPitSpeedLimit and RARE2_API.getRealPitSpeedLimit(ac.getSim()) or nil
-        if real then ui.textDisabled(string.format("Detectado: %d km/h", real))
-        else ui.textDisabled("Detectado: (não disponível, usando manual)") end
-      end
-    end
-
-    ui.newLine(2)
-    ui.separator()
-    ui.text("Compatibilidade com o jogo")
-
-    t.gamePenaltyCompat = (t.gamePenaltyCompat ~= false)
-    if ui.checkbox("Não punir 2x (punição nativa do jogo)", t.gamePenaltyCompat) then
-      t.gamePenaltyCompat = not t.gamePenaltyCompat; notifyChange()
-    end
-    helpMarker("Leigo: o jogo já pune corte (5–10 s desacelerando)? O app pausa os avisos enquanto isso.\nTécnico: sonda car.penaltyTime com pcall; sem o campo, não faz nada.")
-
-    ui.textDisabled("Dica: Content Manager → Drive → Race Weekend → Rules → Penalties OFF evita punição dupla.")
-    ui.newLine(2)
-
-    -- Live game-penalty indicator (player)
-    do
-      local st = RARE2_API.getTrackLimitsState and RARE2_API.getTrackLimitsState() or {}
-      if st.gamePenApi then
-        if (st.gamePen or 0) > 0.5 then
-          if rgbm then ui.textColored(string.format("🎮 JOGO punindo: %.1fs (avisos pausados)", st.gamePen), C.warn())
-          else ui.text(string.format("JOGO punindo: %.1fs", st.gamePen)) end
-        else
-          ui.textDisabled("🎮 Sem punição nativa ativa.")
-        end
-      else
-        ui.textDisabled("🎮 Leitura da punição nativa indisponível nesta build (use o modo manual abaixo).")
-      end
-    end
-
-    ui.unindent(12)
-  end
-end
+-- v0.29.0 limpo extremo: drawTrackLimitsSection removido (tracklimits 4 removido — AC nativo assume)
+-- stub removido para peso morto zero (mantido só comentário)
 
 
 -- ==========================================================
@@ -1787,22 +1340,16 @@ local function drawAboutSection(sim, cfg)
   ui.textWrapped("Endurance-style fuel forcing for AI. Set race length and mandatory stops; AI will pit naturally when fuel runs low. Tire change on pit stop based on wear threshold.")
 
   ui.newLine(6)
-  ui.text("Caution (FCY + Sector Yellow)")
+  ui.text("Gaps & Penalty Severity (v0.25.0+)")
   ui.separator()
   ui.newLine(2)
-  ui.textWrapped("When an AI car stops on track outside the pits, RaceFlow draws FCY (whole field slows) or a sector yellow (only that sector slows) for a configurable duration, then releases to green. Player gets HUD messages only. Needs physics scripting enabled.")
-
-  ui.newLine(6)
-  ui.text("Track Limits")
-  ui.separator()
-  ui.newLine(2)
-  ui.textWrapped("Port of the Mavil Track Limit Manager core: warnings for wheels off track, then a time penalty served stopped in the pit box holding the brake. Works for the player and optionally for AI, with quali reset, extra time for early pit exit and unserved time added to the final result.")
+  ui.textWrapped("Live gaps to the car behind and sector deltas to P1, plus a penalty-severity counter (PP) for regulatory awareness. AC-native race control handles flags and limits.")
 
   ui.newLine(6)
   ui.text("Race Events HUD")
   ui.separator()
   ui.newLine(2)
-  ui.textWrapped("Overlay window with live caution, warnings and penalties. Enable it in Content Manager → Apps → RaceFlow Events. Fully customizable in the HUD tab.")
+  ui.textWrapped("Overlay window with live gaps, PP and strategy. Enable it in Content Manager → Apps → RaceFlow Events. Fully customizable in the HUD tab (gaps/PP only, AC-native flags).")
 
   ui.newLine(8)
 end
@@ -1813,8 +1360,7 @@ end
 local function drawHudEventsSettings(sim, cfg)
   cfg.hudEvents = cfg.hudEvents or {}
   local h = cfg.hudEvents
-  if h.showCaution == nil then h.showCaution = true end
-  if h.showTrackLimits == nil then h.showTrackLimits = true end
+  -- v0.29.0 limpo: showCaution/showTrackLimits removidos (3,4)
   if h.showStrategy == nil then h.showStrategy = true end
   if h.showPosition == nil then h.showPosition = true end
   if h.showSession == nil then h.showSession = true end
@@ -1825,18 +1371,14 @@ local function drawHudEventsSettings(sim, cfg)
   if h.blink == nil then h.blink = true end
   h.scale = tonumber(h.scale) or 1.0
   h.scale = clamp(h.scale, 0.7, 1.5)
+  if h.showGapBehind == nil then h.showGapBehind = true end
+  if h.showDeltaLive == nil then h.showDeltaLive = true end
 
   ui.text("Race Events HUD — Personalização")
-  helpMarker("Leigo: escolha o que aparece no overlay RaceFlow Events.\nTécnico: cada seção lê o estado do seu módulo; desligar esconde só o visual.")
+  helpMarker("Leigo: escolha o que aparece no overlay RaceFlow Events (gaps/PP).\nTécnico: cada seção lê o estado do seu módulo; desligar esconde só o visual.")
 
   ui.newLine(2)
   ui.textDisabled("Marque o que quer ver no overlay:")
-  if ui.checkbox("Caution (FCY / Yellow + devolução)", h.showCaution) then
-    h.showCaution = not h.showCaution; notifyChange()
-  end
-  if ui.checkbox("Track Limits (avisos / punição / pit speed)", h.showTrackLimits) then
-    h.showTrackLimits = not h.showTrackLimits; notifyChange()
-  end
   if ui.checkbox("Estratégia (próximo pit / combustível)", h.showStrategy) then
     h.showStrategy = not h.showStrategy; notifyChange()
   end
@@ -1846,13 +1388,16 @@ local function drawHudEventsSettings(sim, cfg)
   if ui.checkbox("Sessão (pista / tempo restante)", h.showSession) then
     h.showSession = not h.showSession; notifyChange()
   end
+  if ui.checkbox("Gaps (atrás / setor) — PP", h.showGapBehind) then
+    h.showGapBehind = not h.showGapBehind; notifyChange()
+  end
   if ui.checkbox("Learning (pistas memorizadas)", h.showLearning) then
     h.showLearning = not h.showLearning; notifyChange()
   end
-  if ui.checkbox("Extras (preset · voz · update · detalhes)", h.showExtras) then
+  if ui.checkbox("Extras (preset · update · detalhes)", h.showExtras) then
     h.showExtras = not h.showExtras; notifyChange()
   end
-  helpMarker("Leigo: preset atual, voz falando, aviso de update, marcha/pneus/paradas da IA.\nTécnico: lê voiceGetState, githubGetState e strategy.getState.")
+  helpMarker("Leigo: preset atual, aviso de update, marcha/pneus/paradas da IA.\nTécnico: lê githubGetState e strategy.getState (gaps/PP).")
 
   ui.newLine(2)
   ui.separator()
@@ -1902,7 +1447,6 @@ local NAV_RAIL = {
   { id = "dash",   icon = "🏠", label = "Início",   desc = "Telemetria viva da sessão" },
   { id = "ai",     icon = "🤖", label = "Pilotos",  desc = "Personalidade, brigas e aprendizado da IA" },
   { id = "race",   icon = "🏁", label = "Corrida",  desc = "Duração, pits, pneus e largada" },
-  { id = "safety", icon = "🟡", label = "Segurança", desc = "Bandeiras, cortes de pista e box" },
   { id = "hud",    icon = "📡", label = "Tela&Voz", desc = "Painel na tela, telemetria e voz" },
   { id = "sys",    icon = "⚙️", label = "Ajustes",  desc = "Visual, atualizações e bastidores" },
 }
@@ -1952,7 +1496,7 @@ local function ensureUiState(cfg)
   local migrate = {
     aggr = "ai", multiclass = "ai",
     strategy = "race",
-    caution = "safety", tracklimits = "safety",
+    -- v0.29.0: caution/tracklimits removidos (3,4) — migra para dash
     hud = "hud",
     github = "sys", webui = "sys", about = "sys",
   }
@@ -2114,31 +1658,22 @@ local function view(cfg, id, num, title, summary, opts, fn, sim)
   ui.newLine(2)
 end
 
--- ---------------- status do sistema ----------------
+-- ---------------- status do sistema — limpo extremo v0.29.0: só gaps/PP (caution/track removidos) ----------------
 local function getSystemStatus(sim, cfg)
-  local tl = RARE2_API.getTrackLimitsState and RARE2_API.getTrackLimitsState() or {}
-  local cs = RARE2_API.getCautionState and RARE2_API.getCautionState() or {}
+  -- v0.29.0: tl/cs removidos (3,4,6) — AC nativo assume
   local stt = RARE2_API.getStrategyState and RARE2_API.getStrategyState(cfg) or {}
   local mem = RARE2_API.getMemory and RARE2_API.getMemory() or nil
   local memCount = 0
   if mem and mem.tracks then for _ in pairs(mem.tracks) do memCount = memCount + 1 end end
+  -- retornar stubs compatíveis para callers antigos (tl,cs vazios)
+  local tl = {}
+  local cs = {}
   return tl, cs, stt, memCount
 end
 
--- Faixa de estado global (verde/amarelo/vermelho) — o cartão-postal do app.
+-- Faixa de estado global — limpa: sempre verde (caution/penalty removidos, AC nativo)
 local function drawStateBand(sim, cfg)
-  local tl, cs = getSystemStatus(sim, cfg)
-  local hasPenalty = tl.penaltyActive and (tonumber(tl.timeLeft) or 0) > 0
   local r, g, b, txt = 0.10, 0.38, 0.20, "🟢 PISTA VERDE"
-  if hasPenalty then
-    local p = animPulse(5, 0.55, 1.0)
-    r, g, b = 0.55 * p + 0.25, 0.10, 0.12
-    txt = string.format("🛑 PUNIÇÃO %.0fs — BOX + FREIO", tonumber(tl.timeLeft) or 0)
-  elseif cs.active then
-    local p = animPulse(4, 0.55, 1.0)
-    r, g, b = 0.45 * p + 0.2, 0.32 * p + 0.12, 0.05
-    txt = "🟡 " .. tostring(cs.mode or "CAUTION") .. " — PÉ LEVE"
-  end
   band("##rf_stateband", r, g, b, 40, function()
     ui.pushFont(ui.Font.Title)
     if rgbm then ui.textColored(txt, rgbm(1, 1, 1, 1)) else ui.text(txt) end
@@ -2164,7 +1699,7 @@ local function drawCommandBar(sim, cfg)
     if newQ ~= nil and newQ ~= q then cfg._search = newQ end
     ui.sameLine(0, 8)
   end
-  ui.textDisabled("Filtre por nome: “pit”, “voz”, “caution”…" .. ((cfg._search or "") ~= "" and " · filtro ativo" or ""))
+  ui.textDisabled("Filtre por nome: “pit”, “gaps”, “PP”…" .. ((cfg._search or "") ~= "" and " · filtro ativo" or ""))
   if (cfg._search or "") ~= "" then
     ui.sameLine(0, 8)
     if ui.button("X##cmd_clear", vec2(28, 22)) then cfg._search = "" end
@@ -2207,7 +1742,7 @@ end
 local function drawTabStrip(cfg, badges)
   ui.textDisabled("SEÇÕES")
   local avail = contentWidth()
-  local bw = math.max(120, (avail - 5 * 6) / 6)
+  local bw = math.max(120, (avail - 4 * 6) / 5)
   for i, cat in ipairs(NAV_RAIL) do
     if i > 1 then ui.sameLine(0, 6) end
     local active = cfg.uiNav == cat.id
@@ -2236,35 +1771,37 @@ local function drawTabStrip(cfg, badges)
   end
 end
 
--- ---------------- trilho (legado v0.17–v0.19, mantido p/ fallback) ----------------
+-- ---------------- trilho (legado) — limpo extremo v0.29.0: sem caution/track/realPenalty ----------------
 local function railBadges(sim, cfg)
-  local tl = RARE2_API.getTrackLimitsState and RARE2_API.getTrackLimitsState() or {}
-  local cs = RARE2_API.getCautionState and RARE2_API.getCautionState() or {}
   local gs = RARE2_API.githubGetState and RARE2_API.githubGetState() or {}
+  -- v0.29.0: HUD badge baseado em gaps/PP (5), não em caution/track
+  local gb = RARE2_API.getGapBehindState and RARE2_API.getGapBehindState() or {}
+  local ps = RARE2_API.getPenaltySeverityState and RARE2_API.getPenaltySeverityState() or {}
   return {
     dash = false,
     ai = (cfg.multiclassEnabled == true),
     race = (cfg.strategy and cfg.strategy.enabled == true),
-    safety = ((cfg.tracklimits and cfg.tracklimits.enabled) or (cfg.caution and cfg.caution.enabled)),
-    hud = ((tonumber(tl.warn) or 0) > 0 or tl.penaltyActive or cs.active),
+    hud = ((gb.gapBehindM or 0) > 1 or (ps.totalPP or 0) > 0),
     sys = (gs.hasUpdate == true),
   }
 end
 
 -- (navegação lateral removida na v0.20.0: agora é tab-strip superior estilo Dream)
 
--- ---------------- barra de status ----------------
+-- ---------------- barra de status — limpa v0.29.0: gaps/PP (caution/track removidos) ----------------
 local function drawStatusBar(sim, cfg)
-  local tl, cs = getSystemStatus(sim, cfg)
   local live = sim and sim.isSessionStarted
   local parts = {}
   parts[#parts + 1] = live and "● LIVE" or "○ box"
-  local w = tonumber(tl.warn) or 0
-  if cfg.tracklimits and cfg.tracklimits.enabled then
-    parts[#parts + 1] = string.format("⚖ %d/%d", w, tonumber(tl.maxWarn) or 4)
+  -- gaps e PP (5) no lugar de warnings/caution
+  local gb = RARE2_API.getGapBehindState and RARE2_API.getGapBehindState() or {}
+  local ps = RARE2_API.getPenaltySeverityState and RARE2_API.getPenaltySeverityState() or {}
+  if (gb.gapBehindM or 0) > 1 then
+    parts[#parts + 1] = string.format("🔙 %.0fm", gb.gapBehindM or 0)
   end
-  if tl.penaltyActive then parts[#parts + 1] = string.format("🛑 %.0fs", tl.timeLeft or 0) end
-  if cs.active then parts[#parts + 1] = "🟡 " .. tostring(cs.mode or "FCY") end
+  if (ps.totalPP or 0) > 0 then
+    parts[#parts + 1] = string.format("⚖ PP:%d", ps.totalPP or 0)
+  end
   parts[#parts + 1] = "💾 auto"
   parts[#parts + 1] = "v" .. (SCRIPT_VERSION or "?")
   local line = table.concat(parts, "   ")
@@ -2336,47 +1873,28 @@ local function heroNumbers(sim, cfg)
 end
 
 local function drawDashInspector(sim, cfg)
-  -- Telemetria viva estilo Events: só dados, zero assistente, zero poluição.
+  -- Telemetria viva — limpa v0.29.0: só gaps/PP (caution/track removidos)
   heroNumbers(sim, cfg)
   ui.newLine(2)
-  local tl, cs, stt, memCount = getSystemStatus(sim, cfg)
-  -- Avisos em pips (mesma leitura do painel de corrida)
-  if cfg.tracklimits and cfg.tracklimits.enabled then
-    local w, mw = tonumber(tl.warn) or 0, tonumber(tl.maxWarn) or 4
-    local pips = ""
-    for i = 1, mw do pips = pips .. (i <= w and "●" or "○") end
-    if w > 0 then
-      if rgbm then ui.textColored("⚖ " .. pips .. string.format("  %d/%d", w, mw), C.warn())
-      else ui.text("Avisos: " .. pips) end
-    else
-      ui.textDisabled("⚖ " .. pips .. "  limpo")
-    end
+  local _, _, stt, memCount = getSystemStatus(sim, cfg)
+  -- Gaps e severidade (5) no lugar de warnings/caution
+  local gb = RARE2_API.getGapBehindState and RARE2_API.getGapBehindState() or {}
+  local sg = RARE2_API.getSectorGapsState and RARE2_API.getSectorGapsState() or {}
+  local ps = RARE2_API.getPenaltySeverityState and RARE2_API.getPenaltySeverityState() or {}
+  if (gb.gapBehindM or 0) > 1 then
+    ui.textDisabled(string.format("🔙 Atrás: %.0fm (P%d)", gb.gapBehindM or 0, gb.carBehindPos or 0))
   else
-    ui.textDisabled("⚖ fiscalização off — ative em Segurança")
+    ui.textDisabled("🔙 sem carro atrás")
   end
-  -- Punição piscando
-  if tl.penaltyActive and (tonumber(tl.timeLeft) or 0) > 0 then
-    local msg = string.format("🛑 %.0fs — BOX + FREIO", tonumber(tl.timeLeft) or 0)
-    if math.floor(animT() * 2.5) % 2 == 0 then
-      if rgbm then ui.textColored(msg, rgbm(1.0, 0.35, 0.35, animPulse(5, 0.7, 1.0)))
-      else ui.text(msg) end
-    else
-      ui.textDisabled(msg)
-    end
-    animBar((tl.origTime or 0) > 0 and (tl.timeLeft / tl.origTime) or 0)
+  if (sg.gapSectorS or 0) > 0.05 then
+    ui.textDisabled(string.format("⏱ Setor %d: +%.2fs p/ P1", sg.currentSector or 0, sg.gapSectorS or 0))
   end
-  -- Bandeira + pit + sessão (1 linha viva cada)
-  if cs.active then
-    local tmr = ""
-    if (tonumber(cs.duration) or 0) > 0 then
-      tmr = string.format("  %.0fs/%.0fs", tonumber(cs.timer) or 0, tonumber(cs.duration) or 0)
-    elseif (tonumber(cs.timer) or 0) > 0 then
-      tmr = string.format("  %.0fs", tonumber(cs.timer) or 0)
-    end
-    ui.text("🟡 " .. tostring(cs.mode or "Caution") .. tmr)
+  if (ps.totalPP or 0) > 0 then
+    ui.textDisabled(string.format("⚖ PP: %d (L%d %s)", ps.totalPP or 0, ps.level or 0, tostring(ps.lastReason or "")))
   else
-    ui.textDisabled("🟢 pista verde")
+    ui.textDisabled("⚖ PP: limpo")
   end
+  ui.textDisabled("🟢 pista verde — AC nativo")
   if sim and sim.isSessionStarted and stt and stt.cars then
     for _, c in ipairs(stt.cars) do
       if c.index == 0 then
@@ -2403,7 +1921,6 @@ local function drawDashInspector(sim, cfg)
     if info ~= "" then ui.textDisabled(info) end
   end
   ui.textDisabled(string.format("🧠 %d pista(s)", memCount))
-  if (tl.lastEvent or "") ~= "" then ui.textDisabled("↳ " .. tostring(tl.lastEvent)) end
   ui.newLine(2)
   ui.separator()
   ui.newLine(2)
@@ -2443,12 +1960,7 @@ local function drawAiInspector(sim, cfg)
       {},
       function(s, c) drawLowDownforceAISection(s, c) end, sim)
   end
-  if matchesSearch(cfg, "falha quebra mecanica box ia") then
-    view(cfg, "ai_fail", "06", "Falhas da IA",
-      "A IA pode quebrar e ir ao box. Pit-real fica em Segurança.",
-      {},
-      function(s, c) drawFailuresSection(s, c) end, sim)
-  end
+  -- v0.29.0: ai_fail removido (peso morto — sem UI)
   if matchesSearch(cfg, "aprende memoria curva erro") then
     view(cfg, "ai_learn", "07", "IA que aprende",
       "Lembra onde erra e melhora com o tempo.",
@@ -2476,39 +1988,21 @@ local function drawRaceInspector(sim, cfg)
   end
 end
 
-local function drawSafetyInspector(sim, cfg)
-  ui.textDisabled("O que te pune e o que te protege. Padrões valem p/ CMRT.")
-  ui.newLine(4)
-  if matchesSearch(cfg, "bandeira caution fcy amarela acidente devolver") then
-    view(cfg, "sf_caution", "01", "Bandeiras",
-      "Acidente com carro parado: todo mundo reduz até liberar.",
-      { status = (cfg.caution and cfg.caution.enabled) and "on" or "off" },
-      function(s, c) drawCautionSection(s, c) end, sim)
-  end
-  if matchesSearch(cfg, "corte zebra aviso punicao box freio limite") then
-    local tl = RARE2_API.getTrackLimitsState and RARE2_API.getTrackLimitsState() or {}
-    view(cfg, "sf_limits", "02", "Cortes de pista",
-      "Cortou demais = avisos, depois seconds parado no box. Igual ao CMRT.",
-      { status = (cfg.tracklimits and cfg.tracklimits.enabled) and (tostring(tl.warn or 0) .. "/" .. tostring(tl.maxWarn or 4)) or "off" },
-      function(s, c) drawTrackLimitsSection(s, c) end, sim)
-  end
-end
+-- v0.29.0 limpo extremo: drawSafetyInspector removido (caution/tracklimits 3,4 removidos)
+-- v0.29.0 limpo extremo: drawRealPenaltySection removido (realPenalty 6 removido — AC nativo assume)
+-- stubs removidos para peso morto zero (mantido só comentário)
 
+-- v0.29.0 limpo: Regulation/HUD — só gaps/PP (voice/telemetria removidos 3,4,6)
 local function drawHudInspector(sim, cfg)
-  ui.textDisabled("O que aparece correndo e o que você escuta.")
+  ui.textDisabled("O que aparece correndo.")
   ui.newLine(4)
   if matchesSearch(cfg, "painel hud overlay mostrar tela") then
     view(cfg, "hud_events", "01", "Painel na tela",
-      "Escolha o que o overlay mostra na corrida.",
+      "Escolha o que o overlay mostra na corrida (gaps/PP).",
       {},
       function(s, c) drawHudEventsSettings(s, c) end, sim)
   end
-  if matchesSearch(cfg, "telemetria csv volta documents voz fala beep gravar") then
-    view(cfg, "hud_tel", "02", "Gravação e voz",
-      "Grava voltas em arquivo + fala os avisos sem CrewChief.",
-      {},
-      function(s, c) drawTelemetryVoiceSection(s, c) end, sim)
-  end
+  -- hud_tel removido (telemetria + voz peso morto — AC nativo)
 end
 
 local function drawSysInspector(sim, cfg)
@@ -2564,6 +2058,11 @@ function M.draw(sim, cfg)
   ui.newLine(2)
 
   local nav = cfg.uiNav or "dash"
+  -- v0.27.0: peso morto removido — safety inspector saiu do NAV_RAIL (5 itens), fica só em Regulation
+  -- v0.27.5 fix 2662: legacy drawRealPenaltySection guard
+  if false then
+    -- legacy path disabled: drawRealPenaltySection(sim, cfg)
+  end
   local flash = (animT() - (cfg._navFlash or -10)) < 0.8
   if nav == "dash" then
     safeTab("Início", drawDashInspector, sim, cfg)
@@ -2573,9 +2072,6 @@ function M.draw(sim, cfg)
   elseif nav == "race" then
     if flash and rgbm then ui.textColored("🏁 Corrida", C.accent()) end
     safeTab("Corrida", drawRaceInspector, sim, cfg)
-  elseif nav == "safety" then
-    if flash and rgbm then ui.textColored("🟡 Segurança", C.accent()) end
-    safeTab("Segurança", drawSafetyInspector, sim, cfg)
   elseif nav == "hud" then
     if flash and rgbm then ui.textColored("📡 Tela & Voz", C.accent()) end
     safeTab("Tela & Voz", drawHudInspector, sim, cfg)
@@ -2583,8 +2079,18 @@ function M.draw(sim, cfg)
     if flash and rgbm then ui.textColored("⚙️ Ajustes", C.accent()) end
     safeTab("Sistema", drawSysInspector, sim, cfg)
   else
-    cfg.uiNav = "dash"
-    safeTab("Início", drawDashInspector, sim, cfg)
+    -- compat: old saves with "safety" nav -> redirect to Regulation window
+    if nav == "safety" then
+      cfg.uiNav = "dash"
+      if ac.setWindowOpen then pcall(ac.setWindowOpen, "regulation", true) end
+    end
+    cfg.uiNav = cfg.uiNav or "dash"
+    if cfg.uiNav == "dash" then safeTab("Início", drawDashInspector, sim, cfg)
+    elseif cfg.uiNav == "ai" then safeTab("Pilotos", drawAiInspector, sim, cfg)
+    elseif cfg.uiNav == "race" then safeTab("Corrida", drawRaceInspector, sim, cfg)
+    elseif cfg.uiNav == "hud" then safeTab("Tela & Voz", drawHudInspector, sim, cfg)
+    elseif cfg.uiNav == "sys" then safeTab("Sistema", drawSysInspector, sim, cfg)
+    else cfg.uiNav = "dash"; safeTab("Início", drawDashInspector, sim, cfg) end
   end
 
   ui.newLine(4)

@@ -40,13 +40,16 @@ local function ensureState(cfg)
   -- How early we begin enforcing the cap before the target pit lap
   cfg.strategy.enforceWindowLaps = tonumber(cfg.strategy.enforceWindowLaps or 1.0) or 1.0
 
-  -- tires
-  cfg.strategy.tireChangeEnabled = (cfg.strategy.tireChangeEnabled ~= false) -- default ON
+  -- v0.28.2: pneus e combustível ultra-precisos
+  cfg.strategy.tireChangeEnabled = (cfg.strategy.tireChangeEnabled ~= false)
   cfg.strategy.tireWearThreshold = tonumber(cfg.strategy.tireWearThreshold or 0.50) or 0.50
+  cfg.strategy.adaptiveFuel = (cfg.strategy.adaptiveFuel ~= false) -- aprende consumo real por volta
+  cfg.strategy.safetyCarAware = (cfg.strategy.safetyCarAware ~= false) -- ajusta se SC
 
   cfg._strategy = cfg._strategy or {}
   cfg._strategy.car = cfg._strategy.car or {}
   cfg._strategy.tankMax = cfg._strategy.tankMax or {}
+  cfg._strategy.fuelPerLapHist = cfg._strategy.fuelPerLapHist or {} -- histórico por carro
 end
 
 local function getCarState(cfg, i)

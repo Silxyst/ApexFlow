@@ -22,7 +22,8 @@ local state = {
 }
 
 local function getAppDataPath()
-  local docs = ac.getFolder(ac.FolderID.Documents)
+  local ok, docs = pcall(ac.getFolder, ac.FolderID.Documents)
+  if not ok or not docs or docs=="" then return nil end
   return docs .. "/Assetto Corsa/"
 end
 
@@ -94,7 +95,8 @@ local function buildStatus(sim, cfg)
     for i = 0, sim.carsCount - 1 do
       local ok, car = pcall(ac.getCar, i)
       if ok and car then
-        local driver = ac.getDriverName(i) or ("Car " .. i)
+        local okD, driver = pcall(ac.getDriverName, i)
+        driver = (okD and driver and driver~="" and driver) or ("Car " .. i)
         cars[#cars + 1] = {
           index = i,
           driver = driver,
@@ -122,7 +124,8 @@ local function buildStatus(sim, cfg)
       local le = session.leaderboard[pos]
       if le and le.car then
         local idx = le.car.index
-        local name = ac.getDriverName(idx) or ("Car " .. idx)
+        local okN, name = pcall(ac.getDriverName, idx)
+        name = (okN and name and name~="" and name) or ("Car " .. idx)
         leaderboard[#leaderboard + 1] = {
           pos = pos + 1,
           driver = name,
@@ -155,41 +158,22 @@ local function buildStatus(sim, cfg)
       tracksCount = 0,
       totalCorners = 0,
     },
-    -- v0.18.0: snapshots p/ o painel remoto (tudo com pcall, nunca quebra)
-    caution = (function()
-      local ok, cs = pcall(function()
-        return _G.RARE2_API and RARE2_API.getCautionState and RARE2_API.getCautionState() or {}
-      end)
-      if not ok or type(cs) ~= "table" then return { active = false } end
-      return {
-        active = cs.active == true,
-        mode = cs.mode or "",
-        timer = cs.timer or 0,
-        duration = cs.duration or 0,
-        reason = cs.reason or "",
-      }
+    -- v0.29.0 limpo extremo: snapshots só gaps/sector/penaltySeverity (caution/track/voice/box/safety removidos 3,4,6)
+    -- caution/tracklimits/voice/boxPenalty/safetyCar removidos — AC nativo assume
+    gapBehind = (function()
+      local ok, s = pcall(function() return _G.RARE2_API and RARE2_API.getGapBehindState and RARE2_API.getGapBehindState() or {} end)
+      if not ok or type(s) ~= "table" then return { gapBehindM = 0 } end
+      return { gapBehindM = s.gapBehindM or 0, gapBehindKm = s.gapBehindKm or 0, carBehindPos = s.carBehindPos or 0, deltaBehind = s.deltaBehind or 0, isLappedBehind = s.isLappedBehind == true }
     end)(),
-    tracklimits = (function()
-      local ok, ts = pcall(function()
-        return _G.RARE2_API and RARE2_API.getTrackLimitsState and RARE2_API.getTrackLimitsState() or {}
-      end)
-      if not ok or type(ts) ~= "table" then return { warn = 0 } end
-      return {
-        warn = ts.warn or 0,
-        maxWarn = ts.maxWarn or 4,
-        penaltyActive = ts.penaltyActive == true,
-        timeLeft = ts.timeLeft or 0,
-        serving = ts.serving == true,
-        lastEvent = ts.lastEvent or "",
-        pitAlert = ts.pitAlert == true,
-      }
+    sectorGaps = (function()
+      local ok, s = pcall(function() return _G.RARE2_API and RARE2_API.getSectorGapsState and RARE2_API.getSectorGapsState() or {} end)
+      if not ok or type(s) ~= "table" then return { gapSectorS = 0 } end
+      return { currentSector = s.currentSector or 0, gapSectorM = s.gapSectorM or 0, gapSectorS = s.gapSectorS or 0 }
     end)(),
-    voice = (function()
-      local ok, vs = pcall(function()
-        return _G.RARE2_API and RARE2_API.voiceGetState and RARE2_API.voiceGetState() or {}
-      end)
-      if not ok or type(vs) ~= "table" then return { busy = false } end
-      return { busy = vs.busy == true, queue = vs.queue or 0, available = vs.available == true }
+    penaltySeverity = (function()
+      local ok, s = pcall(function() return _G.RARE2_API and RARE2_API.getPenaltySeverityState and RARE2_API.getPenaltySeverityState() or {} end)
+      if not ok or type(s) ~= "table" then return { totalPP = 0 } end
+      return { totalPP = s.totalPP or 0, level = s.level or 0, lastReason = s.lastReason or "" }
     end)(),
     preset = (cfg.categoryPreset or "custom"),
     config = {
@@ -243,16 +227,7 @@ local function processCommands(sim, cfg)
             RARE2_API.applyCategoryPreset(tostring(params.key))
             RARE2_API.markConfigDirty()
           end
-        elseif action == "caution_trigger" then
-          -- v0.18.0: força/encerra caution manual (teste)
-          if RARE2_API.cautionManualTrigger then
-            RARE2_API.cautionManualTrigger(sim, cfg)
-          end
-        elseif action == "voice_test" then
-          -- v0.18.0: testa a voz (limits/pit/caution/penalty)
-          if RARE2_API.voiceTest and params.kind then
-            RARE2_API.voiceTest(tostring(params.kind))
-          end
+        -- v0.29.0 limpo: caution_trigger/voice_test removidos (3,4,6 peso morto)
         elseif action == "github_check" then
           if RARE2_API.githubCheckUpdates then
             RARE2_API.githubCheckUpdates(cfg, true)
