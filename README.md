@@ -13,7 +13,7 @@
   <a href="https://github.com/Silxyst/RaceFlow-V2/releases/latest">
     <img src="https://img.shields.io/github/v/release/Silxyst/RaceFlow-V2?style=for-the-badge&label=Latest%20Release&color=ff6a15" alt="Latest Release"/>
   </a>
-  <img src="https://img.shields.io/badge/Version-v0.29.2-ff6a15?style=for-the-badge" alt="App Version"/>
+  <img src="https://img.shields.io/badge/Version-v0.29.3-ff6a15?style=for-the-badge" alt="App Version"/>
   <a href="https://github.com/Silxyst/RaceFlow-V2/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/Silxyst/RaceFlow-V2?style=for-the-badge&color=8b5cf6" alt="License"/>
   </a>
@@ -23,9 +23,9 @@
 
 ## 🎯 Overview
 
-**ApexFlow v0.29.2** foca no essencial para offline: IA que briga pensada, largada e estratégia perfeitas, gaps precisos e PP persistente. Bandeira/corte/voz removidos — AC nativo já pune e apita, sem duplicar.
+**ApexFlow v0.29.3** foca no essencial: IA pensada + chuva grip 45% menos sensível, largada 2x2, gaps delta, PP persistente. AC nativo cuida de bandeira/corte.
 
-2 janelas: **RaceFlow** (Principal `1024x760` + Setup) + **RaceFlow Events** (`360x260` HUD).
+2 janelas: **RaceFlow** + **RaceFlow Events**.
 
 ---
 
@@ -81,4 +81,4 @@ _G.RARE2_API.getPenaltySeverityState() -- {totalPP, level, history}
 
 ApexFlow by **Silxyst** — offline.
 
-<p align="center"><sub>RaceFlow v0.29.2 — 2 Apps leves, 10 src, 0 FAIL</sub></p>
+<p align="center"><sub>RaceFlow v0.29.3 — 2 Apps leves, 10 src, chuva fix, 0 FAIL</sub></p>
