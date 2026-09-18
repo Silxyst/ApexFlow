@@ -1,12 +1,12 @@
 -- src/gap_behind.lua
--- RaceFlow Gap to Car Behind — v0.25.0
+-- ApexFlow Gap to Car Behind — v0.25.0
 -- Conformidade iRacing/CBA: display do gap em tempo real para o carro imediatamente atrás.
 
 local M = {}
 
--- RARE2_API guard
-_G.RARE2_API = _G.RARE2_API or {}
-local RARE2_API = _G.RARE2_API
+-- APEXFLOW_API guard
+_G.APEXFLOW_API = _G.APEXFLOW_API or {}
+local APEXFLOW_API = _G.APEXFLOW_API
 
 local state = {
   gapBehindKm = 0,

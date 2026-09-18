@@ -1,10 +1,10 @@
 -- src/sector_gaps.lua
--- RaceFlow Sector Gaps — v0.25.0
+-- ApexFlow Sector Gaps — v0.25.0
 -- Conformidade iRacing/CBA: gaps por setor (delta setorial ao líder).
 
 local M = {}
 
-_G.RARE2_API = _G.RARE2_API or {}
+_G.APEXFLOW_API = _G.APEXFLOW_API or {}
 
 local state = {
   currentSector = 0,

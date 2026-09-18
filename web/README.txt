@@ -17,5 +17,5 @@ adjust AI aggression/pace/difficulty, toggle rolling start and
 strategy, save/reset the config.
 
 Files exchanged with the game (Documents/Assetto Corsa folder):
-  RaceFlow_webui_status.json  (app -> panel, every 0.5s)
-  RaceFlow_webui_cmd.json      (panel -> app, commands)
+  ApexFlow_webui_status.json  (app -> panel, every 0.5s)
+  ApexFlow_webui_cmd.json      (panel -> app, commands)

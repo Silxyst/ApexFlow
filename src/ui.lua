@@ -1,10 +1,10 @@
--- RaceFlow UI – Aggression Pack + Pace Pack
+-- ApexFlow UI – Aggression Pack + Pace Pack
 
 local M = {}
 
--- RARE2_API guard (prevents nil errors if called before RaceFlow init)
-_G.RARE2_API = _G.RARE2_API or {}
-local RARE2_API = _G.RARE2_API
+-- APEXFLOW_API guard (prevents nil errors if called before ApexFlow init)
+_G.APEXFLOW_API = _G.APEXFLOW_API or {}
+local APEXFLOW_API = _G.APEXFLOW_API
 
 
 local function hash01(s)
@@ -34,8 +34,8 @@ local function helpMarker(text)
 end
 
 local function notifyChange()
-  if RARE2_API and RARE2_API.markConfigDirty then
-    RARE2_API.markConfigDirty()
+  if APEXFLOW_API and APEXFLOW_API.markConfigDirty then
+    APEXFLOW_API.markConfigDirty()
   end
 end
 
@@ -137,7 +137,7 @@ local function safeTab(label, fn, sim, cfg)
     ui.textWrapped("Detalhe: " .. tostring(err))
     ui.newLine(2)
     ui.textDisabled("O restante do app continua funcionando. Envie esse texto ao suporte.")
-    ac.log("[RaceFlow UI] tab '" .. tostring(label) .. "' draw failed: " .. tostring(err))
+    ac.log("[ApexFlow UI] tab '" .. tostring(label) .. "' draw failed: " .. tostring(err))
   end
 end
 
@@ -169,7 +169,7 @@ end
 local function safeRequire(mod)
   local ok, res = pcall(require, mod)
   if ok then return res end
-  ac.log(string.format("[RaceFlow UI] require('%s') failed: %s", tostring(mod), tostring(res)))
+  ac.log(string.format("[ApexFlow UI] require('%s') failed: %s", tostring(mod), tostring(res)))
   return nil
 end
 
@@ -544,7 +544,7 @@ local function drawFuelStrategySection(sim, cfg)
     ui.separator()
     ui.text("🤖 Estratégia das IAs ao vivo")
     helpMarker("Leigo: mostra quem vai parar e quando.\nTécnico: próximos pitLaps calculados + combustível restante/aprendido.")
-    local sState = RARE2_API.getStrategyState and RARE2_API.getStrategyState(cfg) or {}
+    local sState = APEXFLOW_API.getStrategyState and APEXFLOW_API.getStrategyState(cfg) or {}
     if sState.autoLaps then
       ui.textDisabled(string.format("Voltas da prova (auto): %d", sState.autoLaps))
     else
@@ -687,7 +687,7 @@ local function drawLearningModuleSection(sim, cfg)
   ui.newLine(4)
   ui.separator()
   ui.text("Learning Module")
-  helpMarker("Enable/disable RaceFlow's adaptive corner memory.\n\nON = hard events update track memory and learned danger/caps are applied.\nOFF = no new learning and learned danger/caps are ignored, while the rest of RaceFlow still runs.")
+  helpMarker("Enable/disable ApexFlow's adaptive corner memory.\n\nON = hard events update track memory and learned danger/caps are applied.\nOFF = no new learning and learned danger/caps are ignored, while the rest of ApexFlow still runs.")
 
   if cfg.learningEnabled == nil then
     cfg.learningEnabled = true
@@ -732,7 +732,7 @@ local function drawLearningModuleSection(sim, cfg)
     ui.text("Clear this track's learned memory?")
     ui.sameLine(0, 8)
     if ui.button("Yes##rf_clear_track_yes") then
-      local mem = RARE2_API and RARE2_API.getMemory and RARE2_API.getMemory()
+      local mem = APEXFLOW_API and APEXFLOW_API.getMemory and APEXFLOW_API.getMemory()
       if mem and mem.tracks and trackId and mem.tracks[trackId] then
         local count = 0
         local t = mem.tracks[trackId]
@@ -741,12 +741,12 @@ local function drawLearningModuleSection(sim, cfg)
         end
         mem.tracks[trackId] = nil
         -- Save immediately — don't wait for the 12s autosave cycle
-        if RARE2_API then
-          RARE2_API._memoryDirty = false
-          if RARE2_API.saveMemory then pcall(RARE2_API.saveMemory) end
+        if APEXFLOW_API then
+          APEXFLOW_API._memoryDirty = false
+          if APEXFLOW_API.saveMemory then pcall(APEXFLOW_API.saveMemory) end
         end
         cfg._clearMsg = string.format("Cleared %d corners for %s.", count, tostring(trackId))
-        ac.log(string.format("[RaceFlow] Cleared and saved memory for: %s (%d corners)", tostring(trackId), count))
+        ac.log(string.format("[ApexFlow] Cleared and saved memory for: %s (%d corners)", tostring(trackId), count))
       else
         cfg._clearMsg = string.format("Nothing to clear for %s.", tostring(trackId or "unknown"))
       end
@@ -764,7 +764,7 @@ local function drawLearningModuleSection(sim, cfg)
     ui.text("Clear ALL track memory? Cannot be undone.")
     ui.sameLine(0, 8)
     if ui.button("Yes, clear all##rf_clear_all_yes") then
-      local mem = RARE2_API and RARE2_API.getMemory and RARE2_API.getMemory()
+      local mem = APEXFLOW_API and APEXFLOW_API.getMemory and APEXFLOW_API.getMemory()
       if mem and mem.tracks then
         local trackCount, cornerCount = 0, 0
         for _, t in pairs(mem.tracks) do
@@ -775,12 +775,12 @@ local function drawLearningModuleSection(sim, cfg)
         end
         mem.tracks = {}
         -- Save immediately
-        if RARE2_API then
-          RARE2_API._memoryDirty = false
-          if RARE2_API.saveMemory then pcall(RARE2_API.saveMemory) end
+        if APEXFLOW_API then
+          APEXFLOW_API._memoryDirty = false
+          if APEXFLOW_API.saveMemory then pcall(APEXFLOW_API.saveMemory) end
         end
         cfg._clearMsg = string.format("Cleared %d tracks, %d corners total.", trackCount, cornerCount)
-        ac.log(string.format("[RaceFlow] Cleared ALL memory: %d tracks, %d corners.", trackCount, cornerCount))
+        ac.log(string.format("[ApexFlow] Cleared ALL memory: %d tracks, %d corners.", trackCount, cornerCount))
       else
         cfg._clearMsg = "Nothing to clear."
       end
@@ -806,12 +806,12 @@ local function drawPhysicsIntensitySection(sim, cfg)
   ui.newLine(4)
   ui.separator()
   ui.text("Physics Intensity")
-  helpMarker("Slider adjusts physics ratio.\n\n0 = Base AC AI\n100 = Full RaceFlow physics")
+  helpMarker("Slider adjusts physics ratio.\n\n0 = Base AC AI\n100 = Full ApexFlow physics")
 
   cfg.physicsPush = cfg.physicsPush or {}
   local intensity = cfg.physicsPush.intensity or 50
   local newIntensity = sliderBlock("Intensidade da física", "phys_intensity", intensity, 0, 100, "%.0f",
-    "Leigo: 0 = IA igual ao jogo base, 100 = física RaceFlow total (freadas e tração moldadas).\nTécnico: interpola brakeHint/throttle/topSpeed aplicados por frame.")
+    "Leigo: 0 = IA igual ao jogo base, 100 = física ApexFlow total (freadas e tração moldadas).\nTécnico: interpola brakeHint/throttle/topSpeed aplicados por frame.")
   if newIntensity ~= nil then
     newIntensity = clamp(newIntensity, 0, 100)
     if math.abs(newIntensity - intensity) > 0.001 then
@@ -839,7 +839,7 @@ local function drawRollingStartSection(sim, cfg)
     ui.indent(12)
 
     -- Status do Pace Car
-    local director = (RARE2_API and RARE2_API.getDirector and RARE2_API.getDirector())
+    local director = (APEXFLOW_API and APEXFLOW_API.getDirector and APEXFLOW_API.getDirector())
     local dirState = director and director.getState and director.getState()
     if dirState and dirState.hasSafetyCar then
       if rgbm then
@@ -1131,12 +1131,12 @@ local function drawGitHubUpdateSection(sim, cfg)
     ui.newLine(2)
     if rgbm then ui.textColored("ℹ Verificação automática indisponível", C.accent())
     else ui.text("Verificação automática indisponível") end
-    ui.textWrapped("Esta build do CSP não expõe ac.webRequest, então o app não consegue consultar a API do GitHub sozinho. Isso é esperado e não é um defeito do RaceFlow.")
+    ui.textWrapped("Esta build do CSP não expõe ac.webRequest, então o app não consegue consultar a API do GitHub sozinho. Isso é esperado e não é um defeito do ApexFlow.")
     ui.newLine(2)
     ui.text("Repositório: " .. (cfg.githubUpdate.repo or "Silxyst/RaceFlow-V2"))
-    ui.text("Versão instalada: v" .. (SCRIPT_VERSION or _G.RACEFLOW_VERSION or "?"))
+    ui.text("Versão instalada: v" .. (SCRIPT_VERSION or _G.APEXFLOW_VERSION or "?"))
     ui.newLine(2)
-    ui.textWrapped("Para atualizar: baixe a última release e substitua a pasta apps/lua/RaceFlow.")
+    ui.textWrapped("Para atualizar: baixe a última release e substitua a pasta apps/lua/ApexFlow.")
     if ac.openWebLink then
       if ui.button("🌐 Abrir página de Releases", vec2(230, 30)) then
         pcall(ac.openWebLink, "https://github.com/" .. (cfg.githubUpdate.repo or "Silxyst/RaceFlow-V2") .. "/releases")
@@ -1145,7 +1145,7 @@ local function drawGitHubUpdateSection(sim, cfg)
     return
   end
 
-  local gState = RARE2_API.githubGetState and RARE2_API.githubGetState() or {}
+  local gState = APEXFLOW_API.githubGetState and APEXFLOW_API.githubGetState() or {}
 
   -- Status
   ui.newLine(2)
@@ -1215,14 +1215,14 @@ local function drawGitHubUpdateSection(sim, cfg)
 
   -- Manual check button
   if ui.button("🔍 Verificar Agora", vec2(180, 30)) then
-    if RARE2_API.githubCheckUpdates then
-      RARE2_API.githubCheckUpdates(cfg, true)
+    if APEXFLOW_API.githubCheckUpdates then
+      APEXFLOW_API.githubCheckUpdates(cfg, true)
     end
   end
   ui.sameLine()
   if gState.htmlUrl and gState.htmlUrl ~= "" and ui.button("🌐 Abrir Release", vec2(180, 30)) then
-    if RARE2_API.githubGetState then
-      local state = RARE2_API.githubGetState()
+    if APEXFLOW_API.githubGetState then
+      local state = APEXFLOW_API.githubGetState()
       if state.htmlUrl and ac.openWebLink then
         pcall(ac.openWebLink, state.htmlUrl)
       end
@@ -1305,7 +1305,7 @@ local function drawAppearanceSection(sim, cfg)
 end
 
 local function drawAboutSection(sim, cfg)
-  ui.text("ApexFlow v" .. (SCRIPT_VERSION or _G.RACEFLOW_VERSION or _G.APEXFLOW_VERSION or "?"))
+  ui.text("ApexFlow v" .. (SCRIPT_VERSION or _G.APEXFLOW_VERSION or _G.APEXFLOW_VERSION or "?"))
   ui.textDisabled("Independent race suite for Assetto Corsa — offline AI, strategy & race control.")
 
   ui.textWrapped("ApexFlow enhances offline single-player by giving AI personality, racecraft and memory. Every driver has a class and learns corners; the field spreads naturally with hunt, hot laps and clean-air logic.")
@@ -1320,7 +1320,7 @@ local function drawAboutSection(sim, cfg)
   ui.text("Learning Module")
   ui.separator()
   ui.newLine(2)
-  ui.textWrapped("RaceFlow watches every car, every frame. When a car overshoots, spins, or runs off track, it logs a hard event for that corner. Danger builds, braking starts earlier, and speed is capped. As drivers clean up their runs, confidence returns and restrictions ease. Memory persists between sessions, so each track evolves over time. Use the Clear buttons to reset a track or wipe everything if needed.")
+  ui.textWrapped("ApexFlow watches every car, every frame. When a car overshoots, spins, or runs off track, it logs a hard event for that corner. Danger builds, braking starts earlier, and speed is capped. As drivers clean up their runs, confidence returns and restrictions ease. Memory persists between sessions, so each track evolves over time. Use the Clear buttons to reset a track or wipe everything if needed.")
 
   ui.newLine(6)
   ui.text("Multiclass")
@@ -1350,7 +1350,7 @@ local function drawAboutSection(sim, cfg)
   ui.text("Race Events HUD")
   ui.separator()
   ui.newLine(2)
-  ui.textWrapped("Overlay window with live gaps, PP and strategy. Enable it in Content Manager → Apps → RaceFlow Events. Fully customizable in the HUD tab (gaps/PP only, AC-native flags).")
+  ui.textWrapped("Overlay window with live gaps, PP and strategy. Enable it in Content Manager → Apps → ApexFlow Events. Fully customizable in the HUD tab (gaps/PP only, AC-native flags).")
 
   ui.newLine(8)
 end
@@ -1376,7 +1376,7 @@ local function drawHudEventsSettings(sim, cfg)
   if h.showDeltaLive == nil then h.showDeltaLive = true end
 
   ui.text("Race Events HUD — Personalização")
-  helpMarker("Leigo: escolha o que aparece no overlay RaceFlow Events (gaps/PP).\nTécnico: cada seção lê o estado do seu módulo; desligar esconde só o visual.")
+  helpMarker("Leigo: escolha o que aparece no overlay ApexFlow Events (gaps/PP).\nTécnico: cada seção lê o estado do seu módulo; desligar esconde só o visual.")
 
   ui.newLine(2)
   ui.textDisabled("Marque o que quer ver no overlay:")
@@ -1428,12 +1428,12 @@ local function drawHudEventsSettings(sim, cfg)
   end
 
   ui.newLine(2)
-  if ui.button("📺 Abrir RaceFlow Events", vec2(220, 28)) then
+  if ui.button("📺 Abrir ApexFlow Events", vec2(220, 28)) then
     if ac.setWindowOpen then pcall(ac.setWindowOpen, "events", true) end
   end
   ui.sameLine()
   if ui.button("👁 Testar HUD", vec2(150, 28)) then
-    if RARE2_API.hudPreviewStart then RARE2_API.hudPreviewStart(10) end
+    if APEXFLOW_API.hudPreviewStart then APEXFLOW_API.hudPreviewStart(10) end
   end
   ui.sameLine()
   helpMarker("Abre a janela overlay. O botão 👁 injeta 10s de FCY + punição fake (com tag PREVIEW) p/ ver o layout sem correr.")
@@ -1662,8 +1662,8 @@ end
 -- ---------------- status do sistema — limpo extremo v0.29.0: só gaps/PP (caution/track removidos) ----------------
 local function getSystemStatus(sim, cfg)
   -- v0.29.0: tl/cs removidos (3,4,6) — AC nativo assume
-  local stt = RARE2_API.getStrategyState and RARE2_API.getStrategyState(cfg) or {}
-  local mem = RARE2_API.getMemory and RARE2_API.getMemory() or nil
+  local stt = APEXFLOW_API.getStrategyState and APEXFLOW_API.getStrategyState(cfg) or {}
+  local mem = APEXFLOW_API.getMemory and APEXFLOW_API.getMemory() or nil
   local memCount = 0
   if mem and mem.tracks then for _ in pairs(mem.tracks) do memCount = memCount + 1 end end
   -- retornar stubs compatíveis para callers antigos (tl,cs vazios)
@@ -1774,10 +1774,10 @@ end
 
 -- ---------------- trilho (legado) — limpo extremo v0.29.0: sem caution/track/realPenalty ----------------
 local function railBadges(sim, cfg)
-  local gs = RARE2_API.githubGetState and RARE2_API.githubGetState() or {}
+  local gs = APEXFLOW_API.githubGetState and APEXFLOW_API.githubGetState() or {}
   -- v0.29.0: HUD badge baseado em gaps/PP (5), não em caution/track
-  local gb = RARE2_API.getGapBehindState and RARE2_API.getGapBehindState() or {}
-  local ps = RARE2_API.getPenaltySeverityState and RARE2_API.getPenaltySeverityState() or {}
+  local gb = APEXFLOW_API.getGapBehindState and APEXFLOW_API.getGapBehindState() or {}
+  local ps = APEXFLOW_API.getPenaltySeverityState and APEXFLOW_API.getPenaltySeverityState() or {}
   return {
     dash = false,
     ai = (cfg.multiclassEnabled == true),
@@ -1795,8 +1795,8 @@ local function drawStatusBar(sim, cfg)
   local parts = {}
   parts[#parts + 1] = live and "● LIVE" or "○ box"
   -- gaps e PP (5) no lugar de warnings/caution
-  local gb = RARE2_API.getGapBehindState and RARE2_API.getGapBehindState() or {}
-  local ps = RARE2_API.getPenaltySeverityState and RARE2_API.getPenaltySeverityState() or {}
+  local gb = APEXFLOW_API.getGapBehindState and APEXFLOW_API.getGapBehindState() or {}
+  local ps = APEXFLOW_API.getPenaltySeverityState and APEXFLOW_API.getPenaltySeverityState() or {}
   if (gb.gapBehindM or 0) > 1 then
     parts[#parts + 1] = string.format("🔙 %.0fm", gb.gapBehindM or 0)
   end
@@ -1819,7 +1819,7 @@ local PRESET_ROWS = {
   { key = "endurance", desc = "Provas longas, tolerante" },
 }
 local function drawPresetList(cfg)
-  local presets = RARE2_API.getCategoryPresets and RARE2_API.getCategoryPresets() or {}
+  local presets = APEXFLOW_API.getCategoryPresets and APEXFLOW_API.getCategoryPresets() or {}
   if not next(presets) then return end
   if not matchesSearch(cfg, "preset gt3 f1 tcr categoria corrida") then return end
   ui.textDisabled("PRESET")
@@ -1833,7 +1833,7 @@ local function drawPresetList(cfg)
       local isCur = cur == row.key
       if isCur and rgbm then ui.pushStyleColor(ui.StyleColor.Button, rgbm(1.00, 0.55, 0.15, 1.00)) end
       if ui.button((isCur and "● " or "") .. row.key:upper() .. "##p_" .. row.key, vec2(92, 28)) then
-        if RARE2_API.applyCategoryPreset then RARE2_API.applyCategoryPreset(row.key) end
+        if APEXFLOW_API.applyCategoryPreset then APEXFLOW_API.applyCategoryPreset(row.key) end
         notifyChange()
         if ac.setMessage then pcall(ac.setMessage, "PRESET", pr.label .. " aplicado") end
         toast(cfg, "ok", "Preset", pr.label .. " aplicado")
@@ -1879,9 +1879,9 @@ local function drawDashInspector(sim, cfg)
   ui.newLine(2)
   local _, _, stt, memCount = getSystemStatus(sim, cfg)
   -- Gaps e severidade (5) no lugar de warnings/caution
-  local gb = RARE2_API.getGapBehindState and RARE2_API.getGapBehindState() or {}
-  local sg = RARE2_API.getSectorGapsState and RARE2_API.getSectorGapsState() or {}
-  local ps = RARE2_API.getPenaltySeverityState and RARE2_API.getPenaltySeverityState() or {}
+  local gb = APEXFLOW_API.getGapBehindState and APEXFLOW_API.getGapBehindState() or {}
+  local sg = APEXFLOW_API.getSectorGapsState and APEXFLOW_API.getSectorGapsState() or {}
+  local ps = APEXFLOW_API.getPenaltySeverityState and APEXFLOW_API.getPenaltySeverityState() or {}
   if (gb.gapBehindM or 0) > 1 then
     ui.textDisabled(string.format("🔙 Atrás: %.0fm (P%d)", gb.gapBehindM or 0, gb.carBehindPos or 0))
   else
@@ -2016,7 +2016,7 @@ local function drawSysInspector(sim, cfg)
       function(s, c) drawAppearanceSection(s, c) end, sim)
   end
   if matchesSearch(cfg, "github update release versao baixar") then
-    local gs = RARE2_API.githubGetState and RARE2_API.githubGetState() or {}
+    local gs = APEXFLOW_API.githubGetState and APEXFLOW_API.githubGetState() or {}
     view(cfg, "sys_gh", "02", "Atualizações",
       "Ver se saiu versão nova.",
       { status = gs.hasUpdate and "nova!" or "" },
@@ -2098,8 +2098,8 @@ function M.draw(sim, cfg)
   ui.separator()
   ui.newLine(2)
   if ui.button("💾 Salvar", vec2(110, 26)) then
-    if RARE2_API.saveConfig then
-      RARE2_API.saveConfig()
+    if APEXFLOW_API.saveConfig then
+      APEXFLOW_API.saveConfig()
       cfg._savedFeedback = 180
       toast(cfg, "ok", "Salvo", "")
     end
@@ -2133,7 +2133,7 @@ function M.draw(sim, cfg)
     ui.textDisabled("Apaga TODOS os ajustes (perfis, limites, voz, tema). Sem desfazer.")
     ui.newLine(2)
     if ui.button("Sim, restaurar##cf_yes", vec2(170, 30)) then
-      if RARE2_API.resetToDefaults then RARE2_API.resetToDefaults() end
+      if APEXFLOW_API.resetToDefaults then APEXFLOW_API.resetToDefaults() end
       cfg._confirmReset = false
       cfg._resetFeedback = 180
       toast(cfg, "warn", "Padrões de volta", "")

@@ -2,9 +2,9 @@
 """ApexFlow Remote Panel — servidor local (só stdlib).
 
 O app no jogo NÃO tem HTTP: ele escreve
-  Documents/Assetto Corsa/RaceFlow_webui_status.json   (a cada 0.5s)
+  Documents/Assetto Corsa/ApexFlow_webui_status.json   (a cada 0.5s)
 e lê
-  Documents/Assetto Corsa/RaceFlow_webui_cmd.json      (comandos).
+  Documents/Assetto Corsa/ApexFlow_webui_cmd.json      (comandos).
 
 Este servidor faz a ponte para o navegador:
   http://localhost:8080/panel.html   -> painel remoto (este PC)
@@ -27,8 +27,8 @@ import sys
 import time
 from pathlib import Path
 
-STATUS_FILE = "RaceFlow_webui_status.json"
-CMD_FILE = "RaceFlow_webui_cmd.json"
+STATUS_FILE = "ApexFlow_webui_status.json"
+CMD_FILE = "ApexFlow_webui_cmd.json"
 
 
 def find_docs(cli_docs=None):

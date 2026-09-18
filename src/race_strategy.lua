@@ -5,9 +5,9 @@
 
 local M = {}
 
--- RARE2_API guard
-_G.RARE2_API = _G.RARE2_API or {}
-local RARE2_API = _G.RARE2_API
+-- APEXFLOW_API guard
+_G.APEXFLOW_API = _G.APEXFLOW_API or {}
+local APEXFLOW_API = _G.APEXFLOW_API
 
 
 -- ------------------------------------------------------------

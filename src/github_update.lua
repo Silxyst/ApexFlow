@@ -51,13 +51,13 @@ function M.checkUpdates(cfg, force)
 
   local repo = cfg.githubUpdate.repo or "Silxyst/RaceFlow-V2"
   local url = string.format("https://api.github.com/repos/%s/releases/latest", repo)
-  ac.log("[RaceFlow GitHub] Checking updates: " .. url)
+  ac.log("[ApexFlow GitHub] Checking updates: " .. url)
 
   ac.webRequest({
     url = url,
     method = "GET",
     headers = {
-      ["User-Agent"] = "RaceFlow-AC-App/" .. (SCRIPT_VERSION or "0.4.6"),
+      ["User-Agent"] = "ApexFlow-AC-App/" .. (SCRIPT_VERSION or "0.4.6"),
       ["Accept"] = "application/vnd.github.v3+json",
     },
     timeout = 10000,
@@ -67,14 +67,14 @@ function M.checkUpdates(cfg, force)
         state.error = tostring(err)
         state.latestVersion = nil
         state.hasUpdate = false
-        ac.log("[RaceFlow GitHub] Request failed: " .. state.error)
+        ac.log("[ApexFlow GitHub] Request failed: " .. state.error)
         return
       end
       if not response or response.status ~= 200 then
         state.error = "HTTP " .. tostring(response and response.status or "nil")
         state.latestVersion = nil
         state.hasUpdate = false
-        ac.log("[RaceFlow GitHub] " .. state.error)
+        ac.log("[ApexFlow GitHub] " .. state.error)
         return
       end
 
@@ -83,7 +83,7 @@ function M.checkUpdates(cfg, force)
         state.error = "JSON parse failed"
         state.latestVersion = nil
         state.hasUpdate = false
-        ac.log("[RaceFlow GitHub] " .. state.error)
+        ac.log("[ApexFlow GitHub] " .. state.error)
         return
       end
 
@@ -95,7 +95,7 @@ function M.checkUpdates(cfg, force)
 
       state.hasUpdate = versionNewer(state.latestVersion, SCRIPT_VERSION)
 
-      ac.log(string.format("[RaceFlow GitHub] Current: %s | Latest: %s | Update: %s",
+      ac.log(string.format("[ApexFlow GitHub] Current: %s | Latest: %s | Update: %s",
         SCRIPT_VERSION, state.latestVersion, state.hasUpdate and "YES" or "NO"))
     end
   })
@@ -104,7 +104,7 @@ function M.checkUpdates(cfg, force)
 end
 
 function M.getState(cfg)
-  cfg = cfg or (_G.RARE2_CFG or {})
+  cfg = cfg or (_G.APEXFLOW_CFG or {})
   return {
     checking = state.checking,
     lastCheck = state.lastCheck,

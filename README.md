@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Human-like AI & Race Control for Assetto Corsa</strong><br/>
-  <em>2 lightweight apps: RaceFlow Core + RaceFlow Events HUD</em><br/>
+  <em>2 lightweight apps: ApexFlow Core + ApexFlow Events HUD</em><br/>
   Thinking AI • Clean 2×2 starts • Live delta gaps • Persistent penalty points
 </p>
 
@@ -14,7 +14,7 @@
   <a href="https://github.com/Silxyst/RaceFlow-V2/releases/latest">
     <img src="https://img.shields.io/github/v/release/Silxyst/RaceFlow-V2?style=for-the-badge&label=DOWNLOAD&color=ff6a15&logo=github" alt="Latest Release"/>
   </a>
-  <img src="https://img.shields.io/badge/Version-v0.31.2-ff6a15?style=for-the-badge&label=App" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v0.32.0-ff6a15?style=for-the-badge&label=App" alt="Version"/>
   <img src="https://img.shields.io/badge/CSP-0.3.0-00d4ff?style=for-the-badge" alt="CSP"/>
   <img src="https://img.shields.io/badge/Platform-Windows-0078d6?style=for-the-badge&logo=windows" alt="Platform"/>
   <a href="https://github.com/Silxyst/RaceFlow-V2/blob/main/LICENSE">
@@ -49,8 +49,8 @@
 > **AI that thinks instead of crashing.** Every driver has a personality, picks its own line, brakes progressively into slow corners, and only attacks on straights with a real gap — no kamikaze dives, no train formation.
 
 - 🪶 **Lightweight:** 10 modules • ~260 KB • 3 windows • zero errors in `custom_shaders_patch.log`
-- 🔌 **Offline-first:** no online dependencies, per-track `RaceFlow_config.lua` auto-save
-- 🏁 **2 apps:** `RaceFlow` core (`1024×760` + setup) + `RaceFlow Events` HUD overlay (`360×260`)
+- 🔌 **Offline-first:** no online dependencies, per-track `ApexFlow_config.lua` auto-save
+- 🏁 **2 apps:** `ApexFlow` core (`1024×760` + setup) + `ApexFlow Events` HUD overlay (`360×260`)
 - 🌧️ **Rain-aware:** grip logic desensitized in the wet, AI keeps its pace instead of crawling
 - 🚩 **No conflicts:** flags and track limits are handled by AC itself — no double penalties
 
@@ -74,19 +74,19 @@
 **Requirements:** `Assetto Corsa` + `Custom Shaders Patch 0.3.0+` + `Content Manager` + offline session.
 
 ```bash
-1. Download RaceFlow_v0.31.2.zip from https://github.com/Silxyst/RaceFlow-V2/releases/latest
-2. Extract into Assetto Corsa/apps/lua/  (creates/updates the RaceFlow/ folder)
-3. Content Manager → Apps → enable RaceFlow + RaceFlow Events
-4. In AC → Apps sidebar → RaceFlow
+1. Download ApexFlow_v0.32.0.zip from https://github.com/Silxyst/RaceFlow-V2/releases/latest
+2. Extract into Assetto Corsa/apps/lua/  (creates/updates the ApexFlow/ folder)
+3. Content Manager → Apps → enable ApexFlow + ApexFlow Events
+4. In AC → Apps sidebar → ApexFlow
 ```
 
 <details>
-<summary><strong>📁 Package contents (v0.31.2)</strong></summary>
+<summary><strong>📁 Package contents (v0.32.0)</strong></summary>
 
 ```
-RaceFlow/
+ApexFlow/
 ├─ manifest.ini (3 windows)
-├─ RaceFlow.lua (core loop, 8 guarded modules)
+├─ ApexFlow.lua (core loop, 8 guarded modules)
 ├─ icon.png
 ├─ sfx/rs_beep.wav
 ├─ src/
@@ -109,7 +109,7 @@ RaceFlow/
 
 ## ⚙️ Configuration
 
-Settings auto-save to `RaceFlow_config.lua` (per track). Five tabs in the main app:
+Settings auto-save to `ApexFlow_config.lua` (per track). Five tabs in the main app:
 
 | Tab | Controls |
 |---|---|
@@ -146,23 +146,23 @@ Settings auto-save to `RaceFlow_config.lua` (per track). Five tabs in the main a
 | Phone (same Wi-Fi) | `http://<pc-ip>:8080/panel.html` |
 | OBS | add `panel.html` as a browser source |
 
-Live `position / lap / speed | gap + delta | PP | strategy` every `0.5 s` via `RaceFlow_webui_status.json`.
+Live `position / lap / speed | gap + delta | PP | strategy` every `0.5 s` via `ApexFlow_webui_status.json`.
 
 ---
 
 ## 🛠️ API
 
 ```lua
-_G.RARE2_API.getGapBehindState()      -- {gapBehindM, gapBehindKm, carBehindPos, deltaBehind, isLappedBehind}
-_G.RARE2_API.getSectorGapsState()     -- {gapSectorM, gapSectorS, currentSector}
-_G.RARE2_API.getPenaltySeverityState()-- {totalPP, level, lastReason, history}
-_G.RARE2_API.getStrategyState(cfg)    -- {nextPit, stopsLeft, fuelPerLap}
+_G.APEXFLOW_API.getGapBehindState()      -- {gapBehindM, gapBehindKm, carBehindPos, deltaBehind, isLappedBehind}
+_G.APEXFLOW_API.getSectorGapsState()     -- {gapSectorM, gapSectorS, currentSector}
+_G.APEXFLOW_API.getPenaltySeverityState()-- {totalPP, level, lastReason, history}
+_G.APEXFLOW_API.getStrategyState(cfg)    -- {nextPit, stopsLeft, fuelPerLap}
 ```
 
 ```python
 # Remote control example (Python)
-STATUS = "Documents/Assetto Corsa/RaceFlow_webui_status.json"
-CMD    = "Documents/Assetto Corsa/RaceFlow_webui_cmd.json"
+STATUS = "Documents/Assetto Corsa/ApexFlow_webui_status.json"
+CMD    = "Documents/Assetto Corsa/ApexFlow_webui_cmd.json"
 import json, time
 def cmd(action, params=None):
     with open(CMD, "w") as f:
@@ -188,6 +188,6 @@ cmd("set_aggression", {"value": 68})
 MIT — **Silxyst**. Free for personal and commercial use, see [LICENSE](LICENSE).
 
 <p align="center">
-  <sub>RaceFlow v0.31.2 — 2 apps • 10 modules • CSP 0.3.0 • zero errors</sub><br/>
+  <sub>ApexFlow v0.32.0 — 2 apps • 10 modules • CSP 0.3.0 • zero errors</sub><br/>
   <sub>Built with ❤️ for the Assetto Corsa community</sub>
 </p>

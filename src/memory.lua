@@ -1,5 +1,5 @@
 -- src/memory.lua
--- Minimal persistence helper for RaceFlow.
+-- Minimal persistence helper for ApexFlow.
 -- (Exists mainly so older builds that `require("src.memory")` won’t hard-fail.)
 
 local M = {}
@@ -17,14 +17,14 @@ end
 function M.load(path)
   local chunk, err = loadfile(path)
   if not chunk then
-    safeLog(string.format("[RaceFlow] Memory load skipped: %s", tostring(err)))
+    safeLog(string.format("[ApexFlow] Memory load skipped: %s", tostring(err)))
     return nil
   end
   local ok, data = pcall(chunk)
   if ok and type(data) == "table" then
     return data
   end
-  safeLog("[RaceFlow] Memory load failed (bad table).")
+  safeLog("[ApexFlow] Memory load failed (bad table).")
   return nil
 end
 
@@ -66,14 +66,14 @@ function M.save(tbl, path)
   if type(tbl) ~= "table" then return end
   local f, err = io.open(path, "w")
   if not f then
-    safeLog(string.format("[RaceFlow] Failed to save memory: %s", tostring(err)))
+    safeLog(string.format("[ApexFlow] Failed to save memory: %s", tostring(err)))
     return
   end
   f:write("return ")
   f:write(serializeTable(tbl, ""))
   f:write("\n")
   f:close()
-  safeLog("[RaceFlow] Memory saved to " .. tostring(path))
+  safeLog("[ApexFlow] Memory saved to " .. tostring(path))
 end
 
 return M

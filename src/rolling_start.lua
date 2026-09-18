@@ -9,17 +9,17 @@
 
 local M = {}
 
--- RARE2_API guard
-_G.RARE2_API = _G.RARE2_API or {}
-local RARE2_API = _G.RARE2_API
+-- APEXFLOW_API guard
+_G.APEXFLOW_API = _G.APEXFLOW_API or {}
+local APEXFLOW_API = _G.APEXFLOW_API
 
 
 -- =========================================================
 -- Audio (CSP reliable): ui.MediaPlayer one-shot from absolute file path
--- File location: assettocorsa/apps/lua/RaceFlow/sfx/rs_beep.wav
+-- File location: assettocorsa/apps/lua/ApexFlow/sfx/rs_beep.wav
 -- =========================================================
 
-local RS_BEEP_REL = "apps/lua/RaceFlow/sfx/rs_beep.wav"
+local RS_BEEP_REL = "apps/lua/ApexFlow/sfx/rs_beep.wav"
 local RS_BEEP_ABS = nil
 local RS_BEEP_PLAYER = nil
 
@@ -31,21 +31,21 @@ local function _resolveBeepPath()
     if ok and type(root) == "string" then
       if not root:match("[/\\\\]$") then root = root .. "/" end
       RS_BEEP_ABS = root .. RS_BEEP_REL
-      if ac and ac.log then ac.log("[RaceFlow RollingStart] Resolved beep path: " .. tostring(RS_BEEP_ABS)) end
+      if ac and ac.log then ac.log("[ApexFlow RollingStart] Resolved beep path: " .. tostring(RS_BEEP_ABS)) end
       return RS_BEEP_ABS
     end
   end
 
   -- fallback: use relative path
   RS_BEEP_ABS = RS_BEEP_REL
-  if ac and ac.log then ac.log("[RaceFlow RollingStart] Using RELATIVE beep path (fallback): " .. tostring(RS_BEEP_ABS)) end
+  if ac and ac.log then ac.log("[ApexFlow RollingStart] Using RELATIVE beep path (fallback): " .. tostring(RS_BEEP_ABS)) end
   return RS_BEEP_ABS
 end
 
 local function _getBeepPlayer()
   if RS_BEEP_PLAYER then return RS_BEEP_PLAYER end
   if not ui or not ui.MediaPlayer then
-    if ac and ac.log then ac.log("[RaceFlow RollingStart] ui.MediaPlayer not available") end
+    if ac and ac.log then ac.log("[ApexFlow RollingStart] ui.MediaPlayer not available") end
     return nil
   end
 
@@ -317,7 +317,7 @@ function M.update(dt, sim, cfg)
   local trackLenM = tonumber(sim.trackLengthM) or 0
   if trackLenM < 1500 then
     if not state.warnedMissing and ac and ac.log then
-      ac.log("[RaceFlow RollingStart] Disabled: trackLengthM < 1500m (rolling start unreliable on short tracks).")
+      ac.log("[ApexFlow RollingStart] Disabled: trackLengthM < 1500m (rolling start unreliable on short tracks).")
       state.warnedMissing = true
     end
     return false
@@ -326,7 +326,7 @@ function M.update(dt, sim, cfg)
 
   if not requiredPhysicsOk() then
     if not state.warnedMissing and ac and ac.log then
-      ac.log("[RaceFlow RollingStart] Missing required physics functions (setAIThrottleLimit/setAITopSpeed/setAISplineOffset/addForce).")
+      ac.log("[ApexFlow RollingStart] Missing required physics functions (setAIThrottleLimit/setAITopSpeed/setAISplineOffset/addForce).")
       state.warnedMissing = true
     end
     return false
@@ -463,7 +463,7 @@ state.logTimer = (state.logTimer or 0) + dt
 if shouldLog and ac and ac.log and state.logTimer >= 1.0 then
   state.logTimer = 0
   ac.log(string.format(
-    "[RaceFlow RollingStart] leader=%d lap=%d sp=%.3f releaseAt=%.3f isRolling=%s",
+    "[ApexFlow RollingStart] leader=%d lap=%d sp=%.3f releaseAt=%.3f isRolling=%s",
     state.leader, leaderLap, leaderSP, releaseAt, tostring(isRolling)
   ))
 end

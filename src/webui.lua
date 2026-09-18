@@ -1,13 +1,13 @@
 -- src/webui.lua
--- Remote Web UI for RaceFlow
+-- Remote Web UI for ApexFlow
 -- Uses shared file polling (no HTTP server in CSP)
 -- External tool polls / reads status file, writes commands file
 
 local M = {}
 
--- RARE2_API guard
-_G.RARE2_API = _G.RARE2_API or {}
-local RARE2_API = _G.RARE2_API
+-- APEXFLOW_API guard
+_G.APEXFLOW_API = _G.APEXFLOW_API or {}
+local APEXFLOW_API = _G.APEXFLOW_API
 
 
 local state = {
@@ -17,8 +17,8 @@ local state = {
   lastCommandId = 0,
   lastStatusWrite = 0,
   statusWriteInterval = 0.5, -- write status every 0.5s
-  commandFile = "RaceFlow_webui_cmd.json",
-  statusFile = "RaceFlow_webui_status.json",
+  commandFile = "ApexFlow_webui_cmd.json",
+  statusFile = "ApexFlow_webui_status.json",
 }
 
 local function getAppDataPath()
@@ -86,9 +86,9 @@ end
 
 -- Build status payload
 local function buildStatus(sim, cfg)
-  local mem = _G.RARE2_API and RARE2_API.getMemory and RARE2_API.getMemory() or {}
+  local mem = _G.APEXFLOW_API and APEXFLOW_API.getMemory and APEXFLOW_API.getMemory() or {}
   -- NOTE v0.5.0: VSC removed; field kept as explicit marker for old clients.
-  local githubState = RARE2_API.githubGetState and RARE2_API.githubGetState() or {}
+  local githubState = APEXFLOW_API.githubGetState and APEXFLOW_API.githubGetState() or {}
 
   local cars = {}
   if sim and sim.carsCount then
@@ -161,17 +161,17 @@ local function buildStatus(sim, cfg)
     -- v0.29.0 limpo extremo: snapshots só gaps/sector/penaltySeverity (caution/track/voice/box/safety removidos 3,4,6)
     -- caution/tracklimits/voice/boxPenalty/safetyCar removidos — AC nativo assume
     gapBehind = (function()
-      local ok, s = pcall(function() return _G.RARE2_API and RARE2_API.getGapBehindState and RARE2_API.getGapBehindState() or {} end)
+      local ok, s = pcall(function() return _G.APEXFLOW_API and APEXFLOW_API.getGapBehindState and APEXFLOW_API.getGapBehindState() or {} end)
       if not ok or type(s) ~= "table" then return { gapBehindM = 0 } end
       return { gapBehindM = s.gapBehindM or 0, gapBehindKm = s.gapBehindKm or 0, carBehindPos = s.carBehindPos or 0, deltaBehind = s.deltaBehind or 0, isLappedBehind = s.isLappedBehind == true }
     end)(),
     sectorGaps = (function()
-      local ok, s = pcall(function() return _G.RARE2_API and RARE2_API.getSectorGapsState and RARE2_API.getSectorGapsState() or {} end)
+      local ok, s = pcall(function() return _G.APEXFLOW_API and APEXFLOW_API.getSectorGapsState and APEXFLOW_API.getSectorGapsState() or {} end)
       if not ok or type(s) ~= "table" then return { gapSectorS = 0 } end
       return { currentSector = s.currentSector or 0, gapSectorM = s.gapSectorM or 0, gapSectorS = s.gapSectorS or 0 }
     end)(),
     penaltySeverity = (function()
-      local ok, s = pcall(function() return _G.RARE2_API and RARE2_API.getPenaltySeverityState and RARE2_API.getPenaltySeverityState() or {} end)
+      local ok, s = pcall(function() return _G.APEXFLOW_API and APEXFLOW_API.getPenaltySeverityState and APEXFLOW_API.getPenaltySeverityState() or {} end)
       if not ok or type(s) ~= "table" then return { totalPP = 0 } end
       return { totalPP = s.totalPP or 0, level = s.level or 0, lastReason = s.lastReason or "" }
     end)(),
@@ -197,7 +197,7 @@ local function processCommands(sim, cfg)
       state.lastCommandId = cmd.id
       local token = cmd.token or ""
       if not authCheck(token) then
-        ac.log("[RaceFlow WebUI] Auth failed for command: " .. (cmd.action or "unknown"))
+        ac.log("[ApexFlow WebUI] Auth failed for command: " .. (cmd.action or "unknown"))
       else
         local action = cmd.action
         local params = cmd.params or {}
@@ -205,52 +205,52 @@ local function processCommands(sim, cfg)
         -- NOTE v0.5.0: vsc_* commands removed with the VSC system.
         -- Old clients sending them get a log line instead of a crash.
         if action == "vsc_toggle" or action == "vsc_enable" or action == "vsc_disable" then
-          ac.log("[RaceFlow WebUI] command '" .. tostring(action) .. "' ignored: VSC removed in v0.5.0")
+          ac.log("[ApexFlow WebUI] command '" .. tostring(action) .. "' ignored: VSC removed in v0.5.0")
         elseif action == "rolling_toggle" then
           cfg.rollingStart.enabled = not cfg.rollingStart.enabled
-          RARE2_API.markConfigDirty()
+          APEXFLOW_API.markConfigDirty()
         elseif action == "strategy_toggle" then
           cfg.strategy.enabled = not cfg.strategy.enabled
-          RARE2_API.markConfigDirty()
+          APEXFLOW_API.markConfigDirty()
         elseif action == "set_aggression" then
           cfg.aggression = tonumber(params.value) or cfg.aggression
-          RARE2_API.markConfigDirty()
+          APEXFLOW_API.markConfigDirty()
         elseif action == "set_pace" then
           cfg.paceStrength = tonumber(params.value) or cfg.paceStrength
-          RARE2_API.markConfigDirty()
+          APEXFLOW_API.markConfigDirty()
         elseif action == "set_difficulty" then
           cfg.difficultyBoost = tonumber(params.value) or cfg.difficultyBoost
-          RARE2_API.markConfigDirty()
+          APEXFLOW_API.markConfigDirty()
         elseif action == "apply_preset" then
           -- v0.18.0: aplica preset de categoria (gt3/gt4/tcr/f1/lmp/endurance)
-          if RARE2_API.applyCategoryPreset and params.key then
-            RARE2_API.applyCategoryPreset(tostring(params.key))
-            RARE2_API.markConfigDirty()
+          if APEXFLOW_API.applyCategoryPreset and params.key then
+            APEXFLOW_API.applyCategoryPreset(tostring(params.key))
+            APEXFLOW_API.markConfigDirty()
           end
         -- v0.29.0 limpo: caution_trigger/voice_test removidos (3,4,6 peso morto)
         elseif action == "github_check" then
-          if RARE2_API.githubCheckUpdates then
-            RARE2_API.githubCheckUpdates(cfg, true)
+          if APEXFLOW_API.githubCheckUpdates then
+            APEXFLOW_API.githubCheckUpdates(cfg, true)
           end
         elseif action == "save_config" then
-          if RARE2_API.saveConfig then
-            RARE2_API.saveConfig()
+          if APEXFLOW_API.saveConfig then
+            APEXFLOW_API.saveConfig()
           end
         elseif action == "reset_defaults" then
-          if RARE2_API.resetToDefaults then
-            RARE2_API.resetToDefaults()
+          if APEXFLOW_API.resetToDefaults then
+            APEXFLOW_API.resetToDefaults()
           end
         elseif action == "clear_memory_track" then
-          local mem = RARE2_API.getMemory and RARE2_API.getMemory()
+          local mem = APEXFLOW_API.getMemory and APEXFLOW_API.getMemory()
           if mem and mem.tracks and params.trackId then
             mem.tracks[params.trackId] = nil
-            RARE2_API._memoryDirty = true
+            APEXFLOW_API._memoryDirty = true
           end
         elseif action == "clear_memory_all" then
-          local mem = RARE2_API.getMemory and RARE2_API.getMemory()
+          local mem = APEXFLOW_API.getMemory and APEXFLOW_API.getMemory()
           if mem then
             mem.tracks = {}
-            RARE2_API._memoryDirty = true
+            APEXFLOW_API._memoryDirty = true
           end
         end
       end

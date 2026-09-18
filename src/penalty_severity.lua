@@ -1,10 +1,10 @@
 -- src/penalty_severity.lua
--- RaceFlow Penalty Severity — v0.25.0
+-- ApexFlow Penalty Severity — v0.25.0
 -- Conformidade CBA 5.3-5.14 / iRacing 8.x: classificação gravidade 1-6 e PP.
 
 local M = {}
 
-_G.RARE2_API = _G.RARE2_API or {}
+_G.APEXFLOW_API = _G.APEXFLOW_API or {}
 
 local state = {
   totalPP = 0,
@@ -31,19 +31,28 @@ end
 local ppStorage = nil
 local function getStorage()
   if ppStorage then return ppStorage end
-  local ok, st = pcall(ac.storage, "RaceFlow_PP_Data")
+  local ok, st = pcall(ac.storage, "ApexFlow_PP_Data")
   if ok and st then ppStorage = st; return ppStorage end
   return nil
 end
 local function loadPP()
   local st = getStorage()
+  local data = nil
   if st then
-    local ok, data = pcall(st.load, st)
-    if ok and type(data)=="table" then
-      state.totalPP = tonumber(data.total) or state.totalPP
-      state.history = type(data.history)=="table" and data.history or state.history
-      if #state.history>0 then state.level = state.history[1].level or 0; state.lastReason = state.history[1].reason or "" end
+    local ok, d = pcall(st.load, st)
+    if ok and type(d)=="table" then data = d end
+  end
+  if not data then -- pre-rename fallback (v0.31.2)
+    local okL, stL = pcall(ac.storage, "RaceFlow_PP_Data")
+    if okL and stL then
+      local ok2, d2 = pcall(stL.load, stL)
+      if ok2 and type(d2)=="table" then data = d2 end
     end
+  end
+  if data then
+    state.totalPP = tonumber(data.total) or state.totalPP
+    state.history = type(data.history)=="table" and data.history or state.history
+    if #state.history>0 then state.level = state.history[1].level or 0; state.lastReason = state.history[1].reason or "" end
   end
 end
 local function savePP()
@@ -56,7 +65,7 @@ function M.report(level, reason)
   level = math.max(1, math.min(6, tonumber(level) or 1))
   pushHistory(level, reason)
   pcall(savePP)
-  ac.log(string.format("[RaceFlow PenaltySeverity] L%d +%dPP (%s) total=%d", level, PP_BY_LEVEL[level] or 0, tostring(reason), state.totalPP))
+  ac.log(string.format("[ApexFlow PenaltySeverity] L%d +%dPP (%s) total=%d", level, PP_BY_LEVEL[level] or 0, tostring(reason), state.totalPP))
 end
 
 function M.update(dt, sim, cfg)

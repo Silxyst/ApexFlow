@@ -1,4 +1,4 @@
--- RaceFlow AI Controller v3 — Race Logic (reescrita v0.30.0)
+-- ApexFlow AI Controller v3 — Race Logic (reescrita v0.30.0)
 -- Foco: correr de verdade, disputar limpo, pensar antes de passar.
 -- Sem danger/memory/entryCap: ritmo livre, teto alto, freio tardio.
 -- API compat: update, applyProfileAggression, getSessionCarStats, multiclassClassifyNow
@@ -9,8 +9,8 @@ M._implProbe = M._implProbe or {}
 M._eventProbe = M._eventProbe or {}
 M._eventLog = M._eventLog or {}
 
-_G.RARE2_API = _G.RARE2_API or {}
-local RARE2_API = _G.RARE2_API
+_G.APEXFLOW_API = _G.APEXFLOW_API or {}
+local APEXFLOW_API = _G.APEXFLOW_API
 
 local drivers = {}
 local lastSessionIndex = -1
@@ -86,7 +86,7 @@ local function rebuildDrivers(sim, cfg)
 end
 
 function M.applyProfileAggression(cfg)
-  cfg = cfg or (_G.RARE2_CFG or {})
+  cfg = cfg or (_G.APEXFLOW_CFG or {})
   for idx, d in pairs(drivers) do
     local lv = 1.0
     if d.class == "attack" then lv = 1.05

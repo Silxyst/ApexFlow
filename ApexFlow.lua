@@ -1,10 +1,10 @@
--- ApexFlow — Independent race suite for Assetto Corsa (v0.31.2)
+-- ApexFlow — Independent race suite for Assetto Corsa (v0.32.0)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.31.2"
+SCRIPT_VERSION = "0.32.0"
 
-_G.RARE2_API = _G.RARE2_API or {}
-local RARE2_API = _G.RARE2_API
-_G.RACEFLOW_VERSION = "0.31.2"
+_G.APEXFLOW_API = _G.APEXFLOW_API or {}
+local APEXFLOW_API = _G.APEXFLOW_API
+_G.APEXFLOW_VERSION = "0.32.0"
 _G.APEXFLOW_VERSION = "0.13.1"
 
 local function clamp(v,a,b) if v<a then return a end if v>b then return b end return v end
@@ -20,7 +20,7 @@ local function safeRequire(name)
     return mod
   end
   modStatus[name] = "FAIL: " .. tostring(mod)
-  if ac and ac.log then ac.log(string.format("[RaceFlow] require('%s') failed: %s", tostring(name), tostring(mod))) end
+  if ac and ac.log then ac.log(string.format("[ApexFlow] require('%s') failed: %s", tostring(name), tostring(mod))) end
   return nil
 end
 
@@ -38,7 +38,7 @@ local penalty_sev  = safeRequire("src.penalty_severity")
 -- longer required. GitHub check lives in this file (single source of truth)
 -- to avoid dual-state bugs.
 
-local RARE2_CFG = {
+local APEXFLOW_CFG = {
   enabled      = true,
   aggression   = 65,
   paceEnabled  = true,
@@ -120,8 +120,8 @@ local RARE2_CFG = {
 }
 
 -- Expose config globally for src/* modules (they run in same Lua state
--- but RARE2_CFG is local here). This fixes M.getState() returning nil config.
-_G.RARE2_CFG = RARE2_CFG
+-- but APEXFLOW_CFG is local here). This fixes M.getState() returning nil config.
+_G.APEXFLOW_CFG = APEXFLOW_CFG
 
 -- ----------------------------------------------------------
 -- Track State & FIA State — limpo extremo v0.29.0: AC nativo assume, mantém GREEN fixo
@@ -134,7 +134,7 @@ local Track_State = {
   flags = {},
 }
 _G.Track_State = Track_State
-_G.RARE2_API.Track_State = Track_State
+_G.APEXFLOW_API.Track_State = Track_State
 local FIA_State = {
   mode = "GREEN",
   reason = "",
@@ -152,8 +152,8 @@ local function updateTrackState(dt, sim, cfg)
   FIA_State.timer = (FIA_State.timer or 0) + dt
   Track_State.flags = { state = Track_State.state, reason = "" }
 end
-RARE2_API.getTrackState = function() return Track_State end
-RARE2_API.getFIAState = function() return FIA_State end
+APEXFLOW_API.getTrackState = function() return Track_State end
+APEXFLOW_API.getFIAState = function() return FIA_State end
 
 -- ----------------------------------------------------------
 -- Category presets (v0.14.0) — one click for GT3/F1/Endurance etc.
@@ -169,16 +169,16 @@ local CATEGORY_PRESETS = {
 local function applyCategoryPreset(catKey)
   local p = CATEGORY_PRESETS[catKey]
   if not p then return false end
-  RARE2_CFG.categoryPreset = catKey
+  APEXFLOW_CFG.categoryPreset = catKey
   -- v0.29.0 limpo extremo: preset só marca categoria, sem tocar em 3,4,6 (removidos)
-  if RARE2_API and RARE2_API.markConfigDirty then RARE2_API.markConfigDirty() end
-  ac.log("[RaceFlow] Category preset applied: " .. tostring(p.label))
+  if APEXFLOW_API and APEXFLOW_API.markConfigDirty then APEXFLOW_API.markConfigDirty() end
+  ac.log("[ApexFlow] Category preset applied: " .. tostring(p.label))
   if ac.setMessage then pcall(ac.setMessage, "PRESET", p.label .. " aplicado") end
   return true
 end
-_G.RARE2_API = _G.RARE2_API or {}
-RARE2_API.applyCategoryPreset = applyCategoryPreset
-RARE2_API.getCategoryPresets = function() return CATEGORY_PRESETS end
+_G.APEXFLOW_API = _G.APEXFLOW_API or {}
+APEXFLOW_API.applyCategoryPreset = applyCategoryPreset
+APEXFLOW_API.getCategoryPresets = function() return CATEGORY_PRESETS end
 
 -- ----------------------------------------------------------
 -- Pit speed — real track limit (v0.14.0)
@@ -200,8 +200,8 @@ local function getRealPitSpeedLimit(sim)
   -- keep it simple: return nil to signal "use manual".
   return nil
 end
-_G.RARE2_API = _G.RARE2_API or {}
-RARE2_API.getRealPitSpeedLimit = getRealPitSpeedLimit
+_G.APEXFLOW_API = _G.APEXFLOW_API or {}
+APEXFLOW_API.getRealPitSpeedLimit = getRealPitSpeedLimit
 
 -- ----------------------------------------------------------
 -- Helpers de serialização (v0.24.0: declarados CEDO — o save/load
@@ -265,7 +265,7 @@ local function getTrackIdForSave(sim)
   return "unknown_track"
 end
 local function getPerTrackConfigPath(trackId)
-  return string.format("RaceFlow_config_%s.lua", tostring(trackId))
+  return string.format("ApexFlow_config_%s.lua", tostring(trackId))
 end
 local function savePerTrackConfig(trackId)
   if not trackId then
@@ -276,10 +276,10 @@ local function savePerTrackConfig(trackId)
   local f = io.open(path, "w")
   if not f then return false end
   f:write("return ")
-  f:write(serializeTable(RARE2_CFG, ""))
+  f:write(serializeTable(APEXFLOW_CFG, ""))
   f:write("\n")
   f:close()
-  ac.log("[RaceFlow] Per-track config saved: " .. path)
+  ac.log("[ApexFlow] Per-track config saved: " .. path)
   return true
 end
 local function loadPerTrackConfig(trackId)
@@ -289,16 +289,19 @@ local function loadPerTrackConfig(trackId)
   end
   local path = getPerTrackConfigPath(trackId)
   local chunk = loadfile(path)
+  if not chunk then -- pre-rename fallback (v0.31.2)
+    chunk = loadfile(string.format("RaceFlow_config_%s.lua", tostring(trackId)))
+  end
   if not chunk then return false end
   local ok, data = pcall(chunk)
   if not ok or type(data) ~= "table" then return false end
-  deepMerge(RARE2_CFG, data)
-  ac.log("[RaceFlow] Per-track config loaded: " .. path)
+  deepMerge(APEXFLOW_CFG, data)
+  ac.log("[ApexFlow] Per-track config loaded: " .. path)
   return true
 end
-_G.RARE2_API = _G.RARE2_API or {}
-RARE2_API.savePerTrackConfig = savePerTrackConfig
-RARE2_API.loadPerTrackConfig = loadPerTrackConfig
+_G.APEXFLOW_API = _G.APEXFLOW_API or {}
+APEXFLOW_API.savePerTrackConfig = savePerTrackConfig
+APEXFLOW_API.loadPerTrackConfig = loadPerTrackConfig
 
 -- ----------------------------------------------------------
 -- Telemetry CSV (v0.14.0) — lap-by-lap to Documents
@@ -308,20 +311,20 @@ local lastTelemetryLap = -1
 local function telemetryEnsureFile(sim)
   if telemetryFile then return telemetryFile end
   local trackId = getTrackIdForSave(sim)
-  local fname = string.format("RaceFlow_telemetry_%s_%s.csv", trackId, os.date("%Y%m%d_%H%M%S"))
+  local fname = string.format("ApexFlow_telemetry_%s_%s.csv", trackId, os.date("%Y%m%d_%H%M%S"))
   local okD, docs = pcall(ac.getFolder, ac.FolderID.Documents)
-  if not okD or not docs or docs=="" then ac.log("[RaceFlow] getFolder Documents failed"); return nil end
+  if not okD or not docs or docs=="" then ac.log("[ApexFlow] getFolder Documents failed"); return nil end
   docs = docs .. "/Assetto Corsa/"
   local path = docs .. fname
   local f = io.open(path, "w")
   if not f then return nil end
   f:write("lap,position,speedKmh,fuel,tyreWear,lapTimeMs,valid\n")
   telemetryFile = f
-  ac.log("[RaceFlow] Telemetry CSV started: " .. path)
+  ac.log("[ApexFlow] Telemetry CSV started: " .. path)
   return f
 end
 local function telemetryOnLap(sim)
-  if not RARE2_CFG.telemetryCSV or not RARE2_CFG.telemetryCSV.enabled then return end
+  if not APEXFLOW_CFG.telemetryCSV or not APEXFLOW_CFG.telemetryCSV.enabled then return end
   local ok, pcar = pcall(ac.getCar, 0)
   if not ok or not pcar then return end
   local lap = tonumber(pcar.lapCount) or 0
@@ -347,7 +350,7 @@ end
 -- Voice removido (3,4,6) — AC nativo assume; stubs de peso morto removidos v0.29.0
 -- ----------------------------------------------------------
 -- playVoiceWarning / voiceSay / voiceTest / voiceGetState / voiceEdge removidos
--- (mantidos apenas comentários; peso morto zero, sem acesso a RARE2_CFG.voice)
+-- (mantidos apenas comentários; peso morto zero, sem acesso a APEXFLOW_CFG.voice)
 
 -- ----------------------------------------------------------
 -- Light mechanical failures / driver errors for AI (v0.14.0)
@@ -372,11 +375,11 @@ local function maybeTriggerFailures(dt, sim, cfg)
           -- Slow for 15-30s: cut topspeed/throttle
           pcall(physics.setAITopSpeed, i, 60)
           pcall(physics.setAIThrottleLimit, i, 0.4)
-          ac.log(string.format("[RaceFlow] AI #%d mechanical: slow (15s)", i))
+          ac.log(string.format("[ApexFlow] AI #%d mechanical: slow (15s)", i))
           -- Schedule recovery via delayed reset (simple: rely on next AI update to restore)
         else
           if ac.requestPitStop then pcall(ac.requestPitStop, i) end
-          ac.log(string.format("[RaceFlow] AI #%d mechanical: extra pit", i))
+          ac.log(string.format("[ApexFlow] AI #%d mechanical: extra pit", i))
         end
         if ac.setMessage then pcall(ac.setMessage, "RACE CONTROL", string.format("AI #%d — mechanical issue", i)) end
       end
@@ -387,118 +390,118 @@ end
 -- ----------------------------------------------------------
 -- Learning / safety defaults (can be overridden by config/UI)
 -- ----------------------------------------------------------
-RARE2_CFG.learningEnabled = false
+APEXFLOW_CFG.learningEnabled = false
 -- v0.29.5 teste: danger/memory desligado para IA correr sem amarras
 
 -- Hard-event detection
-RARE2_CFG.offTrackConfirmSec   = 0.8
-RARE2_CFG.overshootTurnX       = 35
-RARE2_CFG.overshootMinSpeedKmh = 95
-RARE2_CFG.overshootMarginKmh   = 25
-RARE2_CFG.overshootMinSamples  = 8
-RARE2_CFG.overshootMaxTurnX    = 80
+APEXFLOW_CFG.offTrackConfirmSec   = 0.8
+APEXFLOW_CFG.overshootTurnX       = 35
+APEXFLOW_CFG.overshootMinSpeedKmh = 95
+APEXFLOW_CFG.overshootMarginKmh   = 25
+APEXFLOW_CFG.overshootMinSamples  = 8
+APEXFLOW_CFG.overshootMaxTurnX    = 80
 
 -- Hard-event impact on learning
-RARE2_CFG.hardEventDangerAdd       = 2.0
-RARE2_CFG.hardEventImprovePenalty  = 4.0
-RARE2_CFG.crashSpeedDropKmh        = 55
-RARE2_CFG.dangerDecayPerClean  = 0.35
-RARE2_CFG.dangerDecayPerSecond = 0.004
+APEXFLOW_CFG.hardEventDangerAdd       = 2.0
+APEXFLOW_CFG.hardEventImprovePenalty  = 4.0
+APEXFLOW_CFG.crashSpeedDropKmh        = 55
+APEXFLOW_CFG.dangerDecayPerClean  = 0.35
+APEXFLOW_CFG.dangerDecayPerSecond = 0.004
 
-RARE2_CFG.dangerGateCleanStreak = 12
+APEXFLOW_CFG.dangerGateCleanStreak = 12
 
-RARE2_CFG.dangerOvercapBonusPerEvent = 0.10
-RARE2_CFG.dangerOvercapMaxCeiling   = 2.80
+APEXFLOW_CFG.dangerOvercapBonusPerEvent = 0.10
+APEXFLOW_CFG.dangerOvercapMaxCeiling   = 2.80
 
-RARE2_CFG.dangerRampStartEvent = 4
-RARE2_CFG.dangerRampPow        = 1.35
-RARE2_CFG.dangerRampGain       = 0.18
+APEXFLOW_CFG.dangerRampStartEvent = 4
+APEXFLOW_CFG.dangerRampPow        = 1.35
+APEXFLOW_CFG.dangerRampGain       = 0.18
 
-RARE2_CFG.brakeBiasAddOnHardEvent   = 0.03
-RARE2_CFG.brakeBiasDecayPerClean    = 0.015
-RARE2_CFG.brakeBiasMax              = 0.15
-RARE2_CFG.brakeBiasThrottleLoss     = 0.06
+APEXFLOW_CFG.brakeBiasAddOnHardEvent   = 0.03
+APEXFLOW_CFG.brakeBiasDecayPerClean    = 0.015
+APEXFLOW_CFG.brakeBiasMax              = 0.15
+APEXFLOW_CFG.brakeBiasThrottleLoss     = 0.06
 
-RARE2_CFG.cornerLockEnabled     = true
-RARE2_CFG.cornerLockMinSamples  = 80
-RARE2_CFG.cornerLockCleanStreak = 120
+APEXFLOW_CFG.cornerLockEnabled     = true
+APEXFLOW_CFG.cornerLockMinSamples  = 80
+APEXFLOW_CFG.cornerLockCleanStreak = 120
 
-RARE2_CFG.entryCapHeadroomKmh           = 6
-RARE2_CFG.entryCapLearnUpKmhPerClean    = 1.0
-RARE2_CFG.entryCapMinKmh                = 60
-RARE2_CFG.entryCapMaxKmh                = 9999
+APEXFLOW_CFG.entryCapHeadroomKmh           = 6
+APEXFLOW_CFG.entryCapLearnUpKmhPerClean    = 1.0
+APEXFLOW_CFG.entryCapMinKmh                = 60
+APEXFLOW_CFG.entryCapMaxKmh                = 9999
 
-RARE2_CFG.entryCapDropKmhOnOvershoot    = 12
-RARE2_CFG.entryCapDropKmhOnContact      = 18
-RARE2_CFG.entryCapDropKmhOnSlide        = 22
-RARE2_CFG.entryCapDropKmhOnOfftrack     = 28
+APEXFLOW_CFG.entryCapDropKmhOnOvershoot    = 12
+APEXFLOW_CFG.entryCapDropKmhOnContact      = 18
+APEXFLOW_CFG.entryCapDropKmhOnSlide        = 22
+APEXFLOW_CFG.entryCapDropKmhOnOfftrack     = 28
 
-RARE2_CFG.entryCapPreMarginKmh          = 16
-RARE2_CFG.entryCapExcessWindowKmh       = 60
-RARE2_CFG.entryCapEarlyKickKmh          = 10
-RARE2_CFG.entryCapEarlyStartTurnX       = 85
-RARE2_CFG.entryCapEarlyEndTurnX         = 20
+APEXFLOW_CFG.entryCapPreMarginKmh          = 16
+APEXFLOW_CFG.entryCapExcessWindowKmh       = 60
+APEXFLOW_CFG.entryCapEarlyKickKmh          = 10
+APEXFLOW_CFG.entryCapEarlyStartTurnX       = 85
+APEXFLOW_CFG.entryCapEarlyEndTurnX         = 20
 
-RARE2_CFG.entryCapEscalateEvents            = 3
-RARE2_CFG.entryCapEscalateDanger            = 18
-RARE2_CFG.entryCapPreMarginBonusEscalated   = 10
-RARE2_CFG.entryCapWindowTightenEscalated    = 15
-RARE2_CFG.entryCapEscalatedStrengthMul      = 1.15
+APEXFLOW_CFG.entryCapEscalateEvents            = 3
+APEXFLOW_CFG.entryCapEscalateDanger            = 18
+APEXFLOW_CFG.entryCapPreMarginBonusEscalated   = 10
+APEXFLOW_CFG.entryCapWindowTightenEscalated    = 15
+APEXFLOW_CFG.entryCapEscalatedStrengthMul      = 1.15
 
-RARE2_CFG.entryCapBrakeGain             = 0.22
-RARE2_CFG.entryCapTopSpeedLoss          = 0.10
-RARE2_CFG.entryCapThrottleLoss          = 0.07
+APEXFLOW_CFG.entryCapBrakeGain             = 0.22
+APEXFLOW_CFG.entryCapTopSpeedLoss          = 0.10
+APEXFLOW_CFG.entryCapThrottleLoss          = 0.07
 
-RARE2_CFG.dangerCap            = 28
-RARE2_CFG.dangerOvercapSlope   = 0.10
-RARE2_CFG.dangerOvercapMax     = 1.15
-RARE2_CFG.dangerBrakeGain      = 0.04
-RARE2_CFG.dangerTopSpeedLoss   = 0.03
-RARE2_CFG.dangerThrottleLoss   = 0.03
-RARE2_CFG.earlyCapWindowM      = 250
-RARE2_CFG.earlyForceWindowM    = 120
-RARE2_CFG.dangerZoneDamp       = 0.40
-RARE2_CFG.dangerZoneThreshold  = 5.0
+APEXFLOW_CFG.dangerCap            = 28
+APEXFLOW_CFG.dangerOvercapSlope   = 0.10
+APEXFLOW_CFG.dangerOvercapMax     = 1.15
+APEXFLOW_CFG.dangerBrakeGain      = 0.04
+APEXFLOW_CFG.dangerTopSpeedLoss   = 0.03
+APEXFLOW_CFG.dangerThrottleLoss   = 0.03
+APEXFLOW_CFG.earlyCapWindowM      = 250
+APEXFLOW_CFG.earlyForceWindowM    = 120
+APEXFLOW_CFG.dangerZoneDamp       = 0.40
+APEXFLOW_CFG.dangerZoneThreshold  = 5.0
 
-RARE2_CFG.paceBaseChillOverride     = -0.05
-RARE2_CFG.paceBaseAttackOverride    =  0.13
-RARE2_CFG.jitterScale               = 1.10
-RARE2_CFG.singleClassBackCatchup    = 0.008
-RARE2_CFG.singleClassBackCurve      = 2.5
-RARE2_CFG.earlySpreadFrac           = 0.55
-RARE2_CFG.earlySpreadNormalBoost    = 0.085
-RARE2_CFG.earlySpreadAttackBoost    = 0.120
-RARE2_CFG.multiclassYieldStrength  = 85
-RARE2_CFG.multiclassPushStrength   = 75
-RARE2_CFG.multiclassYieldDistM     = 120
-RARE2_CFG.multiclassPushDistM      = 80
+APEXFLOW_CFG.paceBaseChillOverride     = -0.05
+APEXFLOW_CFG.paceBaseAttackOverride    =  0.13
+APEXFLOW_CFG.jitterScale               = 1.10
+APEXFLOW_CFG.singleClassBackCatchup    = 0.008
+APEXFLOW_CFG.singleClassBackCurve      = 2.5
+APEXFLOW_CFG.earlySpreadFrac           = 0.55
+APEXFLOW_CFG.earlySpreadNormalBoost    = 0.085
+APEXFLOW_CFG.earlySpreadAttackBoost    = 0.120
+APEXFLOW_CFG.multiclassYieldStrength  = 85
+APEXFLOW_CFG.multiclassPushStrength   = 75
+APEXFLOW_CFG.multiclassYieldDistM     = 120
+APEXFLOW_CFG.multiclassPushDistM      = 80
 
 -- v0.10.0: racecraft mais vivo por padrão (mais brigas e ultrapassagens).
-RARE2_CFG.stuckBehindDelay           = 0.7
-RARE2_CFG.stuckBehindRampTime        = 5.0
-RARE2_CFG.draftCommitRampGate        = 0.16
-RARE2_CFG.draftCommitTime            = 3.2
-RARE2_CFG.stuckBehindAggressionBoost = 0.22
-RARE2_CFG.stuckBehindPushBoost       = 0.035
-RARE2_CFG.draftCommitAggBoost        = 0.28
-RARE2_CFG.draftCommitPushBoost       = 0.052
-RARE2_CFG.draftCommitTopSpeedBoost   = 0.035
+APEXFLOW_CFG.stuckBehindDelay           = 0.7
+APEXFLOW_CFG.stuckBehindRampTime        = 5.0
+APEXFLOW_CFG.draftCommitRampGate        = 0.16
+APEXFLOW_CFG.draftCommitTime            = 3.2
+APEXFLOW_CFG.stuckBehindAggressionBoost = 0.22
+APEXFLOW_CFG.stuckBehindPushBoost       = 0.035
+APEXFLOW_CFG.draftCommitAggBoost        = 0.28
+APEXFLOW_CFG.draftCommitPushBoost       = 0.052
+APEXFLOW_CFG.draftCommitTopSpeedBoost   = 0.035
 
-RARE2_CFG.difficultyTopSpeedScale    = 0.22
+APEXFLOW_CFG.difficultyTopSpeedScale    = 0.22
 
-RARE2_CFG.lap1SuppressBase = 1.0
-RARE2_CFG.lap1RampFrac     = 0.0
-RARE2_CFG.lap1PaceBoost    = 0.05
+APEXFLOW_CFG.lap1SuppressBase = 1.0
+APEXFLOW_CFG.lap1RampFrac     = 0.0
+APEXFLOW_CFG.lap1PaceBoost    = 0.05
 
-RARE2_CFG.cleanAirTopSpeedBoost    = 0.020
-RARE2_CFG.cleanAirPushBoost        = 0.018
-RARE2_CFG.huntPaceBoost            = 0.030
-RARE2_CFG.huntDuration             = 50.0
-RARE2_CFG.tigerChancePerLap        = 0.04
+APEXFLOW_CFG.cleanAirTopSpeedBoost    = 0.020
+APEXFLOW_CFG.cleanAirPushBoost        = 0.018
+APEXFLOW_CFG.huntPaceBoost            = 0.030
+APEXFLOW_CFG.huntDuration             = 50.0
+APEXFLOW_CFG.tigerChancePerLap        = 0.04
 
-local MEMORY_FILE = "RaceFlow_memory.lua"
+local MEMORY_FILE = "ApexFlow_memory.lua"
 
-local RARE2_MEMORY = {
+local APEXFLOW_MEMORY = {
   tracks = {},
   drivers = {},
 }
@@ -524,128 +527,137 @@ if origSetMessage then
       if #raceMsgLog > MAX_MSG_LOG then table.remove(raceMsgLog) end
     end)
     if not ok and ac and ac.log then
-      ac.log("[RaceFlow] setMessage failed: " .. tostring(err))
+      ac.log("[ApexFlow] setMessage failed: " .. tostring(err))
     end
     return ok
   end
 end
-_G.RARE2_API = _G.RARE2_API or {}
-RARE2_API.getRaceMessages = function() return raceMsgLog end
+_G.APEXFLOW_API = _G.APEXFLOW_API or {}
+APEXFLOW_API.getRaceMessages = function() return raceMsgLog end
 
 ---------------------------------------------------------------------
 -- CONFIG SAVE / LOAD
 ---------------------------------------------------------------------
-local CONFIG_FILE = "RaceFlow_config.lua"
+local CONFIG_FILE = "ApexFlow_config.lua"
 local LEGACY_CONFIG_FILE = "RARE_2_0_config.lua"
+local LEGACY_RACEFLOW_CONFIG = "RaceFlow_config.lua" -- pre-rename (v0.31.2)
 
 local function saveConfigToFile()
   local f, err = io.open(CONFIG_FILE, "w")
   if not f then
-    ac.log(string.format("[RaceFlow] Failed to save config: %s", tostring(err)))
+    ac.log(string.format("[ApexFlow] Failed to save config: %s", tostring(err)))
     return false
   end
 
   f:write("return ")
-  f:write(serializeTable(RARE2_CFG, ""))
+  f:write(serializeTable(APEXFLOW_CFG, ""))
   f:write("\n")
   f:close()
 
-  ac.log("[RaceFlow] Config saved to " .. CONFIG_FILE)
+  ac.log("[ApexFlow] Config saved to " .. CONFIG_FILE)
   return true
 end
 
 local function loadConfigFromFile()
   local chunk, err = loadfile(CONFIG_FILE)
   if not chunk then
+    chunk, err = loadfile(LEGACY_RACEFLOW_CONFIG)
+    if chunk then ac.log("[ApexFlow] Migrated legacy RaceFlow_config.lua") end
+  end
+  if not chunk then
     chunk, err = loadfile(LEGACY_CONFIG_FILE)
   end
   if not chunk then
-    ac.log(string.format("[RaceFlow] No config file to load or error: %s", tostring(err)))
+    ac.log(string.format("[ApexFlow] No config file to load or error: %s", tostring(err)))
     return
   end
   local ok, data = pcall(chunk)
   if not ok or type(data) ~= "table" then
-    ac.log("[RaceFlow] Failed to load config table: " .. tostring(data))
+    ac.log("[ApexFlow] Failed to load config table: " .. tostring(data))
     return
   end
-  deepMerge(RARE2_CFG, data)
-  ac.log("[RaceFlow] Config loaded successfully")
+  deepMerge(APEXFLOW_CFG, data)
+  ac.log("[ApexFlow] Config loaded successfully")
 end
 
 local function saveMemoryToFile()
   local f, err = io.open(MEMORY_FILE, "w")
   if not f then
-    ac.log(string.format("[RaceFlow] Failed to save memory: %s", tostring(err)))
+    ac.log(string.format("[ApexFlow] Failed to save memory: %s", tostring(err)))
     return
   end
 
   f:write("return ")
-  f:write(serializeTable(RARE2_MEMORY, ""))
+  f:write(serializeTable(APEXFLOW_MEMORY, ""))
   f:write("\n")
   f:close()
 
-  ac.log("[RaceFlow] Memory saved to " .. MEMORY_FILE)
+  ac.log("[ApexFlow] Memory saved to " .. MEMORY_FILE)
 end
 
 local function loadMemoryFromFile()
   local chunk, err = loadfile(MEMORY_FILE)
   if not chunk then
-    ac.log(string.format("[RaceFlow] Memory load skipped (%s)", tostring(err)))
+    chunk, err = loadfile("RaceFlow_memory.lua") -- pre-rename (v0.31.2)
+    if chunk then ac.log("[ApexFlow] Migrated legacy RaceFlow_memory.lua") end
+  end
+  if not chunk then
+    ac.log(string.format("[ApexFlow] Memory load skipped (%s)", tostring(err)))
     return
   end
 
   local ok, data = pcall(chunk)
   if not ok or type(data) ~= "table" then
-    ac.log("[RaceFlow] Failed to load memory table from " .. MEMORY_FILE)
+    ac.log("[ApexFlow] Failed to load memory table from " .. MEMORY_FILE)
     return
   end
 
-  for k in pairs(RARE2_MEMORY) do
-    RARE2_MEMORY[k] = nil
+  for k in pairs(APEXFLOW_MEMORY) do
+    APEXFLOW_MEMORY[k] = nil
   end
   for k, v in pairs(data) do
-    RARE2_MEMORY[k] = v
+    APEXFLOW_MEMORY[k] = v
   end
 
-  ac.log("[RaceFlow] Memory loaded from " .. MEMORY_FILE)
+  ac.log("[ApexFlow] Memory loaded from " .. MEMORY_FILE)
 end
 
-_G.RARE2_API = _G.RARE2_API or {}
-RARE2_API.saveConfig = saveConfigToFile
-RARE2_API.loadConfig = loadConfigFromFile
-RARE2_API.saveMemory = saveMemoryToFile
-RARE2_API.loadMemory = loadMemoryFromFile
-RARE2_API.getMemory  = function() return RARE2_MEMORY end
-RARE2_API.markConfigDirty = function()
-  if _G.RARE2_API then RARE2_API._configDirty = true end
+_G.APEXFLOW_API = _G.APEXFLOW_API or {}
+APEXFLOW_API.saveConfig = saveConfigToFile
+APEXFLOW_API.loadConfig = loadConfigFromFile
+APEXFLOW_API.saveMemory = saveMemoryToFile
+APEXFLOW_API.loadMemory = loadMemoryFromFile
+APEXFLOW_API.getMemory  = function() return APEXFLOW_MEMORY end
+APEXFLOW_API.markConfigDirty = function()
+  if _G.APEXFLOW_API then APEXFLOW_API._configDirty = true end
 end
-RARE2_API.resetToDefaults = function()
+APEXFLOW_API.resetToDefaults = function()
     -- v0.31.0: alinhado com os defaults de init (era 50/100/65 defasado)
-    RARE2_CFG.aggression = 65
-    RARE2_CFG.difficultyBoost = 104
-    RARE2_CFG.paceStrength = 78
-    RARE2_CFG.stuckBehindDelay = 0.7
-    RARE2_CFG.stuckBehindRampTime = 5.0
-    RARE2_CFG.draftCommitRampGate = 0.16
-    RARE2_CFG.draftCommitTime = 3.2
-    RARE2_CFG.stuckBehindAggressionBoost = 0.22
-    RARE2_CFG.stuckBehindPushBoost = 0.035
-    RARE2_CFG.draftCommitAggBoost = 0.28
-    RARE2_CFG.draftCommitPushBoost = 0.052
-    RARE2_CFG.draftCommitTopSpeedBoost = 0.035
-    RARE2_CFG.huntDuration = 50.0
-    RARE2_CFG.tigerChancePerLap = 0.04
-    if RARE2_CFG.strategy then
-      RARE2_CFG.strategy.manualRaceLaps = 20
-      RARE2_CFG.strategy.forcedStops = 1
-      RARE2_CFG.strategy.tireChangeEnabled = true
-      RARE2_CFG.strategy.tireFreshnessPct = 50
+    APEXFLOW_CFG.aggression = 65
+    APEXFLOW_CFG.difficultyBoost = 104
+    APEXFLOW_CFG.paceStrength = 78
+    APEXFLOW_CFG.stuckBehindDelay = 0.7
+    APEXFLOW_CFG.stuckBehindRampTime = 5.0
+    APEXFLOW_CFG.draftCommitRampGate = 0.16
+    APEXFLOW_CFG.draftCommitTime = 3.2
+    APEXFLOW_CFG.stuckBehindAggressionBoost = 0.22
+    APEXFLOW_CFG.stuckBehindPushBoost = 0.035
+    APEXFLOW_CFG.draftCommitAggBoost = 0.28
+    APEXFLOW_CFG.draftCommitPushBoost = 0.052
+    APEXFLOW_CFG.draftCommitTopSpeedBoost = 0.035
+    APEXFLOW_CFG.huntDuration = 50.0
+    APEXFLOW_CFG.tigerChancePerLap = 0.04
+    if APEXFLOW_CFG.strategy then
+      APEXFLOW_CFG.strategy.manualRaceLaps = 20
+      APEXFLOW_CFG.strategy.forcedStops = 1
+      APEXFLOW_CFG.strategy.tireChangeEnabled = true
+      APEXFLOW_CFG.strategy.tireFreshnessPct = 50
     end
     -- NOTE v0.5.0: vsc reset block removed with the VSC system.
     -- Old saved configs may still contain cfg.vsc; it is ignored.
     -- v0.29.0: caution/tracklimits removidos (3,4) — reset ignora peso morto
-    if RARE2_CFG.hudEvents then
-      local h = RARE2_CFG.hudEvents
+    if APEXFLOW_CFG.hudEvents then
+      local h = APEXFLOW_CFG.hudEvents
       h.showStrategy = (h.showStrategy ~= false)
       h.showPosition = (h.showPosition ~= false)
       h.showSession = (h.showSession ~= false)
@@ -659,32 +671,32 @@ RARE2_API.resetToDefaults = function()
       h.showDeltaLive = (h.showDeltaLive ~= false)
       h.showGapBehind = (h.showGapBehind ~= false)
     end
-    if RARE2_CFG.githubUpdate then
-      RARE2_CFG.githubUpdate.enabled = true
-      RARE2_CFG.githubUpdate.repo = "Silxyst/RaceFlow-V2"
-      RARE2_CFG.githubUpdate.checkIntervalHours = 24
-      RARE2_CFG.githubUpdate.notifyOnStartup = true
+    if APEXFLOW_CFG.githubUpdate then
+      APEXFLOW_CFG.githubUpdate.enabled = true
+      APEXFLOW_CFG.githubUpdate.repo = "Silxyst/RaceFlow-V2"
+      APEXFLOW_CFG.githubUpdate.checkIntervalHours = 24
+      APEXFLOW_CFG.githubUpdate.notifyOnStartup = true
     end
-    if RARE2_CFG.webui then
-      RARE2_CFG.webui.enabled = false
-      RARE2_CFG.webui.port = 8080
-      RARE2_CFG.webui.authToken = ""
+    if APEXFLOW_CFG.webui then
+      APEXFLOW_CFG.webui.enabled = false
+      APEXFLOW_CFG.webui.port = 8080
+      APEXFLOW_CFG.webui.authToken = ""
     end
-    if RARE2_CFG.ui then
-      RARE2_CFG.ui.accent = "orange"
-      RARE2_CFG.ui.bgAlpha = 1.0
-      RARE2_CFG.ui.corner = 8
-      RARE2_CFG.ui.compactHeaders = false
+    if APEXFLOW_CFG.ui then
+      APEXFLOW_CFG.ui.accent = "orange"
+      APEXFLOW_CFG.ui.bgAlpha = 1.0
+      APEXFLOW_CFG.ui.corner = 8
+      APEXFLOW_CFG.ui.compactHeaders = false
     end
-    if RARE2_CFG.pitSpeedReal then RARE2_CFG.pitSpeedReal.enabled = true end
-    if RARE2_CFG.telemetryCSV then RARE2_CFG.telemetryCSV.enabled = false end
+    if APEXFLOW_CFG.pitSpeedReal then APEXFLOW_CFG.pitSpeedReal.enabled = true end
+    if APEXFLOW_CFG.telemetryCSV then APEXFLOW_CFG.telemetryCSV.enabled = false end
     -- v0.29.0: voice/realPenalty/fia removidos (3,4,6) — não resetar peso morto
-    if RARE2_CFG.failures then
-      RARE2_CFG.failures.enabled = false
-      RARE2_CFG.failures.chancePerHour = 0.08
-      RARE2_CFG.failures.minLap = 3
+    if APEXFLOW_CFG.failures then
+      APEXFLOW_CFG.failures.enabled = false
+      APEXFLOW_CFG.failures.chancePerHour = 0.08
+      APEXFLOW_CFG.failures.minLap = 3
     end
-    RARE2_CFG.categoryPreset = "custom"
+    APEXFLOW_CFG.categoryPreset = "custom"
     saveConfigToFile()
     return true
   end
@@ -712,7 +724,7 @@ local function githubCheckUpdates(cfg, force)
     if not webReqMissingLogged then
       webReqMissingLogged = true
       githubState.error = "ac.webRequest indisponível nesta build do CSP (auto-check desativado; use verificação manual se disponível)"
-      ac.log("[RaceFlow GitHub] ac.webRequest not available in this CSP build; automatic checks disabled (logged once)")
+      ac.log("[ApexFlow GitHub] ac.webRequest not available in this CSP build; automatic checks disabled (logged once)")
     end
     return
   end
@@ -729,22 +741,22 @@ local function githubCheckUpdates(cfg, force)
   githubState.lastCheck = now
 
   local url = string.format("https://api.github.com/repos/%s/releases/latest", cfg.githubUpdate.repo or "Silxyst/RaceFlow-V2")
-  ac.log("[RaceFlow GitHub] Checking for updates: " .. url)
+  ac.log("[ApexFlow GitHub] Checking for updates: " .. url)
 
   ac.webRequest({
     url = url,
     method = "GET",
-    headers = { ["User-Agent"] = "RaceFlow-AC-App" },
+    headers = { ["User-Agent"] = "ApexFlow-AC-App" },
     callback = function(err, response)
       githubState.checking = false
       if err then
         githubState.error = tostring(err)
-        ac.log("[RaceFlow GitHub] Request failed: " .. githubState.error)
+        ac.log("[ApexFlow GitHub] Request failed: " .. githubState.error)
         return
       end
       if not response or response.status ~= 200 then
         githubState.error = "HTTP " .. tostring(response and response.status or "nil")
-        ac.log("[RaceFlow GitHub] " .. githubState.error)
+        ac.log("[ApexFlow GitHub] " .. githubState.error)
         return
       end
 
@@ -752,7 +764,7 @@ local function githubCheckUpdates(cfg, force)
       local ok, data = pcall(function() return ac.decodeJson(body) end)
       if not ok or not data then
         githubState.error = "JSON parse failed"
-        ac.log("[RaceFlow GitHub] " .. githubState.error)
+        ac.log("[ApexFlow GitHub] " .. githubState.error)
         return
       end
 
@@ -770,7 +782,7 @@ local function githubCheckUpdates(cfg, force)
       local lM, lm, lP = parseVer(version)
       githubState.hasUpdate = (lM > cM) or (lM == cM and lm > cm) or (lM == cM and lm == cm and lP > cP)
 
-      ac.log(string.format("[RaceFlow GitHub] Current: %s, Latest: %s, Update: %s",
+      ac.log(string.format("[ApexFlow GitHub] Current: %s, Latest: %s, Update: %s",
         SCRIPT_VERSION, version, githubState.hasUpdate and "YES" or "NO"))
     end
   })
@@ -798,47 +810,47 @@ function script.update(dt)
     configLoaded = true
   end
 
-  if not memoryLoaded and _G.RARE2_API and RARE2_API.loadMemory then
-    RARE2_API.loadMemory()
+  if not memoryLoaded and _G.APEXFLOW_API and APEXFLOW_API.loadMemory then
+    APEXFLOW_API.loadMemory()
     memoryLoaded = true
   end
 
   -- GitHub update check on startup + periodic (self-throttled inside)
-  if RARE2_CFG.githubUpdate and RARE2_CFG.githubUpdate.enabled then
-    if not githubStartupChecked and RARE2_CFG.githubUpdate.notifyOnStartup then
+  if APEXFLOW_CFG.githubUpdate and APEXFLOW_CFG.githubUpdate.enabled then
+    if not githubStartupChecked and APEXFLOW_CFG.githubUpdate.notifyOnStartup then
       githubStartupChecked = true
-      githubCheckUpdates(RARE2_CFG, true) -- force check on startup
+      githubCheckUpdates(APEXFLOW_CFG, true) -- force check on startup
     else
-      githubCheckUpdates(RARE2_CFG, false) -- interval check
+      githubCheckUpdates(APEXFLOW_CFG, false) -- interval check
     end
   end
 
   if sim.isOnlineRace then return end
   if not sim.isSessionStarted then return end
-  if not RARE2_CFG.enabled then return end
+  if not APEXFLOW_CFG.enabled then return end
 
   -- NOTE v0.5.0: VSC system removed (was here).
 
   -- Web UI (remote file-based polling)
   if webui and webui.update then
-    webui.update(dt, sim, RARE2_CFG)
+    webui.update(dt, sim, APEXFLOW_CFG)
   end
 
   -- Rolling Start
   local rollingActive = false
   if rolling and rolling.update then
-    rollingActive = (rolling.update(dt, sim, RARE2_CFG) == true)
+    rollingActive = (rolling.update(dt, sim, APEXFLOW_CFG) == true)
   end
 
   if not rollingActive then
     if strategy and strategy.update then
-      strategy.update(dt, sim, RARE2_CFG)
+      strategy.update(dt, sim, APEXFLOW_CFG)
     end
   end
 
   if ai and ai.update then
-    local okA, errA = pcall(ai.update, dt, sim, RARE2_CFG)
-    if not okA then ac.log("[RaceFlow] ai.update: " .. tostring(errA)) end
+    local okA, errA = pcall(ai.update, dt, sim, APEXFLOW_CFG)
+    if not okA then ac.log("[ApexFlow] ai.update: " .. tostring(errA)) end
   end
 
   -- v0.31.1: boost anti-fila (só velocidade — offset lateral é só da IA, sem briga dupla)
@@ -883,16 +895,16 @@ function script.update(dt)
 
   -- v0.29.0 limpa extrema: gaps/penalties mantidos (5) — 3,4,6 removidos (sem peso morto)
   if not rollingActive and gap_behind and gap_behind.update then
-    pcall(gap_behind.update, dt, sim, RARE2_CFG)
+    pcall(gap_behind.update, dt, sim, APEXFLOW_CFG)
   end
   if sector_gaps and sector_gaps.update then
-    pcall(sector_gaps.update, dt, sim, RARE2_CFG)
+    pcall(sector_gaps.update, dt, sim, APEXFLOW_CFG)
   end
   if penalty_sev and penalty_sev.update then
-    pcall(penalty_sev.update, dt, sim, RARE2_CFG)
+    pcall(penalty_sev.update, dt, sim, APEXFLOW_CFG)
   end
   -- FIA / Track_State — mantiene GREEN (peso morto removido, sem caution/realpenalty)
-  pcall(updateTrackState, dt, sim, RARE2_CFG)
+  pcall(updateTrackState, dt, sim, APEXFLOW_CFG)
 
   -- Auto-save per track (v0.14.0)
   do
@@ -909,30 +921,30 @@ function script.update(dt)
   end
 
   -- Telemetry CSV (v0.14.0)
-  if RARE2_CFG.telemetryCSV and RARE2_CFG.telemetryCSV.enabled then
+  if APEXFLOW_CFG.telemetryCSV and APEXFLOW_CFG.telemetryCSV.enabled then
     pcall(telemetryOnLap, sim)
   end
 
   -- Light failures for AI (v0.14.0)
-  if RARE2_CFG.failures and RARE2_CFG.failures.enabled then
-    pcall(maybeTriggerFailures, dt, sim, RARE2_CFG)
+  if APEXFLOW_CFG.failures and APEXFLOW_CFG.failures.enabled then
+    pcall(maybeTriggerFailures, dt, sim, APEXFLOW_CFG)
   end
 
   memorySaveCooldown = math.max(0.0, memorySaveCooldown - dt)
-  if _G.RARE2_API and RARE2_API._memoryDirty and memorySaveCooldown <= 0.0 then
-    if RARE2_API.saveMemory then
-      pcall(RARE2_API.saveMemory)
+  if _G.APEXFLOW_API and APEXFLOW_API._memoryDirty and memorySaveCooldown <= 0.0 then
+    if APEXFLOW_API.saveMemory then
+      pcall(APEXFLOW_API.saveMemory)
     end
-    RARE2_API._memoryDirty = false
+    APEXFLOW_API._memoryDirty = false
     memorySaveCooldown = memorySaveInterval
   end
 
   configSaveCooldown = math.max(0.0, configSaveCooldown - dt)
-  if _G.RARE2_API and RARE2_API._configDirty and configSaveCooldown <= 0.0 then
-    if RARE2_API.saveConfig then
-      pcall(RARE2_API.saveConfig)
+  if _G.APEXFLOW_API and APEXFLOW_API._configDirty and configSaveCooldown <= 0.0 then
+    if APEXFLOW_API.saveConfig then
+      pcall(APEXFLOW_API.saveConfig)
     end
-    RARE2_API._configDirty = false
+    APEXFLOW_API._configDirty = false
     configSaveCooldown = configSaveInterval
   end
 end
@@ -942,17 +954,17 @@ end
 -- NOTE v0.5.0: VSC removido. v0.29.0: caution/tracklimits/voice/box/safety/realpenalty removidos (3,4,6)
 -- ==========================================================
 -- caution/tracklimits/voice/box/safety/realpenalty exports removidos (peso morto)
-RARE2_API.getStrategyState = function(cfg) return strategy and strategy.getState and strategy.getState(cfg or RARE2_CFG) or {} end
+APEXFLOW_API.getStrategyState = function(cfg) return strategy and strategy.getState and strategy.getState(cfg or APEXFLOW_CFG) or {} end
 -- v0.25.0: conformidade — gaps e penalidades mantidos (5)
-RARE2_API.getGapBehindState = function() return gap_behind and gap_behind.getState and gap_behind.getState() or {} end
-RARE2_API.getSectorGapsState = function() return sector_gaps and sector_gaps.getState and sector_gaps.getState() or {} end
-RARE2_API.getPenaltySeverityState = function() return penalty_sev and penalty_sev.getState and penalty_sev.getState() or {} end
-RARE2_API.reportPenaltySeverity = function(level, reason) if penalty_sev and penalty_sev.report then return penalty_sev.report(level, reason) end end
+APEXFLOW_API.getGapBehindState = function() return gap_behind and gap_behind.getState and gap_behind.getState() or {} end
+APEXFLOW_API.getSectorGapsState = function() return sector_gaps and sector_gaps.getState and sector_gaps.getState() or {} end
+APEXFLOW_API.getPenaltySeverityState = function() return penalty_sev and penalty_sev.getState and penalty_sev.getState() or {} end
+APEXFLOW_API.reportPenaltySeverity = function(level, reason) if penalty_sev and penalty_sev.report then return penalty_sev.report(level, reason) end end
 -- RealPenalty/sound/box/safety/voice/caution removidos — AC nativo assume
-RARE2_API.githubCheckUpdates = function(cfg, force)
-  githubCheckUpdates(cfg or RARE2_CFG, force)
+APEXFLOW_API.githubCheckUpdates = function(cfg, force)
+  githubCheckUpdates(cfg or APEXFLOW_CFG, force)
 end
-RARE2_API.githubGetState = function()
+APEXFLOW_API.githubGetState = function()
   return {
     checking = githubState.checking,
     lastCheck = githubState.lastCheck,
@@ -964,20 +976,20 @@ RARE2_API.githubGetState = function()
     tagName = githubState.tagName,
     publishedAt = githubState.publishedAt,
     htmlUrl = githubState.htmlUrl,
-    repo = RARE2_CFG.githubUpdate and RARE2_CFG.githubUpdate.repo or "Silxyst/RaceFlow-V2",
+    repo = APEXFLOW_CFG.githubUpdate and APEXFLOW_CFG.githubUpdate.repo or "Silxyst/RaceFlow-V2",
   }
 end
-RARE2_API.webuiGetState = function() return webui and webui.getState and webui.getState() or {} end
+APEXFLOW_API.webuiGetState = function() return webui and webui.getState and webui.getState() or {} end
 
 -- ==========================================================
 -- WINDOWS
 -- ==========================================================
 local function drawFallbackIfMissingModules()
   ui.pushFont(ui.Font.Title)
-  ui.textAligned("RaceFlow", vec2(0.5, 0.5), vec2(ui.availableSpaceX(), 34))
+  ui.textAligned("ApexFlow", vec2(0.5, 0.5), vec2(ui.availableSpaceX(), 34))
   ui.popFont()
   ui.newLine(4)
-  ui.textWrapped("RaceFlow modules failed to load. Check custom_shaders_patch.log for require() errors.")
+  ui.textWrapped("ApexFlow modules failed to load. Check custom_shaders_patch.log for require() errors.")
   ui.newLine(4)
   ui.separator()
   ui.text("Module status: (v0.28.1 extrema 1,2,5,7,8)")
@@ -991,7 +1003,7 @@ function script.windowMain()
   local ok, sim = pcall(ac.getSim)
   if not ok or not sim then sim = nil end
   if ui_root and ui_root.draw then
-    ui_root.draw(sim, RARE2_CFG)
+    ui_root.draw(sim, APEXFLOW_CFG)
   else
     drawFallbackIfMissingModules()
   end
@@ -1001,10 +1013,10 @@ function script.windowSetup()
   local ok, sim = pcall(ac.getSim)
   if not ok or not sim then sim = nil end
   if ui_root and ui_root.draw then
-    ui_root.draw(sim, RARE2_CFG)
+    ui_root.draw(sim, APEXFLOW_CFG)
   else
     ui.pushFont(ui.Font.Title)
-    ui.textAligned("RaceFlow", vec2(0.5, 0.5), vec2(ui.availableSpaceX(), 34))
+    ui.textAligned("ApexFlow", vec2(0.5, 0.5), vec2(ui.availableSpaceX(), 34))
     ui.popFont()
     drawFallbackIfMissingModules()
   end
@@ -1021,7 +1033,7 @@ end
 -- Small overlay window; every read is guarded so it never crashes.
 ---------------------------------------------------------------------
 -- v0.12.0: Full-featured, customizable Race Events HUD.
--- Each section honors RARE2_CFG.hudEvents toggles; visuals degrade gracefully.
+-- Each section honors APEXFLOW_CFG.hudEvents toggles; visuals degrade gracefully.
 local function hudPulse(speed, lo, hi)
   local t = (os.clock() or 0) * (speed or 4)
   local s = (math.sin(t) + 1) / 2
@@ -1051,14 +1063,14 @@ end
 -- v0.24.0 Sug4/Sug5: file-locals do HUD (auto-hide no box + preview fake)
 local pitHideSince = nil
 local hudPreviewUntil = 0
-RARE2_API.hudPreviewStart = function(secs)
+APEXFLOW_API.hudPreviewStart = function(secs)
   hudPreviewUntil = (os.clock() or 0) + (tonumber(secs) or 10)
   return true
 end
 
 -- Barra fina de combustível do herói (usa hudBar p/ respeitar o toggle de barras)
 local function animBarPlaceholder(fuel, maxF)
-  hudBar(maxF > 0 and (fuel / maxF) or 0, (RARE2_CFG and RARE2_CFG.hudEvents) or {})
+  hudBar(maxF > 0 and (fuel / maxF) or 0, (APEXFLOW_CFG and APEXFLOW_CFG.hudEvents) or {})
 end
 
 local function drawRaceEventsBody()
@@ -1067,7 +1079,7 @@ local function drawRaceEventsBody()
   local okS, sim = pcall(ac.getSim)
   if not okS then sim = nil end
   local inSession = sim and sim.isSessionStarted
-  local hudCfg = (RARE2_CFG and RARE2_CFG.hudEvents) or {}
+  local hudCfg = (APEXFLOW_CFG and APEXFLOW_CFG.hudEvents) or {}
   local showStrategy= hudCfg.showStrategy ~= false
   local showPos     = hudCfg.showPosition ~= false
   local showSess    = hudCfg.showSession ~= false
@@ -1077,8 +1089,8 @@ local function drawRaceEventsBody()
   local green = rgbm and rgbm(0.25, 0.95, 0.45, 1.0) or nil
   local cyan  = rgbm and rgbm(0.22, 0.88, 1.00, 1.0) or nil
 
-  local api = _G.RARE2_API or {}
-  local st = (showStrategy and api.getStrategyState and api.getStrategyState(RARE2_CFG)) or {}
+  local api = _G.APEXFLOW_API or {}
+  local st = (showStrategy and api.getStrategyState and api.getStrategyState(APEXFLOW_CFG)) or {}
   local gs = (showExtras and api.githubGetState and api.githubGetState()) or {}
 
   -- Sug4: box parado +10s => HUD dorme (1 linha explicando, sem poluir)
@@ -1115,7 +1127,7 @@ local function drawRaceEventsBody()
       -- Sug3: identidade por categoria (GT3 laranja, F1 vermelho…)
       local heroCol = nil
       if showExtras and rgbm then
-        local pk = (_G.RARE2_CFG and _G.RARE2_CFG.categoryPreset) or "custom"
+        local pk = (_G.APEXFLOW_CFG and _G.APEXFLOW_CFG.categoryPreset) or "custom"
         local pm = { gt3 = {1.0,0.55,0.15}, gt4 = {0.25,0.95,0.45}, tcr = {0.22,0.88,1.0},
                      f1 = {1.0,0.35,0.35}, lmp = {0.70,0.50,1.0}, endurance = {0.20,0.90,0.80} }
         local cc = pm[pk]
@@ -1270,7 +1282,7 @@ local function drawRaceEventsBody()
   if showExtras and not compact then
     local bits = {}
     -- Preset atual (mesmo nome da lista do app)
-    local presetKey = (_G.RARE2_CFG and _G.RARE2_CFG.categoryPreset) or "custom"
+    local presetKey = (_G.APEXFLOW_CFG and _G.APEXFLOW_CFG.categoryPreset) or "custom"
     if presetKey ~= "custom" then
       local label = presetKey:upper()
       if api.getCategoryPresets then
@@ -1322,7 +1334,7 @@ local function drawRaceEventsBody()
 
   -- ===== Rodapé: versão + LIVE + atalho p/ o app =====
   if not compact then
-    local v = _G.RACEFLOW_VERSION or SCRIPT_VERSION or "?"
+    local v = _G.APEXFLOW_VERSION or SCRIPT_VERSION or "?"
     ui.textDisabled("ApexFlow v" .. tostring(v) .. (previewOn and " • 👁 PREVIEW" or "") .. (inSession and " • LIVE" or ""))
     ui.sameLine(0, 8)
     if ui.button("⚙ App##hud_open_app", vec2(70, 22)) then
