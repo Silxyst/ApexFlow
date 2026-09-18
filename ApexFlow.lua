@@ -1,10 +1,10 @@
--- ApexFlow — Independent race suite for Assetto Corsa (v0.32.12)
+-- ApexFlow — Independent race suite for Assetto Corsa (v0.33.0)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.32.12"
+SCRIPT_VERSION = "0.33.0"
 
 _G.APEXFLOW_API = _G.APEXFLOW_API or {}
 local APEXFLOW_API = _G.APEXFLOW_API
-_G.APEXFLOW_VERSION = "0.32.12"
+_G.APEXFLOW_VERSION = "0.33.0"
 
 local function clamp(v,a,b) if v<a then return a end if v>b then return b end return v end
 local function lerp(a,b,t) return a + (b-a)*t end
@@ -28,7 +28,6 @@ local ui_root      = safeRequire("src.ui")
 local ai           = safeRequire("src.ai_controller")
 local rolling      = safeRequire("src.rolling_start")
 local strategy     = safeRequire("src.race_strategy")
-local webui        = safeRequire("src.webui")
 local gap_behind   = safeRequire("src.gap_behind")
 local sector_gaps  = safeRequire("src.sector_gaps")
 local penalty_sev  = safeRequire("src.penalty_severity")
@@ -96,11 +95,7 @@ local APEXFLOW_CFG = {
     showGapBehind = true,
   },
 
-  webui = {
-    enabled = false,
-    port = 8080,
-    authToken = "",
-  },
+  -- v0.33.0: Web UI removida (painel é a janela Panel dentro do jogo)
 
   packs = { pace = true, ers = true, traffic = true, hud = true },
 
@@ -653,11 +648,7 @@ APEXFLOW_API.resetToDefaults = function()
       APEXFLOW_CFG.githubUpdate.checkIntervalHours = 24
       APEXFLOW_CFG.githubUpdate.notifyOnStartup = true
     end
-    if APEXFLOW_CFG.webui then
-      APEXFLOW_CFG.webui.enabled = false
-      APEXFLOW_CFG.webui.port = 8080
-      APEXFLOW_CFG.webui.authToken = ""
-    end
+    -- v0.33.0: Web UI removida
     if APEXFLOW_CFG.ui then
       APEXFLOW_CFG.ui.accent = "orange"
       APEXFLOW_CFG.ui.bgAlpha = 1.0
@@ -821,42 +812,6 @@ local githubState = {
 -- builds (incl. 0.3.0-preview542). Without this guard the check logs
 -- EVERY frame (~400+ lines/session). Probe once, stay silent afterwards.
 local webReqMissingLogged = false
--- Fallback sem HTTP no jogo: lê ApexFlow_update.json gravado pelo
--- panel_server.py / check_update.py (mesmo formato da API do GitHub).
-local function githubCheckFromFile(cfg)
-  local okD, docs = pcall(ac.getFolder, ac.FolderID.Documents)
-  if not okD or not docs or docs == "" then return false end
-  local f = io.open(docs .. "/Assetto Corsa/ApexFlow_update.json", "r")
-  if not f then return false end
-  local content = f:read("*a")
-  f:close()
-  if not content or content == "" then return false end
-  local data = decodeJsonSafe(content)
-  if type(data) ~= "table" then return false end
-  -- Só vale para o mesmo repositório
-  if data.repo and data.repo ~= (cfg.githubUpdate.repo or "Silxyst/ApexFlow") then return false end
-  local version = tostring(data.version or "")
-  if version == "" then return false end
-  githubState.latestVersion = version
-  githubState.changelog = data.changelog or ""
-  githubState.tagName = data.tag
-  githubState.publishedAt = data.published_at
-  githubState.htmlUrl = data.html_url
-  githubState.checkedAt = data.checked_at
-  githubState.fromFile = true
-  local function parseVer(v)
-    local major, minor, patch = v:match("(%d+)%.(%d+)%.(%d+)")
-    return tonumber(major or 0), tonumber(minor or 0), tonumber(patch or 0)
-  end
-  local cM, cm, cP = parseVer(SCRIPT_VERSION)
-  local lM, lm, lP = parseVer(version)
-  githubState.hasUpdate = (lM > cM) or (lM == cM and lm > cm) or (lM == cM and lm == cm and lP > cP)
-  githubState.error = nil
-  ac.log(string.format("[ApexFlow GitHub] File check: current %s, latest %s, update %s",
-    SCRIPT_VERSION, version, githubState.hasUpdate and "YES" or "NO"))
-  return true
-end
-
 -- HTTP no jogo: CSP expõe o global `web` (web.get), NÃO ac.webRequest.
 -- Detectado em outros apps Lua instalados (Advanced Gamepad Assist, SetupExchange).
 local function hasWebGet()
@@ -866,15 +821,10 @@ end
 local function githubCheckUpdates(cfg, force)
   if not cfg.githubUpdate.enabled then return end
   if not hasWebGet() and not ac.webRequest then
-    -- Sem HTTP no jogo: tenta o arquivo do painel local (atualiza o estado de verdade)
-    if githubCheckFromFile(cfg) then
-      webReqMissingLogged = false
-      return
-    end
     if not webReqMissingLogged then
       webReqMissingLogged = true
-      githubState.error = "file"
-      ac.log("[ApexFlow GitHub] sem HTTP no jogo; rode panel_server.py ou check_update.py (logged once)")
+      githubState.error = "nohttp"
+      ac.log("[ApexFlow GitHub] sem HTTP nesta build do CSP (logged once)")
     end
     return
   end
@@ -954,7 +904,7 @@ local function githubCheckUpdates(cfg, force)
 end
 
 -- ==========================================================
--- MAIN UPDATE (GitHub + WebUI + rolling + strategy + AI)
+-- MAIN UPDATE (GitHub + rolling + strategy + AI)
 -- NOTE: Pure VSC system removed in v0.5.0 (see CHANGELOG).
 -- ==========================================================
 local configLoaded = false
@@ -995,11 +945,7 @@ function script.update(dt)
   if not APEXFLOW_CFG.enabled then return end
 
   -- NOTE v0.5.0: VSC system removed (was here).
-
-  -- Web UI (remote file-based polling)
-  if webui and webui.update then
-    webui.update(dt, sim, APEXFLOW_CFG)
-  end
+  -- NOTE v0.33.0: Web UI removed (panel is the in-game Panel window).
 
   -- Rolling Start
   local rollingActive = false
@@ -1127,28 +1073,6 @@ APEXFLOW_API.reportPenaltySeverity = function(level, reason) if penalty_sev and 
 APEXFLOW_API.githubCheckUpdates = function(cfg, force)
   githubCheckUpdates(cfg or APEXFLOW_CFG, force)
 end
--- URL do painel pelo IP da máquina (gravado pelo panel_server.py).
--- O jogo não tem como descobrir o IP sozinho, então lê ApexFlow_server.json.
-APEXFLOW_API.getServerUrl = function()
-  local okD, docs = pcall(ac.getFolder, ac.FolderID.Documents)
-  if not okD or not docs or docs == "" then return nil end
-  local f = io.open(docs .. "/Assetto Corsa/ApexFlow_server.json", "r")
-  if not f then return nil end
-  local content = f:read("*a")
-  f:close()
-  if not content or content == "" then return nil end
-  local data = decodeJsonSafe(content)
-  if type(data) ~= "table" then return nil end
-  local url = data.url
-  if type(url) ~= "string" or url == "" then
-    if data.ip and data.port then
-      url = string.format("http://%s:%s/panel.html", tostring(data.ip), tostring(data.port))
-    else
-      return nil
-    end
-  end
-  return url
-end
 APEXFLOW_API.githubGetState = function()
   return {
     checking = githubState.checking,
@@ -1166,7 +1090,7 @@ APEXFLOW_API.githubGetState = function()
     repo = APEXFLOW_CFG.githubUpdate and APEXFLOW_CFG.githubUpdate.repo or "Silxyst/ApexFlow",
   }
 end
-APEXFLOW_API.webuiGetState = function() return webui and webui.getState and webui.getState() or {} end
+-- v0.33.0: Web UI removida (webuiGetState/getServerUrl fora)
 
 -- ==========================================================
 -- WINDOWS
@@ -1179,8 +1103,8 @@ local function drawFallbackIfMissingModules()
   ui.textWrapped("ApexFlow modules failed to load. Check custom_shaders_patch.log for require() errors.")
   ui.newLine(4)
   ui.separator()
-  ui.text("Module status: (v0.28.1 extrema 1,2,5,7,8)")
-  local names = {"src.ui", "src.ai_controller", "src.rolling_start", "src.race_strategy", "src.webui", "src.gap_behind", "src.sector_gaps", "src.penalty_severity"}
+  ui.text("Module status: (v0.33.0 sem WEB)")
+  local names = {"src.ui", "src.ai_controller", "src.rolling_start", "src.race_strategy", "src.gap_behind", "src.sector_gaps", "src.penalty_severity"}
   for _, n in ipairs(names) do
     ui.text((modStatus[n] == "OK" and "✓ " or "✗ ") .. n .. ": " .. tostring(modStatus[n] or "not attempted"))
   end

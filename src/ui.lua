@@ -1153,15 +1153,13 @@ local function drawGitHubUpdateSection(sim, cfg)
 
   local gState = APEXFLOW_API.githubGetState and APEXFLOW_API.githubGetState() or {}
 
-  -- Sem HTTP no jogo (nem web.get nem ac.webRequest): se o painel local
-  -- (panel_server.py) já gravou o resultado, o painel funcional abaixo
-  -- aparece normalmente (via arquivo).
+  -- Sem HTTP no jogo (nem web.get nem ac.webRequest): mostra aviso simples.
   local hasHttp = (web ~= nil and type(web.get) == "function") or ac.webRequest ~= nil
   if not hasHttp and not gState.latestVersion then
     ui.newLine(2)
     if rgbm then ui.textColored("ℹ Verificação automática indisponível", C.accent())
     else ui.text("Verificação automática indisponível") end
-    ui.textWrapped("Esta build do CSP não expõe HTTP para o Lua. Para checagem automática, rode o painel local: python web/panel_server.py (ele consulta o GitHub e o app lê o resultado).")
+    ui.textWrapped("Esta build do CSP não expõe HTTP para o Lua. A verificação volta sozinha ao atualizar o CSP.")
     ui.newLine(2)
     ui.text("Repositório: " .. (cfg.githubUpdate.repo or "Silxyst/ApexFlow"))
     ui.text("Versão instalada: v" .. (SCRIPT_VERSION or _G.APEXFLOW_VERSION or "?"))
@@ -1175,10 +1173,6 @@ local function drawGitHubUpdateSection(sim, cfg)
     drawLinkMsg(cfg)
     return
   end
-  if gState.fromFile then
-    ui.textDisabled("Via painel local (panel_server.py) — o jogo não tem HTTP nesta build do CSP")
-  end
-
   -- Status
   ui.newLine(2)
   if gState.checking then
@@ -2041,9 +2035,6 @@ local function drawHudInspector(sim, cfg)
   -- hud_tel removido (telemetria + voz peso morto — AC nativo)
 end
 
--- Forward declaration (drawSysInspector chama antes da definição — evita crash nil global)
-local drawWebPanelSection
-
 local function drawSysInspector(sim, cfg)
   ui.textDisabled("Visual, updates e bastidores. Mexa uma vez e esqueça.")
   ui.newLine(4)
@@ -2060,14 +2051,9 @@ local function drawSysInspector(sim, cfg)
       { status = gs.hasUpdate and "nova!" or "" },
       function(s, c) drawGitHubUpdateSection(s, c) end, sim)
   end
-  if matchesSearch(cfg, "painel web remoto celular navegador") then
-    view(cfg, "sys_web", "03", "Painel WEB",
-      "Abra o painel no navegador com 1 clique.",
-      {},
-      function(s, c) drawWebPanelSection(s, c) end, sim)
-  end
+  -- v0.33.0: Painel WEB removido (era sys_web 03) — use Apps → ApexFlow Panel
   if matchesSearch(cfg, "ajuda sobre como funciona") then
-    view(cfg, "sys_about", "04", "Ajuda",
+    view(cfg, "sys_about", "03", "Ajuda",
       "O que cada parte faz, em linguagem simples.",
       {},
       function(s, c) drawAboutSection(s, c) end, sim)
@@ -2142,64 +2128,7 @@ local function drawPanelBody(sim, cfg)
   hand()
 end
 
-drawWebPanelSection = function(sim, cfg)
-  cfg.webui = cfg.webui or {}
-  if cfg.webui.enabled == nil then cfg.webui.enabled = false end
-  if ui.checkbox("Ativar painel remoto (Web UI)##web_en", cfg.webui.enabled) then
-    cfg.webui.enabled = not cfg.webui.enabled; notifyChange()
-  end
-  helpMarker("Liga a ponte app <-> navegador/celular (posição, gaps, PP, comandos).")
-  cfg.webui.port = tonumber(cfg.webui.port) or 8080
-  local newP = sliderBlock("Porta do painel", "web_port", cfg.webui.port, 1024, 9999, "%.0f",
-    "Abre pelo IP da máquina (http://SEU-IP:PORTA/panel.html) — funciona melhor que localhost")
-  if newP ~= nil then
-    local val = math.floor(clamp(newP, 1024, 9999) + 0.5)
-    if val ~= cfg.webui.port then cfg.webui.port = val; notifyChange() end
-  end
-  ui.newLine(2)
-  -- Sonda se o servidor local está no ar (throttle 3s, via web.get que funciona neste CSP)
-  local port = cfg.webui.port or 8080
-  cfg._panelProbeAt = tonumber(cfg._panelProbeAt) or 0
-  if (os.clock() or 0) - cfg._panelProbeAt > 3 then
-    cfg._panelProbeAt = os.clock() or 0
-    if web ~= nil and type(web.get) == "function" then
-      pcall(web.get, string.format("http://127.0.0.1:%d/api/status", port), function(err, resp)
-        cfg._panelUp = (err == nil) and resp ~= nil and tonumber(resp.status) == 200
-      end)
-    end
-  end
-  if cfg._panelUp then
-    if rgbm then ui.textColored("● Servidor ligado — painel pronto", C.ok())
-    else ui.text("Servidor ligado — painel pronto") end
-  else
-    if rgbm then ui.textColored("○ Servidor desligado", C.warn())
-    else ui.text("Servidor desligado") end
-    ui.textDisabled("Rode 1x: web/ABRIR_PAINEL.bat — ou instale web/INSTALAR_INICIALIZACAO.bat p/ ligar junto com o Windows.")
-  end
-  ui.newLine(2)
-  if ui.button("🖥 Painel aqui no jogo", vec2(220, 30)) then
-    if ac.setWindowOpen then pcall(ac.setWindowOpen, "panel", true) end
-  end
-  hand()
-  ui.sameLine(0, 8)
-  if ui.button("🌐 Abrir no Navegador", vec2(220, 30)) then
-    cfg._linkMsg = nil
-    if not cfg._panelUp then
-      toast(cfg, "warn", "Servidor desligado", "Rode ABRIR_PAINEL.bat 1x")
-    else
-      -- Abre pelo IP da máquina (funciona melhor que localhost)
-      local url = nil
-      if APEXFLOW_API.getServerUrl then url = APEXFLOW_API.getServerUrl() end
-      url = url or string.format("http://localhost:%d/panel.html", port)
-      if openLink(cfg, url) then
-        toast(cfg, "ok", "Navegador abrindo…", "")
-      end
-    end
-  end
-  hand()
-  drawLinkMsg(cfg)
-  ui.textDisabled("No jogo = janela Painel (Apps). No navegador = servidor precisa estar ligado.")
-end
+-- v0.33.0: painel remoto (WEB) removido — use a janela Painel dentro do jogo (Apps → ApexFlow Panel)
 
 -- ---------------- moldura principal ----------------
 function M.draw(sim, cfg)
