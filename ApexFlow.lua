@@ -1,11 +1,10 @@
--- ApexFlow — Independent race suite for Assetto Corsa (v0.32.1)
+-- ApexFlow — Independent race suite for Assetto Corsa (v0.32.2)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.32.1"
+SCRIPT_VERSION = "0.32.2"
 
 _G.APEXFLOW_API = _G.APEXFLOW_API or {}
 local APEXFLOW_API = _G.APEXFLOW_API
-_G.APEXFLOW_VERSION = "0.32.1"
-_G.APEXFLOW_VERSION = "0.13.1"
+_G.APEXFLOW_VERSION = "0.32.2"
 
 local function clamp(v,a,b) if v<a then return a end if v>b then return b end return v end
 local function lerp(a,b,t) return a + (b-a)*t end
@@ -549,6 +548,11 @@ local function loadConfigFromFile()
     return
   end
   deepMerge(APEXFLOW_CFG, data)
+  -- v0.32.2: migra repo antigo (screenshot mostrava RaceFlow-V2 salvo)
+  if APEXFLOW_CFG.githubUpdate and APEXFLOW_CFG.githubUpdate.repo == "Silxyst/RaceFlow-V2" then
+    APEXFLOW_CFG.githubUpdate.repo = "Silxyst/ApexFlow"
+    ac.log("[ApexFlow] Migrated repo to Silxyst/ApexFlow")
+  end
   ac.log("[ApexFlow] Config loaded successfully")
 end
 
@@ -726,24 +730,33 @@ local function githubCheckUpdates(cfg, force)
         ac.log("[ApexFlow GitHub] Request failed: " .. githubState.error)
         return
       end
-      if not response or response.status ~= 200 then
+      local status = tonumber(response and response.status) or 0
+      if not response or status ~= 200 then
         githubState.error = "HTTP " .. tostring(response and response.status or "nil")
         ac.log("[ApexFlow GitHub] " .. githubState.error)
         return
       end
 
+      if not ac.decodeJson then
+        githubState.error = "ac.decodeJson indisponível nesta build do CSP"
+        ac.log("[ApexFlow GitHub] " .. githubState.error)
+        return
+      end
       local body = response.body or response.data
       local ok, data = pcall(function() return ac.decodeJson(body) end)
-      if not ok or not data then
+      if not ok or type(data) ~= "table" then
         githubState.error = "JSON parse failed"
         ac.log("[ApexFlow GitHub] " .. githubState.error)
         return
       end
 
-      local tag = data.tag_name or data.name or ""
+      local tag = tostring(data.tag_name or data.name or "")
       local version = tag:gsub("^v", "")
       githubState.latestVersion = version
       githubState.changelog = data.body or "No changelog provided."
+      githubState.tagName = data.tag_name
+      githubState.publishedAt = data.published_at
+      githubState.htmlUrl = data.html_url
 
       -- Compare versions (simple semantic version compare)
       local function parseVer(v)
