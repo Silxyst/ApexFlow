@@ -39,6 +39,29 @@ local function notifyChange()
   end
 end
 
+-- Abre URL no navegador: tenta ac.openWebLink, depois shell (start).
+-- Retorna true se algum método funcionou. Se nada funcionar, guarda a URL
+-- em cfg._linkMsg para o usuário digitar manualmente (nunca falha em silêncio).
+local function openLink(cfg, url)
+  if ac.openWebLink then
+    local ok = pcall(ac.openWebLink, url)
+    if ok then return true end
+  end
+  if os and os.execute then
+    local ok = pcall(os.execute, string.format('start "" "%s"', tostring(url)))
+    if ok then return true end
+  end
+  if cfg then cfg._linkMsg = tostring(url) end
+  return false
+end
+
+local function drawLinkMsg(cfg)
+  if cfg and cfg._linkMsg and cfg._linkMsg ~= "" then
+    ui.textDisabled("Não consegui abrir sozinho. Digite no navegador:")
+    ui.text(cfg._linkMsg)
+  end
+end
+
 -- ApexFlow theme engine (v0.13.0): independent palette, warm default.
 local ACCENTS = {
   orange = { 1.00, 0.55, 0.15, "Laranja Apex" },
@@ -1141,11 +1164,12 @@ local function drawGitHubUpdateSection(sim, cfg)
     ui.text("Versão instalada: v" .. (SCRIPT_VERSION or _G.APEXFLOW_VERSION or "?"))
     ui.newLine(2)
     ui.textWrapped("Para atualizar: baixe a última release e substitua a pasta apps/lua/ApexFlow.")
-    if ac.openWebLink then
-      if ui.button("🌐 Abrir página de Releases", vec2(230, 30)) then
-        pcall(ac.openWebLink, "https://github.com/" .. (cfg.githubUpdate.repo or "Silxyst/ApexFlow") .. "/releases")
-      end
+    if ui.button("🌐 Abrir página de Releases", vec2(230, 30)) then
+      cfg._linkMsg = nil
+      openLink(cfg, "https://github.com/" .. (cfg.githubUpdate.repo or "Silxyst/ApexFlow") .. "/releases")
     end
+    hand()
+    drawLinkMsg(cfg)
     return
   end
   if gState.fromFile then
@@ -1228,11 +1252,14 @@ local function drawGitHubUpdateSection(sim, cfg)
   if gState.htmlUrl and gState.htmlUrl ~= "" and ui.button("🌐 Abrir Release", vec2(180, 30)) then
     if APEXFLOW_API.githubGetState then
       local state = APEXFLOW_API.githubGetState()
-      if state.htmlUrl and ac.openWebLink then
-        pcall(ac.openWebLink, state.htmlUrl)
+      if state.htmlUrl then
+        cfg._linkMsg = nil
+        openLink(cfg, state.htmlUrl)
       end
     end
   end
+  hand()
+  drawLinkMsg(cfg)
 
   -- Changelog
   if gState.changelog and gState.changelog ~= "" then
@@ -2133,9 +2160,13 @@ drawWebPanelSection = function(sim, cfg)
   hand()
   ui.sameLine(0, 8)
   if ui.button("🌐 Abrir no Navegador", vec2(220, 30)) then
-    pcall(ac.openWebLink, string.format("http://localhost:%d/panel.html", cfg.webui.port or 8080))
+    cfg._linkMsg = nil
+    if openLink(cfg, string.format("http://localhost:%d/panel.html", cfg.webui.port or 8080)) then
+      toast(cfg, "ok", "Navegador abrindo…", "")
+    end
   end
   hand()
+  drawLinkMsg(cfg)
   ui.textDisabled("No jogo = janela Painel (Apps). No navegador = rode web/ABRIR_PAINEL.bat 1x.")
 end
 
