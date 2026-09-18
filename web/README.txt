@@ -3,11 +3,16 @@ ApexFlow Web — remote panel (v0.31.2)
 REMOTE PANEL (live, talks to the in-game app)
 Requires Python 3 (standard library only, nothing to install).
 
+  EASY (1 double-click): run web/ABRIR_PAINEL.bat — it starts the
+  server AND opens the browser automatically.
+
+  Manual:
   a) In game: open ApexFlow > System > "Remote Web UI" and ENABLE it.
      Note the token if you set one (empty = no password).
   b) On the PC, run:
-       python panel_server.py
+       python panel_server.py --open
      and open  http://localhost:8080/panel.html
+  c) In game anytime: System > "Painel WEB" > "Abrir Painel no Navegador".
   c) On your phone (same Wi-Fi): open  http://<pc-ip>:8080/panel.html
      (the server prints the address on startup).
   d) For streaming/OBS: add panel.html as a Browser Source.

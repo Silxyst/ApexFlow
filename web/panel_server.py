@@ -157,6 +157,7 @@ def main():
     ap.add_argument("--update-interval", type=int, default=UPDATE_INTERVAL,
                     help="Segundos entre checagens de update (0 = só na inicialização)")
     ap.add_argument("--no-update-check", action="store_true", help="Desativa a checagem de update")
+    ap.add_argument("--open", action="store_true", help="Abre o painel no navegador ao iniciar")
     args = ap.parse_args()
 
     docs = find_docs(args.docs)
@@ -168,9 +169,18 @@ def main():
     Handler.docs = docs
     handler = functools.partial(Handler, directory=str(webdir))
 
+    url = f"http://localhost:{args.port}/panel.html"
+    if args.open:
+        try:
+            import webbrowser
+            webbrowser.open(url)
+            print("[panel] Navegador aberto.")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[panel] Não consegui abrir o navegador: {exc}")
+
     with http.server.ThreadingHTTPServer((args.host, args.port), handler) as srv:
         print(f"[panel] Docs AC : {docs}")
-        print(f"[panel] Este PC : http://localhost:{args.port}/panel.html")
+        print(f"[panel] Este PC : {url}")
         print(f"[panel] Rede     : http://{lan_ip()}:{args.port}/panel.html")
         print("[panel] Ctrl+C para parar.")
         try:

@@ -2027,12 +2027,41 @@ local function drawSysInspector(sim, cfg)
       { status = gs.hasUpdate and "nova!" or "" },
       function(s, c) drawGitHubUpdateSection(s, c) end, sim)
   end
+  if matchesSearch(cfg, "painel web remoto celular navegador") then
+    view(cfg, "sys_web", "03", "Painel WEB",
+      "Abra o painel no navegador com 1 clique.",
+      {},
+      function(s, c) drawWebPanelSection(s, c) end, sim)
+  end
   if matchesSearch(cfg, "ajuda sobre como funciona") then
-    view(cfg, "sys_about", "03", "Ajuda",
+    view(cfg, "sys_about", "04", "Ajuda",
       "O que cada parte faz, em linguagem simples.",
       {},
       function(s, c) drawAboutSection(s, c) end, sim)
   end
+end
+
+local function drawWebPanelSection(sim, cfg)
+  cfg.webui = cfg.webui or {}
+  if cfg.webui.enabled == nil then cfg.webui.enabled = false end
+  if ui.checkbox("Ativar painel remoto (Web UI)##web_en", cfg.webui.enabled) then
+    cfg.webui.enabled = not cfg.webui.enabled; notifyChange()
+  end
+  helpMarker("Liga a ponte app <-> navegador (posição, gaps, PP, comandos).")
+  cfg.webui.port = tonumber(cfg.webui.port) or 8080
+  local newP = sliderBlock("Porta do painel", "web_port", cfg.webui.port, 1024, 9999, "%.0f",
+    "Mesma porta do endereço http://localhost:PORTA/panel.html")
+  if newP ~= nil then
+    local val = math.floor(clamp(newP, 1024, 9999) + 0.5)
+    if val ~= cfg.webui.port then cfg.webui.port = val; notifyChange() end
+  end
+  ui.newLine(2)
+  if ui.button("🌐 Abrir Painel no Navegador", vec2(260, 32)) then
+    pcall(ac.openWebLink, string.format("http://localhost:%d/panel.html", cfg.webui.port or 8080))
+  end
+  hand()
+  ui.textDisabled("1º passo (1 clique): duplo clique em web/ABRIR_PAINEL.bat — ele liga o servidor e já abre o navegador.")
+  ui.textDisabled("Depois é só usar este botão sempre que quiser.")
 end
 
 -- ---------------- moldura principal ----------------
