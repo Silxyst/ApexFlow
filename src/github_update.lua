@@ -49,7 +49,7 @@ function M.checkUpdates(cfg, force)
   state.error = nil
   state.lastCheck = now
 
-  local repo = cfg.githubUpdate.repo or "Silxyst/RaceFlow-V2"
+  local repo = cfg.githubUpdate.repo or "Silxyst/ApexFlow"
   local url = string.format("https://api.github.com/repos/%s/releases/latest", repo)
   ac.log("[ApexFlow GitHub] Checking updates: " .. url)
 
@@ -116,7 +116,7 @@ function M.getState(cfg)
     tagName = state.tagName,
     publishedAt = state.publishedAt,
     htmlUrl = state.htmlUrl,
-    repo = (cfg.githubUpdate and cfg.githubUpdate.repo) or "Silxyst/RaceFlow-V2",
+    repo = (cfg.githubUpdate and cfg.githubUpdate.repo) or "Silxyst/ApexFlow",
   }
 end
 

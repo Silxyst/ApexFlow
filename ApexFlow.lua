@@ -75,7 +75,7 @@ local APEXFLOW_CFG = {
   -- Extras mantidos (8)
   githubUpdate = {
     enabled = true,
-    repo = "Silxyst/RaceFlow-V2",
+    repo = "Silxyst/ApexFlow",
     checkIntervalHours = 24,
     notifyOnStartup = true,
   },
@@ -645,7 +645,7 @@ APEXFLOW_API.resetToDefaults = function()
     end
     if APEXFLOW_CFG.githubUpdate then
       APEXFLOW_CFG.githubUpdate.enabled = true
-      APEXFLOW_CFG.githubUpdate.repo = "Silxyst/RaceFlow-V2"
+      APEXFLOW_CFG.githubUpdate.repo = "Silxyst/ApexFlow"
       APEXFLOW_CFG.githubUpdate.checkIntervalHours = 24
       APEXFLOW_CFG.githubUpdate.notifyOnStartup = true
     end
@@ -712,7 +712,7 @@ local function githubCheckUpdates(cfg, force)
   githubState.error = nil
   githubState.lastCheck = now
 
-  local url = string.format("https://api.github.com/repos/%s/releases/latest", cfg.githubUpdate.repo or "Silxyst/RaceFlow-V2")
+  local url = string.format("https://api.github.com/repos/%s/releases/latest", cfg.githubUpdate.repo or "Silxyst/ApexFlow")
   ac.log("[ApexFlow GitHub] Checking for updates: " .. url)
 
   ac.webRequest({
@@ -946,7 +946,7 @@ APEXFLOW_API.githubGetState = function()
     tagName = githubState.tagName,
     publishedAt = githubState.publishedAt,
     htmlUrl = githubState.htmlUrl,
-    repo = APEXFLOW_CFG.githubUpdate and APEXFLOW_CFG.githubUpdate.repo or "Silxyst/RaceFlow-V2",
+    repo = APEXFLOW_CFG.githubUpdate and APEXFLOW_CFG.githubUpdate.repo or "Silxyst/ApexFlow",
   }
 end
 APEXFLOW_API.webuiGetState = function() return webui and webui.getState and webui.getState() or {} end

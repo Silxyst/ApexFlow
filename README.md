@@ -11,14 +11,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Silxyst/RaceFlow-V2/releases/latest">
-    <img src="https://img.shields.io/github/v/release/Silxyst/RaceFlow-V2?style=for-the-badge&label=DOWNLOAD&color=ff6a15&logo=github" alt="Latest Release"/>
+  <a href="https://github.com/Silxyst/ApexFlow/releases/latest">
+    <img src="https://img.shields.io/github/v/release/Silxyst/ApexFlow?style=for-the-badge&label=DOWNLOAD&color=ff6a15&logo=github" alt="Latest Release"/>
   </a>
   <img src="https://img.shields.io/badge/Version-v0.32.0-ff6a15?style=for-the-badge&label=App" alt="Version"/>
   <img src="https://img.shields.io/badge/CSP-0.3.0-00d4ff?style=for-the-badge" alt="CSP"/>
   <img src="https://img.shields.io/badge/Platform-Windows-0078d6?style=for-the-badge&logo=windows" alt="Platform"/>
-  <a href="https://github.com/Silxyst/RaceFlow-V2/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/Silxyst/RaceFlow-V2?style=for-the-badge&color=8b5cf6" alt="License"/>
+  <a href="https://github.com/Silxyst/ApexFlow/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/Silxyst/ApexFlow?style=for-the-badge&color=8b5cf6" alt="License"/>
   </a>
 </p>
 
@@ -74,7 +74,7 @@
 **Requirements:** `Assetto Corsa` + `Custom Shaders Patch 0.3.0+` + `Content Manager` + offline session.
 
 ```bash
-1. Download ApexFlow_v0.32.0.zip from https://github.com/Silxyst/RaceFlow-V2/releases/latest
+1. Download ApexFlow_v0.32.0.zip from https://github.com/Silxyst/ApexFlow/releases/latest
 2. Extract into Assetto Corsa/apps/lua/  (creates/updates the ApexFlow/ folder)
 3. Content Manager → Apps → enable ApexFlow + ApexFlow Events
 4. In AC → Apps sidebar → ApexFlow

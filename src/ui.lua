@@ -1133,13 +1133,13 @@ local function drawGitHubUpdateSection(sim, cfg)
     else ui.text("Verificação automática indisponível") end
     ui.textWrapped("Esta build do CSP não expõe ac.webRequest, então o app não consegue consultar a API do GitHub sozinho. Isso é esperado e não é um defeito do ApexFlow.")
     ui.newLine(2)
-    ui.text("Repositório: " .. (cfg.githubUpdate.repo or "Silxyst/RaceFlow-V2"))
+    ui.text("Repositório: " .. (cfg.githubUpdate.repo or "Silxyst/ApexFlow"))
     ui.text("Versão instalada: v" .. (SCRIPT_VERSION or _G.APEXFLOW_VERSION or "?"))
     ui.newLine(2)
     ui.textWrapped("Para atualizar: baixe a última release e substitua a pasta apps/lua/ApexFlow.")
     if ac.openWebLink then
       if ui.button("🌐 Abrir página de Releases", vec2(230, 30)) then
-        pcall(ac.openWebLink, "https://github.com/" .. (cfg.githubUpdate.repo or "Silxyst/RaceFlow-V2") .. "/releases")
+        pcall(ac.openWebLink, "https://github.com/" .. (cfg.githubUpdate.repo or "Silxyst/ApexFlow") .. "/releases")
       end
     end
     return
@@ -1190,7 +1190,7 @@ local function drawGitHubUpdateSection(sim, cfg)
   if cfg.githubUpdate.enabled then
     ui.indent(12)
 
-    cfg.githubUpdate.repo = cfg.githubUpdate.repo or "Silxyst/RaceFlow-V2"
+    cfg.githubUpdate.repo = cfg.githubUpdate.repo or "Silxyst/ApexFlow"
     ui.text("Repositório: " .. cfg.githubUpdate.repo)
 
     cfg.githubUpdate.checkIntervalHours = cfg.githubUpdate.checkIntervalHours or 24
