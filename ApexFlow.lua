@@ -1,10 +1,10 @@
--- ApexFlow — Independent race suite for Assetto Corsa (v0.32.4)
+-- ApexFlow — Independent race suite for Assetto Corsa (v0.32.5)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.32.4"
+SCRIPT_VERSION = "0.32.5"
 
 _G.APEXFLOW_API = _G.APEXFLOW_API or {}
 local APEXFLOW_API = _G.APEXFLOW_API
-_G.APEXFLOW_VERSION = "0.32.4"
+_G.APEXFLOW_VERSION = "0.32.5"
 
 local function clamp(v,a,b) if v<a then return a end if v>b then return b end return v end
 local function lerp(a,b,t) return a + (b-a)*t end
@@ -678,8 +678,135 @@ APEXFLOW_API.resetToDefaults = function()
   end
 
 -- ==========================================================
--- GITHUB UPDATE CHECKER (async, uses ac.webRequest)
+-- GITHUB UPDATE CHECKER (async, uses web.get / ac.webRequest / file)
 -- ==========================================================
+-- Parser JSON mínimo em Lua puro (fallback quando ac.decodeJson não existe).
+-- Cobre o que a API do GitHub retorna: objetos, arrays, strings com escapes, números.
+local function jsonDecodeFallback(s)
+  local pos = 1
+  local function skip()
+    while true do
+      local c = s:sub(pos, pos)
+      if c == " " or c == "\t" or c == "\n" or c == "\r" then pos = pos + 1 else break end
+    end
+  end
+  local parseValue
+  local function parseString()
+    pos = pos + 1 -- abre "
+    local out = {}
+    while true do
+      local c = s:sub(pos, pos)
+      if c == "" then error("unterminated string") end
+      if c == '"' then pos = pos + 1; break end
+      if c == "\\" then
+        local e = s:sub(pos + 1, pos + 1)
+        if e == "n" then out[#out + 1] = "\n"
+        elseif e == "t" then out[#out + 1] = "\t"
+        elseif e == "r" then out[#out + 1] = "\r"
+        elseif e == "b" then out[#out + 1] = "\b"
+        elseif e == "f" then out[#out + 1] = "\f"
+        elseif e == "u" then
+          local hex = s:sub(pos + 2, pos + 5)
+          local code = tonumber(hex, 16)
+          local function utf8(code)
+            if not code then return "?" end
+            if code < 0x80 then return string.char(code)
+            elseif code < 0x800 then
+              return string.char(0xC0 + math.floor(code / 0x40), 0x80 + (code % 0x40))
+            elseif code < 0x10000 then
+              return string.char(0xE0 + math.floor(code / 0x1000),
+                0x80 + (math.floor(code / 0x40) % 0x40), 0x80 + (code % 0x40))
+            else
+              return string.char(0xF0 + math.floor(code / 0x40000),
+                0x80 + (math.floor(code / 0x1000) % 0x40),
+                0x80 + (math.floor(code / 0x40) % 0x40),
+                0x80 + (code % 0x40))
+            end
+          end
+          -- par surrogate (emoji): \uD83C\uDF89
+          if code and code >= 0xD800 and code <= 0xDBFF
+             and s:sub(pos + 6, pos + 7) == "\\u" then
+            local lo = tonumber(s:sub(pos + 8, pos + 11), 16)
+            if lo and lo >= 0xDC00 and lo <= 0xDFFF then
+              code = 0x10000 + (code - 0xD800) * 0x400 + (lo - 0xDC00)
+              pos = pos + 6
+            end
+          end
+          out[#out + 1] = utf8(code)
+          pos = pos + 4
+        else out[#out + 1] = e end
+        pos = pos + 2
+      else
+        out[#out + 1] = c
+        pos = pos + 1
+      end
+    end
+    return table.concat(out)
+  end
+  local function parseNumber()
+    local num = s:match("^-?%d+%.?%d*[eE]?[+-]?%d*", pos)
+    pos = pos + #num
+    return tonumber(num)
+  end
+  parseValue = function()
+    skip()
+    local c = s:sub(pos, pos)
+    if c == "{" then
+      pos = pos + 1
+      local obj = {}
+      skip()
+      if s:sub(pos, pos) == "}" then pos = pos + 1; return obj end
+      while true do
+        skip()
+        local k = parseString()
+        skip()
+        assert(s:sub(pos, pos) == ":", "expected :")
+        pos = pos + 1
+        obj[k] = parseValue()
+        skip()
+        local d = s:sub(pos, pos)
+        if d == "}" then pos = pos + 1; break end
+        assert(d == ",", "expected ,")
+        pos = pos + 1
+      end
+      return obj
+    elseif c == "[" then
+      pos = pos + 1
+      local arr = {}
+      skip()
+      if s:sub(pos, pos) == "]" then pos = pos + 1; return arr end
+      while true do
+        arr[#arr + 1] = parseValue()
+        skip()
+        local d = s:sub(pos, pos)
+        if d == "]" then pos = pos + 1; break end
+        assert(d == ",", "expected ,")
+        pos = pos + 1
+      end
+      return arr
+    elseif c == '"' then
+      return parseString()
+    elseif s:sub(pos, pos + 3) == "true" then pos = pos + 4; return true
+    elseif s:sub(pos, pos + 4) == "false" then pos = pos + 5; return false
+    elseif s:sub(pos, pos + 3) == "null" then pos = pos + 4; return nil
+    else
+      return parseNumber()
+    end
+  end
+  local v = parseValue()
+  skip()
+  return v
+end
+
+local function decodeJsonSafe(body)
+  if ac.decodeJson then
+    local ok, data = pcall(function() return ac.decodeJson(body) end)
+    if ok and type(data) == "table" then return data end
+  end
+  local ok, data = pcall(jsonDecodeFallback, body)
+  if ok and type(data) == "table" then return data end
+  return nil
+end
 local githubState = {
   lastCheck = 0,
   checkInterval = 0,
@@ -703,9 +830,9 @@ local function githubCheckFromFile(cfg)
   if not f then return false end
   local content = f:read("*a")
   f:close()
-  if not content or content == "" or not ac.decodeJson then return false end
-  local ok, data = pcall(function() return ac.decodeJson(content) end)
-  if not ok or type(data) ~= "table" then return false end
+  if not content or content == "" then return false end
+  local data = decodeJsonSafe(content)
+  if type(data) ~= "table" then return false end
   -- Só vale para o mesmo repositório
   if data.repo and data.repo ~= (cfg.githubUpdate.repo or "Silxyst/ApexFlow") then return false end
   local version = tostring(data.version or "")
@@ -781,14 +908,9 @@ local function githubCheckUpdates(cfg, force)
         return
       end
 
-      if not ac.decodeJson then
-        githubState.error = "ac.decodeJson indisponível nesta build do CSP"
-        ac.log("[ApexFlow GitHub] " .. githubState.error)
-        return
-      end
       local body = response.body or response.data
-      local ok, data = pcall(function() return ac.decodeJson(body) end)
-      if not ok or type(data) ~= "table" then
+      local data = decodeJsonSafe(body)
+      if type(data) ~= "table" then
         githubState.error = "JSON parse failed"
         ac.log("[ApexFlow GitHub] " .. githubState.error)
         return
