@@ -6,3 +6,4 @@ ApexFlow_webui_cmd.json
 *.log
 .DS_Store
 Thumbs.db
+__pycache__/
