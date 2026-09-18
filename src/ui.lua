@@ -62,6 +62,9 @@ local function drawLinkMsg(cfg)
   end
 end
 
+-- Forward (funções acima usam antes da definição — evita crash nil global)
+local hand
+
 -- ApexFlow theme engine (v0.13.0): independent palette, warm default.
 local ACCENTS = {
   orange = { 1.00, 0.55, 0.15, "Laranja Apex" },
@@ -1629,7 +1632,7 @@ local function titleText(txt, color)
 end
 
 -- Cursor de mão sobre o último widget (tudo guardado).
-local function hand()
+hand = function()
   if ui.setMouseCursor and ui.MouseCursor and ui.MouseCursor.Hand and ui.itemHovered then
     local ok, hov = pcall(ui.itemHovered)
     if ok and hov then pcall(ui.setMouseCursor, ui.MouseCursor.Hand) end
