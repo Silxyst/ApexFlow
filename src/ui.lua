@@ -2011,6 +2011,9 @@ local function drawHudInspector(sim, cfg)
   -- hud_tel removido (telemetria + voz peso morto — AC nativo)
 end
 
+-- Forward declaration (drawSysInspector chama antes da definição — evita crash nil global)
+local drawWebPanelSection
+
 local function drawSysInspector(sim, cfg)
   ui.textDisabled("Visual, updates e bastidores. Mexa uma vez e esqueça.")
   ui.newLine(4)
@@ -2042,13 +2045,11 @@ local function drawSysInspector(sim, cfg)
 end
 
 -- Painel embutido no jogo (4ª janela: Apps → ApexFlow Panel) + seção WEB remota.
--- Usa só RARE2_API local: funciona 100% dentro do jogo, sem Python, sem sair do jogo.
--- (forward declarado: drawSysInspector usa antes da definição — evita crash nil)
-local drawWebPanelSection
+-- Usa só APEXFLOW_API local: funciona 100% dentro do jogo, sem Python, sem sair do jogo.
 local function drawPanelBody(sim, cfg)
-  local gb = RARE2_API.getGapBehindState and RARE2_API.getGapBehindState() or {}
-  local sg = RARE2_API.getSectorGapsState and RARE2_API.getSectorGapsState() or {}
-  local ps = RARE2_API.getPenaltySeverityState and RARE2_API.getPenaltySeverityState() or {}
+  local gb = APEXFLOW_API.getGapBehindState and APEXFLOW_API.getGapBehindState() or {}
+  local sg = APEXFLOW_API.getSectorGapsState and APEXFLOW_API.getSectorGapsState() or {}
+  local ps = APEXFLOW_API.getPenaltySeverityState and APEXFLOW_API.getPenaltySeverityState() or {}
   local okP, pcar = pcall(ac.getCar, 0)
   if okP and pcar and sim and sim.isSessionStarted then
     ui.pushFont(ui.Font.Title)
@@ -2095,18 +2096,18 @@ local function drawPanelBody(sim, cfg)
   for i, pr in ipairs(presets) do
     if i > 1 then ui.sameLine(0, 6) end
     if ui.button(pr[2] .. "##panel_pr_" .. pr[1], vec2(62, 26)) then
-      if RARE2_API.applyCategoryPreset then RARE2_API.applyCategoryPreset(pr[1]) end
+      if APEXFLOW_API.applyCategoryPreset then APEXFLOW_API.applyCategoryPreset(pr[1]) end
     end
     hand()
   end
   ui.newLine(4)
   if ui.button("💾 Salvar", vec2(110, 28)) then
-    if RARE2_API.saveConfig then RARE2_API.saveConfig() end
+    if APEXFLOW_API.saveConfig then APEXFLOW_API.saveConfig() end
     toast(cfg, "ok", "Salvo", "")
   end
   ui.sameLine(0, 8)
   if ui.button("☁ Update", vec2(110, 28)) then
-    if RARE2_API.githubCheckUpdates then RARE2_API.githubCheckUpdates(cfg, true) end
+    if APEXFLOW_API.githubCheckUpdates then APEXFLOW_API.githubCheckUpdates(cfg, true) end
   end
   hand()
 end
