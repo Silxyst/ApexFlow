@@ -1,10 +1,10 @@
--- ApexFlow — Independent race suite for Assetto Corsa (v0.33.0)
+-- ApexFlow — Independent race suite for Assetto Corsa (v0.33.1)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.33.0"
+SCRIPT_VERSION = "0.33.1"
 
 _G.APEXFLOW_API = _G.APEXFLOW_API or {}
 local APEXFLOW_API = _G.APEXFLOW_API
-_G.APEXFLOW_VERSION = "0.33.0"
+_G.APEXFLOW_VERSION = "0.33.1"
 
 local function clamp(v,a,b) if v<a then return a end if v>b then return b end return v end
 local function lerp(a,b,t) return a + (b-a)*t end
@@ -1136,16 +1136,6 @@ end
 function script.windowMainSettings()
   if ui.checkbox("Show window in setup", ac.isWindowOpen("main_setup")) then
     ac.setWindowOpen("main_setup", not ac.isWindowOpen("main_setup"))
-  end
-end
-
-function script.windowPanel()
-  local ok, sim = pcall(ac.getSim)
-  if not ok or not sim then sim = nil end
-  if ui_root and ui_root.drawPanel then
-    ui_root.drawPanel(sim, APEXFLOW_CFG)
-  else
-    drawFallbackIfMissingModules()
   end
 end
 

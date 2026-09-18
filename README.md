@@ -14,7 +14,7 @@
   <a href="https://github.com/Silxyst/ApexFlow/releases/latest">
     <img src="https://img.shields.io/github/v/release/Silxyst/ApexFlow?style=for-the-badge&label=DOWNLOAD&color=ff6a15&logo=github" alt="Latest Release"/>
   </a>
-  <img src="https://img.shields.io/badge/Version-v0.33.0-ff6a15?style=for-the-badge&label=App" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v0.33.1-ff6a15?style=for-the-badge&label=App" alt="Version"/>
   <img src="https://img.shields.io/badge/CSP-0.3.0-00d4ff?style=for-the-badge" alt="CSP"/>
   <img src="https://img.shields.io/badge/Platform-Windows-0078d6?style=for-the-badge&logo=windows" alt="Platform"/>
   <a href="https://github.com/Silxyst/ApexFlow/blob/main/LICENSE">
@@ -63,7 +63,6 @@
 | 🏁 **Race & Starts** | Aligned 2×2 rolling formation • adaptive fuel strategy with mandatory stops • real pit speed limit • endurance presets (Sprint → 24h) | `Race` tab |
 | 📏 **Live gaps** | Gap to leader in meters • gap + time delta to the car behind (blue when lapped) • per-sector delta, wrap-safe | `Events` HUD |
 | 📊 **Penalty points** | L1 = 1 PP … L6 = 6 PP, persisted across sessions via `ac.storage` | `Events` HUD |
-| 🖥️ **In-game Panel** | Live dashboard inside the game (Apps → ApexFlow Panel): gaps, PP, AI sliders, presets | 4th window |
 | ☁️ **Extras** | GitHub update checker • per-track learning memory • lap telemetry CSV | `System` tab |
 
 ---
@@ -75,7 +74,7 @@
 ```bash
 1. Download ApexFlow_v0.33.0.zip from https://github.com/Silxyst/ApexFlow/releases/latest
 2. Extract into Assetto Corsa/apps/lua/  (creates/updates the ApexFlow/ folder)
-3. Content Manager → Apps → enable ApexFlow + ApexFlow Events (+ ApexFlow Panel)
+3. Content Manager → Apps → enable ApexFlow + ApexFlow Events
 4. In AC → Apps sidebar → ApexFlow
 ```
 
@@ -97,7 +96,7 @@ ApexFlow/
    ├─ race_strategy.lua  (adaptive fuel)
    ├─ rolling_start.lua  (aligned 2×2)
    ├─ sector_gaps.lua    (sector delta)
-   └─ ui.lua             (5 tabs + Panel window)
+   └─ ui.lua             (5 tabs)
 ```
 </details>
 
@@ -128,9 +127,7 @@ Settings auto-save to `ApexFlow_config.lua` (per track). Five tabs in the main a
 
 **Backmarkers:** the car behind shows **blue** when lapped, with time delta.
 
-**Penalty points:** `PP 3 · L3` persists across qualifying and race — check `Events` or the `Panel` window.
-
-**In-game Panel:** open `Apps → ApexFlow Panel` for the live dashboard (gaps, PP, AI sliders, presets) — no browser, no extra setup.
+**Penalty points:** `PP 3 · L3` persists across qualifying and race — check `Events`.
 
 ## 🛠️ API
 
@@ -145,7 +142,8 @@ _G.APEXFLOW_API.getStrategyState(cfg)    -- {nextPit, stopsLeft, fuelPerLap}
 
 ## 🗺️ Roadmap
 
-- [x] `v0.33.0` WEB removed — in-game Panel window does it all
+- [x] `v0.33.1` Panel window removed too — back to Principal + Events
+- [x] `v0.33.0` WEB removed (panel_server, panel.html, webui)
 - [x] `v0.32.2` GitHub auto-update on new CSP + repo migration
 - [x] `v0.31.2` Smooth race lines (±0.30 cap, no mid-corner crossing) + progressive slow-corner braking
 - [x] `v0.30.0` New Race Logic AI: thinks before passing, no trains, no kamikaze
@@ -161,6 +159,6 @@ _G.APEXFLOW_API.getStrategyState(cfg)    -- {nextPit, stopsLeft, fuelPerLap}
 MIT — **Silxyst**. Free for personal and commercial use, see [LICENSE](LICENSE).
 
 <p align="center">
-  <sub>ApexFlow v0.33.0 — 2 apps • 9 modules • CSP 0.3.0 • zero errors • no WEB</sub><br/>
+  <sub>ApexFlow v0.33.1 — 2 apps • 9 modules • CSP 0.3.0 • zero errors • no WEB</sub><br/>
   <sub>Built with ❤️ for the Assetto Corsa community</sub>
 </p>

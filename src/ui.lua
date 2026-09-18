@@ -2060,75 +2060,7 @@ local function drawSysInspector(sim, cfg)
   end
 end
 
--- Painel embutido no jogo (4ª janela: Apps → ApexFlow Panel) + seção WEB remota.
--- Usa só APEXFLOW_API local: funciona 100% dentro do jogo, sem Python, sem sair do jogo.
-local function drawPanelBody(sim, cfg)
-  local gb = APEXFLOW_API.getGapBehindState and APEXFLOW_API.getGapBehindState() or {}
-  local sg = APEXFLOW_API.getSectorGapsState and APEXFLOW_API.getSectorGapsState() or {}
-  local ps = APEXFLOW_API.getPenaltySeverityState and APEXFLOW_API.getPenaltySeverityState() or {}
-  local okP, pcar = pcall(ac.getCar, 0)
-  if okP and pcar and sim and sim.isSessionStarted then
-    ui.pushFont(ui.Font.Title)
-    ui.text(string.format("P%d  |  Volta %d  |  %d km/h",
-      pcar.racePosition or 0, (pcar.lapCount or 0) + 1, math.floor(pcar.speedKmh or 0)))
-    ui.popFont()
-    ui.text(string.format("⛽ %.1f L", pcar.fuel or 0))
-  else
-    ui.textDisabled("Entre na pista para ver os dados ao vivo.")
-  end
-  ui.separator()
-  if (gb.gapBehindM or 0) > 1 then
-    ui.text(string.format("🔙 Atrás: %.0fm (P%d)%s", gb.gapBehindM or 0, gb.carBehindPos or 0,
-      (gb.deltaBehind or 0) > 0 and string.format(" +%.1fs", gb.deltaBehind) or ""))
-  else
-    ui.textDisabled("🔙 Atrás: ninguém te pressionando")
-  end
-  if (sg.gapSectorS or 0) > 0.05 then
-    ui.text(string.format("⏱ Setor %d: +%.2fs p/ P1", sg.currentSector or 0, sg.gapSectorS or 0))
-  end
-  if (ps.totalPP or 0) > 0 then
-    ui.text(string.format("⚖ PP: %d (L%d %s)", ps.totalPP or 0, ps.level or 0, tostring(ps.lastReason or "")))
-  else
-    ui.textDisabled("⚖ PP: 0 (limpo)")
-  end
-  ui.separator()
-  ui.textDisabled("IA (vale na hora):")
-  local agg = clamp(tonumber(cfg.aggression) or 50, 0, 100)
-  local newA = sliderBlock("Agressividade", "panel_agg", agg, 0, 100, "%.0f", "0 = calmo, 100 = brigando")
-  if newA ~= nil and math.abs(newA - agg) > 0.001 then cfg.aggression = clamp(newA, 0, 100); notifyChange() end
-  local pace = clamp(tonumber(cfg.paceStrength) or 65, 0, 100)
-  local newPc = sliderBlock("Ritmo", "panel_pace", pace, 0, 100, "%.0f", "Espalha o pelotão")
-  if newPc ~= nil and math.abs(newPc - pace) > 0.001 then cfg.paceStrength = clamp(newPc, 0, 100); notifyChange() end
-  cfg.rollingStart = cfg.rollingStart or {}
-  cfg.strategy = cfg.strategy or {}
-  local rs = (cfg.rollingStart.enabled == true)
-  if ui.checkbox("Largada em movimento##panel_roll", rs) then cfg.rollingStart.enabled = not rs; notifyChange() end
-  ui.sameLine(0, 8)
-  local st = (cfg.strategy.enabled == true)
-  if ui.checkbox("Estratégia/pits##panel_strat", st) then cfg.strategy.enabled = not st; notifyChange() end
-  ui.newLine(2)
-  ui.textDisabled("Preset (1 toque):")
-  local presets = { { "gt3", "GT3" }, { "gt4", "GT4" }, { "tcr", "TCR" }, { "f1", "F1" }, { "lmp", "LMP" }, { "endurance", "Enduro" } }
-  for i, pr in ipairs(presets) do
-    if i > 1 then ui.sameLine(0, 6) end
-    if ui.button(pr[2] .. "##panel_pr_" .. pr[1], vec2(62, 26)) then
-      if APEXFLOW_API.applyCategoryPreset then APEXFLOW_API.applyCategoryPreset(pr[1]) end
-    end
-    hand()
-  end
-  ui.newLine(4)
-  if ui.button("💾 Salvar", vec2(110, 28)) then
-    if APEXFLOW_API.saveConfig then APEXFLOW_API.saveConfig() end
-    toast(cfg, "ok", "Salvo", "")
-  end
-  ui.sameLine(0, 8)
-  if ui.button("☁ Update", vec2(110, 28)) then
-    if APEXFLOW_API.githubCheckUpdates then APEXFLOW_API.githubCheckUpdates(cfg, true) end
-  end
-  hand()
-end
-
--- v0.33.0: painel remoto (WEB) removido — use a janela Painel dentro do jogo (Apps → ApexFlow Panel)
+-- v0.33.1: janela Panel removida (era do WEB) — ficam Principal + Events
 
 -- ---------------- moldura principal ----------------
 function M.draw(sim, cfg)
@@ -2246,30 +2178,6 @@ function M.draw(sim, cfg)
   ui.separator()
   drawStatusBar(sim, cfg)
 
-  popDarkTheme()
-end
-
--- Janela Painel (Apps → ApexFlow Panel): tudo dentro do jogo, sem sair.
-function M.drawPanel(sim, cfg)
-  cfg.ui = cfg.ui or {}
-  local acc = cfg.ui.accent
-  local accOk = false
-  for _, k in ipairs(ACCENT_ORDER) do if k == acc then accOk = true break end end
-  THEME.accent = accOk and acc or "orange"
-  THEME.bgAlpha = clamp(tonumber(cfg.ui.bgAlpha) or 1.0, 0.4, 1.0)
-  THEME.corner = math.floor(clamp(tonumber(cfg.ui.corner) or 8, 0, 12) + 0.5)
-  pushDarkTheme()
-  ensureUiState(cfg)
-  titleText("APEXFLOW · PAINEL", C.accent())
-  ui.textDisabled("Ao vivo, dentro do jogo — sem Python, sem navegador.")
-  ui.separator()
-  ui.newLine(2)
-  safeTab("Painel", drawPanelBody, sim, cfg)
-  ui.newLine(2)
-  if ui.button("⚙ Abrir Principal", vec2(170, 28)) then
-    if ac.setWindowOpen then pcall(ac.setWindowOpen, "main", true) end
-  end
-  hand()
   popDarkTheme()
 end
 
