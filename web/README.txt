@@ -1,29 +1,21 @@
-ApexFlow Web — painel remoto + mockups de design (v0.18.0)
+ApexFlow Web — remote panel (v0.31.2)
 
-1) PAINEL REMOTO (de verdade, fala com o app no jogo)
-   Requer Python 3 (só biblioteca padrão, nada para instalar).
+REMOTE PANEL (live, talks to the in-game app)
+Requires Python 3 (standard library only, nothing to install).
 
-   a) No jogo: abra o ApexFlow > Ajustes > "Web remota" e ATIVE.
-      Anote o token se configurar um (se vazio, sem senha).
-   b) No PC: rode
-        python panel_server.py
-      e abra  http://localhost:8080/panel.html
-   c) No celular (mesma Wi-Fi): abra  http://<ip-do-pc>:8080/panel.html
-      (o servidor mostra o endereço ao iniciar).
-   d) Para live/OBS: adicione panel.html como Browser Source.
+  a) In game: open ApexFlow > System > "Remote Web UI" and ENABLE it.
+     Note the token if you set one (empty = no password).
+  b) On the PC, run:
+       python panel_server.py
+     and open  http://localhost:8080/panel.html
+  c) On your phone (same Wi-Fi): open  http://<pc-ip>:8080/panel.html
+     (the server prints the address on startup).
+  d) For streaming/OBS: add panel.html as a Browser Source.
 
-   O que dá para fazer: ver bandeira/posição/volta/classificação ao vivo,
-   trocar preset, mexer em agressividade/ritmo/dificuldade, ligar/desligar
-   largada e estratégia, forçar caution, testar a voz, salvar/resetar config.
+What you can do: live position/lap/speed/gaps/penalty points,
+adjust AI aggression/pace/difficulty, toggle rolling start and
+strategy, save/reset the config.
 
-   Arquivos trocados com o jogo (pasta Documents/Assetto Corsa):
-     RaceFlow_webui_status.json  (app -> painel, a cada 0.5s)
-     RaceFlow_webui_cmd.json      (painel -> app, comandos)
-
-2) MOCKUPS (só visual, para escolher o design do app)
-   Com o mesmo servidor rodando, abra:
-     http://localhost:8080/mock-a-console.html   (A · trilho + inspetor)
-     http://localhost:8080/mock-b-wizard.html    (B · assistente 3 passos)
-     http://localhost:8080/mock-c-cards.html     (C · cartões estilo RaceLab)
-   Dá para abrir direto com duplo clique também (sem servidor).
-   Escolha um e avise — o vencedor vira o layout do app no jogo.
+Files exchanged with the game (Documents/Assetto Corsa folder):
+  RaceFlow_webui_status.json  (app -> panel, every 0.5s)
+  RaceFlow_webui_cmd.json      (panel -> app, commands)

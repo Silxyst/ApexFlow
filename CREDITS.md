@@ -2,7 +2,9 @@
 
 ApexFlow is developed and maintained by **Silxyst** as an independent app.
 
-Built for offline single-player: AI personalities, learning, rolling start, endurance strategy, multiclass, caution FCY/sector-yellow, track limits and live HUD.
+Built for offline single-player: thinking AI personalities, aligned 2×2 rolling starts, adaptive endurance strategy, multiclass racing, live delta gaps, persistent penalty points and live HUD.
+
+Flags and track limits are handled by Assetto Corsa itself — no double penalties.
 
 ## License
 
