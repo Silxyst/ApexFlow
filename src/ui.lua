@@ -555,7 +555,8 @@ local function drawFuelStrategySection(sim, cfg)
       for _, c in ipairs(sState.cars) do
         if shown >= 8 then break end
         shown = shown + 1
-        local nm = ac.getDriverName(c.index) or ("IA " .. tostring(c.index))
+        local okN, nm = pcall(ac.getDriverName, c.index)
+        if not okN or type(nm) ~= "string" or nm == "" then nm = ("IA " .. tostring(c.index)) end
         if #nm > 16 then nm = nm:sub(1, 15) .. "…" end
         local pitTxt = c.nextPit and ("pit v" .. tostring(c.nextPit)) or "sem pit"
         ui.text(string.format("#%-2d %-17s v%-3d ⛽%.1fL %s",

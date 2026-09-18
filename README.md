@@ -14,7 +14,7 @@
   <a href="https://github.com/Silxyst/RaceFlow-V2/releases/latest">
     <img src="https://img.shields.io/github/v/release/Silxyst/RaceFlow-V2?style=for-the-badge&label=Download&color=ff6a15&logo=github" alt="Latest Release"/>
   </a>
-  <img src="https://img.shields.io/badge/Version-v0.29.3-ff6a15?style=for-the-badge&label=App" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v0.31.2-ff6a15?style=for-the-badge&label=App" alt="Version"/>
   <img src="https://img.shields.io/badge/CSP-0.3.0.619-00d4ff?style=for-the-badge&logo=assettocorsa" alt="CSP"/>
   <img src="https://img.shields.io/badge/Platform-Windows-0078d6?style=for-the-badge&logo=windows" alt="Platform"/>
   <a href="https://github.com/Silxyst/RaceFlow-V2/blob/main/LICENSE">
@@ -73,14 +73,14 @@
 **Requisitos:** `Assetto Corsa` + `CSP 0.3.0.619+` (`dwrite.dll 0.3.0`) + `Content Manager` + offline.
 
 ```bash
-1. Baixe RaceFlow_0.29.3_GitHub.zip em https://github.com/Silxyst/RaceFlow-V2/releases/latest
+1. Baixe RaceFlow_v0.31.2.zip em https://github.com/Silxyst/RaceFlow-V2/releases/latest
 2. Extraia para Assetto Corsa/apps/lua/RaceFlow/ (substitua)
 3. Content Manager → Apps → ative RaceFlow + RaceFlow Events
 4. AC → Apps barra lateral → RaceFlow
 ```
 
 <details>
-<summary><strong>📁 Estrutura v0.29.3 (10 src leves)</strong></summary>
+<summary><strong>📁 Estrutura v0.31.2 (10 src leves)</strong></summary>
 
 ```
 RaceFlow/
@@ -175,14 +175,16 @@ cmd("set_aggression", {"value":68})
 
 ## 🗺️ Roadmap
 
-- [x] `v0.29.3` Chuva grip 2% + PP persistente + Gaps delta (esta)
+- [x] `v0.31.2` IA Race Logic suave: linhas ±0.30 sem tranco + freada progressiva nas lentas
+- [x] `v0.30.0` IA nova Race Logic: pensa antes de passar, sem trem, sem kamikaze
+- [x] `v0.29.3` Chuva grip 2% + PP persistente + Gaps delta
 - [x] `v0.29.1` IA pensada gap 8-120m + anti-kamikaze
 - [x] `v0.28.1` Extrema 2 Apps leves
-- [ ] `v0.30.0` Radar helicorsa + telemetry CSV gráfico
-- [ ] `v0.31.0` Campeonato PP por temporada
+- [ ] Radar helicorsa + telemetry CSV gráfico
+- [ ] Campeonato PP por temporada
 
 ---
 
 ## 📄 License MIT — Silxyst
 
-<p align="center"><sub>RaceFlow v0.29.3 — 2 Apps • 10 src • CSP 0.3.0 • 0 FAIL • AC nativo bandeira/corte</sub></p>
+<p align="center"><sub>RaceFlow v0.31.2 — 2 Apps • 10 src • CSP 0.3.0 • 0 FAIL • AC nativo bandeira/corte</sub></p>

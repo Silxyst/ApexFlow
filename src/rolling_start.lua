@@ -458,7 +458,10 @@ local shouldLog = isRolling or ((state.logPostReleaseTimer or 0) > 0)
     end
   end
 
-if shouldLog and ac and ac.log then
+-- v0.31.0: log 1x/s (era 60x/s = 3k linhas/min no custom_shaders_patch.log)
+state.logTimer = (state.logTimer or 0) + dt
+if shouldLog and ac and ac.log and state.logTimer >= 1.0 then
+  state.logTimer = 0
   ac.log(string.format(
     "[RaceFlow RollingStart] leader=%d lap=%d sp=%.3f releaseAt=%.3f isRolling=%s",
     state.leader, leaderLap, leaderSP, releaseAt, tostring(isRolling)

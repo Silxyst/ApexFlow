@@ -1,10 +1,10 @@
--- ApexFlow — Independent race suite for Assetto Corsa (v0.29.3)
+-- ApexFlow — Independent race suite for Assetto Corsa (v0.31.2)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.29.3"
+SCRIPT_VERSION = "0.31.2"
 
 _G.RARE2_API = _G.RARE2_API or {}
 local RARE2_API = _G.RARE2_API
-_G.RACEFLOW_VERSION = "0.29.3"
+_G.RACEFLOW_VERSION = "0.31.2"
 _G.APEXFLOW_VERSION = "0.13.1"
 
 local function clamp(v,a,b) if v<a then return a end if v>b then return b end return v end
@@ -40,10 +40,11 @@ local penalty_sev  = safeRequire("src.penalty_severity")
 
 local RARE2_CFG = {
   enabled      = true,
-  aggression   = 50,
+  aggression   = 65,
   paceEnabled  = true,
-  paceStrength = 65,
-  difficultyBoost = 100,
+  paceStrength = 78,
+  difficultyBoost = 104,
+  physicsPush  = { intensity = 70 },
 
   strategy = {
     enabled = true,
@@ -267,7 +268,10 @@ local function getPerTrackConfigPath(trackId)
   return string.format("RaceFlow_config_%s.lua", tostring(trackId))
 end
 local function savePerTrackConfig(trackId)
-  trackId = trackId or getTrackIdForSave(ac.getSim())
+  if not trackId then
+    local okS, sim = pcall(ac.getSim)
+    trackId = (okS and sim) and getTrackIdForSave(sim) or "unknown_track"
+  end
   local path = getPerTrackConfigPath(trackId)
   local f = io.open(path, "w")
   if not f then return false end
@@ -279,7 +283,10 @@ local function savePerTrackConfig(trackId)
   return true
 end
 local function loadPerTrackConfig(trackId)
-  trackId = trackId or getTrackIdForSave(ac.getSim())
+  if not trackId then
+    local okS, sim = pcall(ac.getSim)
+    trackId = (okS and sim) and getTrackIdForSave(sim) or "unknown_track"
+  end
   local path = getPerTrackConfigPath(trackId)
   local chunk = loadfile(path)
   if not chunk then return false end
@@ -380,8 +387,8 @@ end
 -- ----------------------------------------------------------
 -- Learning / safety defaults (can be overridden by config/UI)
 -- ----------------------------------------------------------
-RARE2_CFG.learningEnabled = true
--- NOTE v0.5.0: disableLearningDuringVSC removed with the VSC system.
+RARE2_CFG.learningEnabled = false
+-- v0.29.5 teste: danger/memory desligado para IA correr sem amarras
 
 -- Hard-event detection
 RARE2_CFG.offTrackConfirmSec   = 0.8
@@ -438,20 +445,24 @@ RARE2_CFG.entryCapPreMarginBonusEscalated   = 10
 RARE2_CFG.entryCapWindowTightenEscalated    = 15
 RARE2_CFG.entryCapEscalatedStrengthMul      = 1.15
 
-RARE2_CFG.entryCapBrakeGain             = 0.42
-RARE2_CFG.entryCapTopSpeedLoss          = 0.22
-RARE2_CFG.entryCapThrottleLoss          = 0.16
+RARE2_CFG.entryCapBrakeGain             = 0.22
+RARE2_CFG.entryCapTopSpeedLoss          = 0.10
+RARE2_CFG.entryCapThrottleLoss          = 0.07
 
-RARE2_CFG.dangerCap            = 20
-RARE2_CFG.dangerOvercapSlope   = 0.15
-RARE2_CFG.dangerOvercapMax     = 1.30
-RARE2_CFG.dangerBrakeGain      = 0.10
-RARE2_CFG.dangerTopSpeedLoss   = 0.08
-RARE2_CFG.dangerThrottleLoss   = 0.07
+RARE2_CFG.dangerCap            = 28
+RARE2_CFG.dangerOvercapSlope   = 0.10
+RARE2_CFG.dangerOvercapMax     = 1.15
+RARE2_CFG.dangerBrakeGain      = 0.04
+RARE2_CFG.dangerTopSpeedLoss   = 0.03
+RARE2_CFG.dangerThrottleLoss   = 0.03
+RARE2_CFG.earlyCapWindowM      = 250
+RARE2_CFG.earlyForceWindowM    = 120
+RARE2_CFG.dangerZoneDamp       = 0.40
+RARE2_CFG.dangerZoneThreshold  = 5.0
 
-RARE2_CFG.paceBaseChillOverride     = -0.07
-RARE2_CFG.paceBaseAttackOverride    =  0.07
-RARE2_CFG.jitterScale               = 0.80
+RARE2_CFG.paceBaseChillOverride     = -0.05
+RARE2_CFG.paceBaseAttackOverride    =  0.13
+RARE2_CFG.jitterScale               = 1.10
 RARE2_CFG.singleClassBackCatchup    = 0.008
 RARE2_CFG.singleClassBackCurve      = 2.5
 RARE2_CFG.earlySpreadFrac           = 0.55
@@ -463,17 +474,17 @@ RARE2_CFG.multiclassYieldDistM     = 120
 RARE2_CFG.multiclassPushDistM      = 80
 
 -- v0.10.0: racecraft mais vivo por padrão (mais brigas e ultrapassagens).
-RARE2_CFG.stuckBehindDelay           = 0.9
-RARE2_CFG.stuckBehindRampTime        = 5.5
-RARE2_CFG.draftCommitRampGate        = 0.20
-RARE2_CFG.draftCommitTime            = 3.0
-RARE2_CFG.stuckBehindAggressionBoost = 0.20
-RARE2_CFG.stuckBehindPushBoost       = 0.030
-RARE2_CFG.draftCommitAggBoost        = 0.26
-RARE2_CFG.draftCommitPushBoost       = 0.045
-RARE2_CFG.draftCommitTopSpeedBoost   = 0.030
+RARE2_CFG.stuckBehindDelay           = 0.7
+RARE2_CFG.stuckBehindRampTime        = 5.0
+RARE2_CFG.draftCommitRampGate        = 0.16
+RARE2_CFG.draftCommitTime            = 3.2
+RARE2_CFG.stuckBehindAggressionBoost = 0.22
+RARE2_CFG.stuckBehindPushBoost       = 0.035
+RARE2_CFG.draftCommitAggBoost        = 0.28
+RARE2_CFG.draftCommitPushBoost       = 0.052
+RARE2_CFG.draftCommitTopSpeedBoost   = 0.035
 
-RARE2_CFG.difficultyTopSpeedScale    = 0.10
+RARE2_CFG.difficultyTopSpeedScale    = 0.22
 
 RARE2_CFG.lap1SuppressBase = 1.0
 RARE2_CFG.lap1RampFrac     = 0.0
@@ -609,21 +620,21 @@ RARE2_API.markConfigDirty = function()
   if _G.RARE2_API then RARE2_API._configDirty = true end
 end
 RARE2_API.resetToDefaults = function()
-    RARE2_CFG.aggression = 50
-    RARE2_CFG.difficultyBoost = 100
-    RARE2_CFG.paceStrength = 65
-    -- v0.10.0: racecraft defaults (spicier racing).
-    RARE2_CFG.stuckBehindDelay = 0.8
+    -- v0.31.0: alinhado com os defaults de init (era 50/100/65 defasado)
+    RARE2_CFG.aggression = 65
+    RARE2_CFG.difficultyBoost = 104
+    RARE2_CFG.paceStrength = 78
+    RARE2_CFG.stuckBehindDelay = 0.7
     RARE2_CFG.stuckBehindRampTime = 5.0
-    RARE2_CFG.draftCommitRampGate = 0.15
-    RARE2_CFG.draftCommitTime = 3.5
-    RARE2_CFG.stuckBehindAggressionBoost = 0.26
-    RARE2_CFG.stuckBehindPushBoost = 0.034
-    RARE2_CFG.draftCommitAggBoost = 0.32
-    RARE2_CFG.draftCommitPushBoost = 0.070
-    RARE2_CFG.draftCommitTopSpeedBoost = 0.050
+    RARE2_CFG.draftCommitRampGate = 0.16
+    RARE2_CFG.draftCommitTime = 3.2
+    RARE2_CFG.stuckBehindAggressionBoost = 0.22
+    RARE2_CFG.stuckBehindPushBoost = 0.035
+    RARE2_CFG.draftCommitAggBoost = 0.28
+    RARE2_CFG.draftCommitPushBoost = 0.052
+    RARE2_CFG.draftCommitTopSpeedBoost = 0.035
     RARE2_CFG.huntDuration = 50.0
-    RARE2_CFG.tigerChancePerLap = 0.07
+    RARE2_CFG.tigerChancePerLap = 0.04
     if RARE2_CFG.strategy then
       RARE2_CFG.strategy.manualRaceLaps = 20
       RARE2_CFG.strategy.forcedStops = 1
@@ -779,8 +790,8 @@ local configSaveCooldown = 0.0
 local configSaveInterval = 1.0
 
 function script.update(dt)
-  local sim = ac.getSim()
-  if not sim then return end
+  local okS, sim = pcall(ac.getSim)
+  if not okS or not sim then return end
 
   if not configLoaded then
     loadConfigFromFile()
@@ -830,7 +841,7 @@ function script.update(dt)
     if not okA then ac.log("[RaceFlow] ai.update: " .. tostring(errA)) end
   end
 
-  -- v0.29.2: Force AI to overtake QUALQUER carro parado (player ou IA batida) — desvio rápido, sem fila
+  -- v0.31.1: boost anti-fila (só velocidade — offset lateral é só da IA, sem briga dupla)
   do
     local L = tonumber(sim.trackLengthM) or 0
     if L > 0 then
@@ -842,7 +853,7 @@ function script.update(dt)
           local bOff = (tonumber(bcar.wheelsOutside) or 0) >= 2 or bcar.isLapValid == false
           local isBlocking = (bSpd < 3) or (bSpd < 8 and bOff) or (bcar.isRetired == true)
           if isBlocking and bcar.splinePosition then
-            blockers[#blockers+1] = { idx=j, pos=bcar.splinePosition, isPlayer=(j==0) }
+            blockers[#blockers+1] = { idx=j, pos=bcar.splinePosition }
           end
         end
       end
@@ -855,15 +866,10 @@ function script.update(dt)
               for _, b in ipairs(blockers) do
                 if b.idx ~= i then
                   local gapFwd = (tonumber(b.pos) - tonumber(aPos)) % 1
-                  if gapFwd > 0.0015 and gapFwd < 0.045 then -- 6m a 180m atrás do batido
+                  if gapFwd > 0.0015 and gapFwd < 0.045 then
                     pcall(physics.setAITopSpeed, i, 320)
                     pcall(physics.setAIThrottleLimit, i, 1.0)
                     if physics.setAIAggression then pcall(physics.setAIAggression, i, 1.0) end
-                    if physics.setAISplineOffset then
-                      -- desvio lateral para não enroscar no batido
-                      local side = (i % 2 == 0) and 0.9 or -0.9
-                      pcall(physics.setAISplineOffset, i, side, false)
-                    end
                     break
                   end
                 end
@@ -1058,7 +1064,8 @@ end
 local function drawRaceEventsBody()
   -- v0.24.0: par-a-par com o app — faixa + herói + pips + IA + jogo +
   -- estratégia estendida + preset/voz/update + ⚙ p/ abrir o app.
-  local sim = ac.getSim()
+  local okS, sim = pcall(ac.getSim)
+  if not okS then sim = nil end
   local inSession = sim and sim.isSessionStarted
   local hudCfg = (RARE2_CFG and RARE2_CFG.hudEvents) or {}
   local showStrategy= hudCfg.showStrategy ~= false
