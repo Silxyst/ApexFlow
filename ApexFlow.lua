@@ -1,10 +1,10 @@
--- ApexFlow — Independent race suite for Assetto Corsa (v0.32.9)
+-- ApexFlow — Independent race suite for Assetto Corsa (v0.32.10)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.32.9"
+SCRIPT_VERSION = "0.32.10"
 
 _G.APEXFLOW_API = _G.APEXFLOW_API or {}
 local APEXFLOW_API = _G.APEXFLOW_API
-_G.APEXFLOW_VERSION = "0.32.9"
+_G.APEXFLOW_VERSION = "0.32.10"
 
 local function clamp(v,a,b) if v<a then return a end if v>b then return b end return v end
 local function lerp(a,b,t) return a + (b-a)*t end

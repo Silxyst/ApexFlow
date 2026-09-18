@@ -2154,6 +2154,26 @@ drawWebPanelSection = function(sim, cfg)
     if val ~= cfg.webui.port then cfg.webui.port = val; notifyChange() end
   end
   ui.newLine(2)
+  -- Sonda se o servidor local está no ar (throttle 3s, via web.get que funciona neste CSP)
+  local port = cfg.webui.port or 8080
+  cfg._panelProbeAt = tonumber(cfg._panelProbeAt) or 0
+  if (os.clock() or 0) - cfg._panelProbeAt > 3 then
+    cfg._panelProbeAt = os.clock() or 0
+    if web ~= nil and type(web.get) == "function" then
+      pcall(web.get, string.format("http://127.0.0.1:%d/api/status", port), function(err, resp)
+        cfg._panelUp = (err == nil) and resp ~= nil and tonumber(resp.status) == 200
+      end)
+    end
+  end
+  if cfg._panelUp then
+    if rgbm then ui.textColored("● Servidor ligado — painel pronto", C.ok())
+    else ui.text("Servidor ligado — painel pronto") end
+  else
+    if rgbm then ui.textColored("○ Servidor desligado", C.warn())
+    else ui.text("Servidor desligado") end
+    ui.textDisabled("Rode 1x: web/ABRIR_PAINEL.bat — ou instale web/INSTALAR_INICIALIZACAO.bat p/ ligar junto com o Windows.")
+  end
+  ui.newLine(2)
   if ui.button("🖥 Painel aqui no jogo", vec2(220, 30)) then
     if ac.setWindowOpen then pcall(ac.setWindowOpen, "panel", true) end
   end
@@ -2161,13 +2181,15 @@ drawWebPanelSection = function(sim, cfg)
   ui.sameLine(0, 8)
   if ui.button("🌐 Abrir no Navegador", vec2(220, 30)) then
     cfg._linkMsg = nil
-    if openLink(cfg, string.format("http://localhost:%d/panel.html", cfg.webui.port or 8080)) then
+    if not cfg._panelUp then
+      toast(cfg, "warn", "Servidor desligado", "Rode ABRIR_PAINEL.bat 1x")
+    elseif openLink(cfg, string.format("http://localhost:%d/panel.html", port)) then
       toast(cfg, "ok", "Navegador abrindo…", "")
     end
   end
   hand()
   drawLinkMsg(cfg)
-  ui.textDisabled("No jogo = janela Painel (Apps). No navegador = rode web/ABRIR_PAINEL.bat 1x.")
+  ui.textDisabled("No jogo = janela Painel (Apps). No navegador = servidor precisa estar ligado.")
 end
 
 -- ---------------- moldura principal ----------------
