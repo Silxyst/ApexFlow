@@ -1127,13 +1127,15 @@ local function drawGitHubUpdateSection(sim, cfg)
 
   local gState = APEXFLOW_API.githubGetState and APEXFLOW_API.githubGetState() or {}
 
-  -- Sem HTTP no jogo: se o painel local (panel_server.py) já gravou o
-  -- resultado, o painel funcional abaixo aparece normalmente (via arquivo).
-  if ac.webRequest == nil and not gState.latestVersion then
+  -- Sem HTTP no jogo (nem web.get nem ac.webRequest): se o painel local
+  -- (panel_server.py) já gravou o resultado, o painel funcional abaixo
+  -- aparece normalmente (via arquivo).
+  local hasHttp = (web ~= nil and type(web.get) == "function") or ac.webRequest ~= nil
+  if not hasHttp and not gState.latestVersion then
     ui.newLine(2)
     if rgbm then ui.textColored("ℹ Verificação automática indisponível", C.accent())
     else ui.text("Verificação automática indisponível") end
-    ui.textWrapped("Esta build do CSP não expõe ac.webRequest. Para checagem automática, rode o painel local: python web/panel_server.py (ele consulta o GitHub e o app lê o resultado).")
+    ui.textWrapped("Esta build do CSP não expõe HTTP para o Lua. Para checagem automática, rode o painel local: python web/panel_server.py (ele consulta o GitHub e o app lê o resultado).")
     ui.newLine(2)
     ui.text("Repositório: " .. (cfg.githubUpdate.repo or "Silxyst/ApexFlow"))
     ui.text("Versão instalada: v" .. (SCRIPT_VERSION or _G.APEXFLOW_VERSION or "?"))

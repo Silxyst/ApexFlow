@@ -1,10 +1,10 @@
--- ApexFlow — Independent race suite for Assetto Corsa (v0.32.3)
+-- ApexFlow — Independent race suite for Assetto Corsa (v0.32.4)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.32.3"
+SCRIPT_VERSION = "0.32.4"
 
 _G.APEXFLOW_API = _G.APEXFLOW_API or {}
 local APEXFLOW_API = _G.APEXFLOW_API
-_G.APEXFLOW_VERSION = "0.32.3"
+_G.APEXFLOW_VERSION = "0.32.4"
 
 local function clamp(v,a,b) if v<a then return a end if v>b then return b end return v end
 local function lerp(a,b,t) return a + (b-a)*t end
@@ -730,9 +730,15 @@ local function githubCheckFromFile(cfg)
   return true
 end
 
+-- HTTP no jogo: CSP expõe o global `web` (web.get), NÃO ac.webRequest.
+-- Detectado em outros apps Lua instalados (Advanced Gamepad Assist, SetupExchange).
+local function hasWebGet()
+  return web ~= nil and type(web.get) == "function"
+end
+
 local function githubCheckUpdates(cfg, force)
   if not cfg.githubUpdate.enabled then return end
-  if not ac.webRequest then
+  if not hasWebGet() and not ac.webRequest then
     -- Sem HTTP no jogo: tenta o arquivo do painel local (atualiza o estado de verdade)
     if githubCheckFromFile(cfg) then
       webReqMissingLogged = false
@@ -741,7 +747,7 @@ local function githubCheckUpdates(cfg, force)
     if not webReqMissingLogged then
       webReqMissingLogged = true
       githubState.error = "file"
-      ac.log("[ApexFlow GitHub] ac.webRequest indisponível; rode panel_server.py ou check_update.py (logged once)")
+      ac.log("[ApexFlow GitHub] sem HTTP no jogo; rode panel_server.py ou check_update.py (logged once)")
     end
     return
   end
@@ -761,11 +767,7 @@ local function githubCheckUpdates(cfg, force)
   local url = string.format("https://api.github.com/repos/%s/releases/latest", cfg.githubUpdate.repo or "Silxyst/ApexFlow")
   ac.log("[ApexFlow GitHub] Checking for updates: " .. url)
 
-  ac.webRequest({
-    url = url,
-    method = "GET",
-    headers = { ["User-Agent"] = "ApexFlow-AC-App" },
-    callback = function(err, response)
+  local function onResponse(err, response)
       githubState.checking = false
       if err then
         githubState.error = tostring(err)
@@ -811,8 +813,22 @@ local function githubCheckUpdates(cfg, force)
 
       ac.log(string.format("[ApexFlow GitHub] Current: %s, Latest: %s, Update: %s",
         SCRIPT_VERSION, version, githubState.hasUpdate and "YES" or "NO"))
-    end
-  })
+  end
+
+  if hasWebGet() then
+    -- web.get(url, callback) ou web.get(url, headers, callback)
+    local okCall = pcall(web.get, url,
+      { ["User-Agent"] = "ApexFlow-AC-App", ["Accept"] = "application/vnd.github+json" },
+      onResponse)
+    if not okCall then pcall(web.get, url, onResponse) end
+  else
+    ac.webRequest({
+      url = url,
+      method = "GET",
+      headers = { ["User-Agent"] = "ApexFlow-AC-App" },
+      callback = onResponse,
+    })
+  end
 end
 
 -- ==========================================================
