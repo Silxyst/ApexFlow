@@ -14,7 +14,7 @@
   <a href="https://github.com/Silxyst/ApexFlow/releases/latest">
     <img src="https://img.shields.io/github/v/release/Silxyst/ApexFlow?style=for-the-badge&label=DOWNLOAD&color=ff6a15&logo=github" alt="Latest Release"/>
   </a>
-  <img src="https://img.shields.io/badge/Version-v0.32.0-ff6a15?style=for-the-badge&label=App" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v0.32.2-ff6a15?style=for-the-badge&label=App" alt="Version"/>
   <img src="https://img.shields.io/badge/CSP-0.3.0-00d4ff?style=for-the-badge" alt="CSP"/>
   <img src="https://img.shields.io/badge/Platform-Windows-0078d6?style=for-the-badge&logo=windows" alt="Platform"/>
   <a href="https://github.com/Silxyst/ApexFlow/blob/main/LICENSE">
@@ -74,14 +74,14 @@
 **Requirements:** `Assetto Corsa` + `Custom Shaders Patch 0.3.0+` + `Content Manager` + offline session.
 
 ```bash
-1. Download ApexFlow_v0.32.0.zip from https://github.com/Silxyst/ApexFlow/releases/latest
+1. Download ApexFlow_v0.32.2.zip from https://github.com/Silxyst/ApexFlow/releases/latest
 2. Extract into Assetto Corsa/apps/lua/  (creates/updates the ApexFlow/ folder)
 3. Content Manager → Apps → enable ApexFlow + ApexFlow Events
 4. In AC → Apps sidebar → ApexFlow
 ```
 
 <details>
-<summary><strong>📁 Package contents (v0.32.0)</strong></summary>
+<summary><strong>📁 Package contents (v0.32.2)</strong></summary>
 
 ```
 ApexFlow/
@@ -174,6 +174,7 @@ cmd("set_aggression", {"value": 68})
 
 ## 🗺️ Roadmap
 
+- [x] `v0.32.2` GitHub auto-update on new CSP + repo migration
 - [x] `v0.31.2` Smooth race lines (±0.30 cap, no mid-corner crossing) + progressive slow-corner braking
 - [x] `v0.30.0` New Race Logic AI: thinks before passing, no trains, no kamikaze
 - [x] `v0.29.3` Rain grip fix + persistent PP + delta gaps
@@ -188,6 +189,6 @@ cmd("set_aggression", {"value": 68})
 MIT — **Silxyst**. Free for personal and commercial use, see [LICENSE](LICENSE).
 
 <p align="center">
-  <sub>ApexFlow v0.32.0 — 2 apps • 10 modules • CSP 0.3.0 • zero errors</sub><br/>
+  <sub>ApexFlow v0.32.2 — 2 apps • 10 modules • CSP 0.3.0 • zero errors</sub><br/>
   <sub>Built with ❤️ for the Assetto Corsa community</sub>
 </p>
