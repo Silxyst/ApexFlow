@@ -14,7 +14,7 @@
   <a href="https://github.com/Silxyst/ApexFlow/releases/latest">
     <img src="https://img.shields.io/github/v/release/Silxyst/ApexFlow?style=for-the-badge&label=DOWNLOAD&color=ff6a15&logo=github" alt="Latest Release"/>
   </a>
-  <img src="https://img.shields.io/badge/Version-v0.32.2-ff6a15?style=for-the-badge&label=App" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v0.32.3-ff6a15?style=for-the-badge&label=App" alt="Version"/>
   <img src="https://img.shields.io/badge/CSP-0.3.0-00d4ff?style=for-the-badge" alt="CSP"/>
   <img src="https://img.shields.io/badge/Platform-Windows-0078d6?style=for-the-badge&logo=windows" alt="Platform"/>
   <a href="https://github.com/Silxyst/ApexFlow/blob/main/LICENSE">
@@ -189,6 +189,6 @@ cmd("set_aggression", {"value": 68})
 MIT — **Silxyst**. Free for personal and commercial use, see [LICENSE](LICENSE).
 
 <p align="center">
-  <sub>ApexFlow v0.32.2 — 2 apps • 10 modules • CSP 0.3.0 • zero errors</sub><br/>
+  <sub>ApexFlow v0.32.3 — 2 apps • 10 modules • CSP 0.3.0 • zero errors</sub><br/>
   <sub>Built with ❤️ for the Assetto Corsa community</sub>
 </p>

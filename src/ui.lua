@@ -1125,13 +1125,15 @@ local function drawGitHubUpdateSection(sim, cfg)
   ui.text("GitHub Update Checker")
   helpMarker("Verifica releases no GitHub via API (requer CSP com ac.webRequest).")
 
-  -- Graceful degradation: this CSP build has no ac.webRequest, so in-app
-  -- checks can never work. Show guidance instead of a red error + dead toggles.
-  if ac.webRequest == nil then
+  local gState = APEXFLOW_API.githubGetState and APEXFLOW_API.githubGetState() or {}
+
+  -- Sem HTTP no jogo: se o painel local (panel_server.py) já gravou o
+  -- resultado, o painel funcional abaixo aparece normalmente (via arquivo).
+  if ac.webRequest == nil and not gState.latestVersion then
     ui.newLine(2)
     if rgbm then ui.textColored("ℹ Verificação automática indisponível", C.accent())
     else ui.text("Verificação automática indisponível") end
-    ui.textWrapped("Esta build do CSP não expõe ac.webRequest, então o app não consegue consultar a API do GitHub sozinho. Isso é esperado e não é um defeito do ApexFlow.")
+    ui.textWrapped("Esta build do CSP não expõe ac.webRequest. Para checagem automática, rode o painel local: python web/panel_server.py (ele consulta o GitHub e o app lê o resultado).")
     ui.newLine(2)
     ui.text("Repositório: " .. (cfg.githubUpdate.repo or "Silxyst/ApexFlow"))
     ui.text("Versão instalada: v" .. (SCRIPT_VERSION or _G.APEXFLOW_VERSION or "?"))
@@ -1144,8 +1146,9 @@ local function drawGitHubUpdateSection(sim, cfg)
     end
     return
   end
-
-  local gState = APEXFLOW_API.githubGetState and APEXFLOW_API.githubGetState() or {}
+  if gState.fromFile then
+    ui.textDisabled("Via painel local (panel_server.py) — o jogo não tem HTTP nesta build do CSP")
+  end
 
   -- Status
   ui.newLine(2)

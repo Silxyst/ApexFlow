@@ -1,10 +1,10 @@
--- ApexFlow — Independent race suite for Assetto Corsa (v0.32.2)
+-- ApexFlow — Independent race suite for Assetto Corsa (v0.32.3)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.32.2"
+SCRIPT_VERSION = "0.32.3"
 
 _G.APEXFLOW_API = _G.APEXFLOW_API or {}
 local APEXFLOW_API = _G.APEXFLOW_API
-_G.APEXFLOW_VERSION = "0.32.2"
+_G.APEXFLOW_VERSION = "0.32.3"
 
 local function clamp(v,a,b) if v<a then return a end if v>b then return b end return v end
 local function lerp(a,b,t) return a + (b-a)*t end
@@ -694,13 +694,54 @@ local githubState = {
 -- builds (incl. 0.3.0-preview542). Without this guard the check logs
 -- EVERY frame (~400+ lines/session). Probe once, stay silent afterwards.
 local webReqMissingLogged = false
+-- Fallback sem HTTP no jogo: lê ApexFlow_update.json gravado pelo
+-- panel_server.py / check_update.py (mesmo formato da API do GitHub).
+local function githubCheckFromFile(cfg)
+  local okD, docs = pcall(ac.getFolder, ac.FolderID.Documents)
+  if not okD or not docs or docs == "" then return false end
+  local f = io.open(docs .. "/Assetto Corsa/ApexFlow_update.json", "r")
+  if not f then return false end
+  local content = f:read("*a")
+  f:close()
+  if not content or content == "" or not ac.decodeJson then return false end
+  local ok, data = pcall(function() return ac.decodeJson(content) end)
+  if not ok or type(data) ~= "table" then return false end
+  -- Só vale para o mesmo repositório
+  if data.repo and data.repo ~= (cfg.githubUpdate.repo or "Silxyst/ApexFlow") then return false end
+  local version = tostring(data.version or "")
+  if version == "" then return false end
+  githubState.latestVersion = version
+  githubState.changelog = data.changelog or ""
+  githubState.tagName = data.tag
+  githubState.publishedAt = data.published_at
+  githubState.htmlUrl = data.html_url
+  githubState.checkedAt = data.checked_at
+  githubState.fromFile = true
+  local function parseVer(v)
+    local major, minor, patch = v:match("(%d+)%.(%d+)%.(%d+)")
+    return tonumber(major or 0), tonumber(minor or 0), tonumber(patch or 0)
+  end
+  local cM, cm, cP = parseVer(SCRIPT_VERSION)
+  local lM, lm, lP = parseVer(version)
+  githubState.hasUpdate = (lM > cM) or (lM == cM and lm > cm) or (lM == cM and lm == cm and lP > cP)
+  githubState.error = nil
+  ac.log(string.format("[ApexFlow GitHub] File check: current %s, latest %s, update %s",
+    SCRIPT_VERSION, version, githubState.hasUpdate and "YES" or "NO"))
+  return true
+end
+
 local function githubCheckUpdates(cfg, force)
   if not cfg.githubUpdate.enabled then return end
   if not ac.webRequest then
+    -- Sem HTTP no jogo: tenta o arquivo do painel local (atualiza o estado de verdade)
+    if githubCheckFromFile(cfg) then
+      webReqMissingLogged = false
+      return
+    end
     if not webReqMissingLogged then
       webReqMissingLogged = true
-      githubState.error = "ac.webRequest indisponível nesta build do CSP (auto-check desativado; use verificação manual se disponível)"
-      ac.log("[ApexFlow GitHub] ac.webRequest not available in this CSP build; automatic checks disabled (logged once)")
+      githubState.error = "file"
+      ac.log("[ApexFlow GitHub] ac.webRequest indisponível; rode panel_server.py ou check_update.py (logged once)")
     end
     return
   end
@@ -714,6 +755,7 @@ local function githubCheckUpdates(cfg, force)
 
   githubState.checking = true
   githubState.error = nil
+  githubState.fromFile = false
   githubState.lastCheck = now
 
   local url = string.format("https://api.github.com/repos/%s/releases/latest", cfg.githubUpdate.repo or "Silxyst/ApexFlow")
@@ -956,6 +998,8 @@ APEXFLOW_API.githubGetState = function()
     hasUpdate = githubState.hasUpdate,
     changelog = githubState.changelog,
     error = githubState.error,
+    fromFile = githubState.fromFile == true,
+    checkedAt = githubState.checkedAt,
     tagName = githubState.tagName,
     publishedAt = githubState.publishedAt,
     htmlUrl = githubState.htmlUrl,

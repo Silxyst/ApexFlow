@@ -24,11 +24,15 @@ import json
 import os
 import socket
 import sys
+import threading
 import time
 from pathlib import Path
 
+from check_update import check as check_update
+
 STATUS_FILE = "ApexFlow_webui_status.json"
 CMD_FILE = "ApexFlow_webui_cmd.json"
+UPDATE_INTERVAL = 1800  # 30 min entre checagens de update no GitHub
 
 
 def find_docs(cli_docs=None):
@@ -131,14 +135,35 @@ def lan_ip():
         return "127.0.0.1"
 
 
+def update_loop(docs, repo, interval, stop):
+    # Checa na inicialização e periodicamente (o jogo lê ApexFlow_update.json)
+    try:
+        check_update(repo, docs)
+    except Exception:  # noqa: BLE001 - nunca derruba o painel
+        pass
+    while not stop.wait(interval):
+        try:
+            check_update(repo, docs)
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def main():
     ap = argparse.ArgumentParser(description="ApexFlow Remote Panel")
     ap.add_argument("--port", type=int, default=8080)
     ap.add_argument("--docs", default=None, help="Pasta Documents/Assetto Corsa")
     ap.add_argument("--host", default="0.0.0.0", help="Interface de escuta")
+    ap.add_argument("--repo", default="Silxyst/ApexFlow", help="Repositório GitHub")
+    ap.add_argument("--update-interval", type=int, default=UPDATE_INTERVAL,
+                    help="Segundos entre checagens de update (0 = só na inicialização)")
+    ap.add_argument("--no-update-check", action="store_true", help="Desativa a checagem de update")
     args = ap.parse_args()
 
     docs = find_docs(args.docs)
+    stop = threading.Event()
+    if not args.no_update_check:
+        threading.Thread(target=update_loop, args=(docs, args.repo, max(60, args.update_interval), stop),
+                         daemon=True).start()
     webdir = Path(__file__).resolve().parent
     Handler.docs = docs
     handler = functools.partial(Handler, directory=str(webdir))
@@ -152,6 +177,8 @@ def main():
             srv.serve_forever()
         except KeyboardInterrupt:
             print("\n[panel] até logo!")
+        finally:
+            stop.set()
 
 
 if __name__ == "__main__":

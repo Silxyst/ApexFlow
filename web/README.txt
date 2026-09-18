@@ -16,6 +16,12 @@ What you can do: live position/lap/speed/gaps/penalty points,
 adjust AI aggression/pace/difficulty, toggle rolling start and
 strategy, save/reset the config.
 
+UPDATE CHECK (GitHub): the game has no HTTP in most CSP builds, so
+the panel checks releases itself (on startup + every 30 min) and
+writes Documents/Assetto Corsa/ApexFlow_update.json, which the
+in-game "02 · Atualizações" tab reads. No panel = no auto-check.
+Standalone: python web/check_update.py
+
 Files exchanged with the game (Documents/Assetto Corsa folder):
   ApexFlow_webui_status.json  (app -> panel, every 0.5s)
   ApexFlow_webui_cmd.json      (panel -> app, commands)
