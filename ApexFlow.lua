@@ -1,10 +1,10 @@
--- ApexFlow — Independent race suite for Assetto Corsa (v0.32.0)
+-- ApexFlow — Independent race suite for Assetto Corsa (v0.32.1)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.32.0"
+SCRIPT_VERSION = "0.32.1"
 
 _G.APEXFLOW_API = _G.APEXFLOW_API or {}
 local APEXFLOW_API = _G.APEXFLOW_API
-_G.APEXFLOW_VERSION = "0.32.0"
+_G.APEXFLOW_VERSION = "0.32.1"
 _G.APEXFLOW_VERSION = "0.13.1"
 
 local function clamp(v,a,b) if v<a then return a end if v>b then return b end return v end
@@ -123,37 +123,9 @@ local APEXFLOW_CFG = {
 -- but APEXFLOW_CFG is local here). This fixes M.getState() returning nil config.
 _G.APEXFLOW_CFG = APEXFLOW_CFG
 
--- ----------------------------------------------------------
--- Track State & FIA State — limpo extremo v0.29.0: AC nativo assume, mantém GREEN fixo
--- (caution/realpenalty removidos — sem ranger/yellow, só compat)
--- ----------------------------------------------------------
-local Track_State = {
-  state = "GREEN",
-  lastChange = 0,
-  yellowDistance = 80,
-  flags = {},
-}
-_G.Track_State = Track_State
-_G.APEXFLOW_API.Track_State = Track_State
-local FIA_State = {
-  mode = "GREEN",
-  reason = "",
-  timer = 0,
-  lastMode = "GREEN",
-}
-_G.FIA_State = FIA_State
-local function updateTrackState(dt, sim, cfg)
-  -- peso morto removido: sem caution/realpenalty, mantém GREEN
-  if Track_State.state ~= "GREEN" then
-    Track_State.state = "GREEN"
-    FIA_State.mode = "GREEN"
-    FIA_State.reason = ""
-  end
-  FIA_State.timer = (FIA_State.timer or 0) + dt
-  Track_State.flags = { state = Track_State.state, reason = "" }
-end
-APEXFLOW_API.getTrackState = function() return Track_State end
-APEXFLOW_API.getFIAState = function() return FIA_State end
+-- v0.32.1: Track/FIA removidos (AC nativo assume) — stubs estáticos p/ compat externa, sem _G, sem alloc/frame
+APEXFLOW_API.getTrackState = function() return { state = "GREEN" } end
+APEXFLOW_API.getFIAState = function() return { mode = "GREEN", reason = "" } end
 
 -- ----------------------------------------------------------
 -- Category presets (v0.14.0) — one click for GT3/F1/Endurance etc.
@@ -903,8 +875,6 @@ function script.update(dt)
   if penalty_sev and penalty_sev.update then
     pcall(penalty_sev.update, dt, sim, APEXFLOW_CFG)
   end
-  -- FIA / Track_State — mantiene GREEN (peso morto removido, sem caution/realpenalty)
-  pcall(updateTrackState, dt, sim, APEXFLOW_CFG)
 
   -- Auto-save per track (v0.14.0)
   do

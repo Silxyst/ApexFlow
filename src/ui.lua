@@ -1305,7 +1305,7 @@ local function drawAppearanceSection(sim, cfg)
 end
 
 local function drawAboutSection(sim, cfg)
-  ui.text("ApexFlow v" .. (SCRIPT_VERSION or _G.APEXFLOW_VERSION or _G.APEXFLOW_VERSION or "?"))
+  ui.text("ApexFlow v" .. (SCRIPT_VERSION or _G.APEXFLOW_VERSION or "?"))
   ui.textDisabled("Independent race suite for Assetto Corsa — offline AI, strategy & race control.")
 
   ui.textWrapped("ApexFlow enhances offline single-player by giving AI personality, racecraft and memory. Every driver has a class and learns corners; the field spreads naturally with hunt, hot laps and clean-air logic.")

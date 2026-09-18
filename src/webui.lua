@@ -202,11 +202,7 @@ local function processCommands(sim, cfg)
         local action = cmd.action
         local params = cmd.params or {}
 
-        -- NOTE v0.5.0: vsc_* commands removed with the VSC system.
-        -- Old clients sending them get a log line instead of a crash.
-        if action == "vsc_toggle" or action == "vsc_enable" or action == "vsc_disable" then
-          ac.log("[ApexFlow WebUI] command '" .. tostring(action) .. "' ignored: VSC removed in v0.5.0")
-        elseif action == "rolling_toggle" then
+        if action == "rolling_toggle" then
           cfg.rollingStart.enabled = not cfg.rollingStart.enabled
           APEXFLOW_API.markConfigDirty()
         elseif action == "strategy_toggle" then
