@@ -1,10 +1,10 @@
--- ApexFlow — Independent race suite for Assetto Corsa (v0.32.11)
+-- ApexFlow — Independent race suite for Assetto Corsa (v0.32.12)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.32.11"
+SCRIPT_VERSION = "0.32.12"
 
 _G.APEXFLOW_API = _G.APEXFLOW_API or {}
 local APEXFLOW_API = _G.APEXFLOW_API
-_G.APEXFLOW_VERSION = "0.32.11"
+_G.APEXFLOW_VERSION = "0.32.12"
 
 local function clamp(v,a,b) if v<a then return a end if v>b then return b end return v end
 local function lerp(a,b,t) return a + (b-a)*t end
@@ -1126,6 +1126,28 @@ APEXFLOW_API.reportPenaltySeverity = function(level, reason) if penalty_sev and 
 -- RealPenalty/sound/box/safety/voice/caution removidos — AC nativo assume
 APEXFLOW_API.githubCheckUpdates = function(cfg, force)
   githubCheckUpdates(cfg or APEXFLOW_CFG, force)
+end
+-- URL do painel pelo IP da máquina (gravado pelo panel_server.py).
+-- O jogo não tem como descobrir o IP sozinho, então lê ApexFlow_server.json.
+APEXFLOW_API.getServerUrl = function()
+  local okD, docs = pcall(ac.getFolder, ac.FolderID.Documents)
+  if not okD or not docs or docs == "" then return nil end
+  local f = io.open(docs .. "/Assetto Corsa/ApexFlow_server.json", "r")
+  if not f then return nil end
+  local content = f:read("*a")
+  f:close()
+  if not content or content == "" then return nil end
+  local data = decodeJsonSafe(content)
+  if type(data) ~= "table" then return nil end
+  local url = data.url
+  if type(url) ~= "string" or url == "" then
+    if data.ip and data.port then
+      url = string.format("http://%s:%s/panel.html", tostring(data.ip), tostring(data.port))
+    else
+      return nil
+    end
+  end
+  return url
 end
 APEXFLOW_API.githubGetState = function()
   return {

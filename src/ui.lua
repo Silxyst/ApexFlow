@@ -2151,7 +2151,7 @@ drawWebPanelSection = function(sim, cfg)
   helpMarker("Liga a ponte app <-> navegador/celular (posição, gaps, PP, comandos).")
   cfg.webui.port = tonumber(cfg.webui.port) or 8080
   local newP = sliderBlock("Porta do painel", "web_port", cfg.webui.port, 1024, 9999, "%.0f",
-    "Mesma porta do endereço http://localhost:PORTA/panel.html")
+    "Abre pelo IP da máquina (http://SEU-IP:PORTA/panel.html) — funciona melhor que localhost")
   if newP ~= nil then
     local val = math.floor(clamp(newP, 1024, 9999) + 0.5)
     if val ~= cfg.webui.port then cfg.webui.port = val; notifyChange() end
@@ -2186,8 +2186,14 @@ drawWebPanelSection = function(sim, cfg)
     cfg._linkMsg = nil
     if not cfg._panelUp then
       toast(cfg, "warn", "Servidor desligado", "Rode ABRIR_PAINEL.bat 1x")
-    elseif openLink(cfg, string.format("http://localhost:%d/panel.html", port)) then
-      toast(cfg, "ok", "Navegador abrindo…", "")
+    else
+      -- Abre pelo IP da máquina (funciona melhor que localhost)
+      local url = nil
+      if APEXFLOW_API.getServerUrl then url = APEXFLOW_API.getServerUrl() end
+      url = url or string.format("http://localhost:%d/panel.html", port)
+      if openLink(cfg, url) then
+        toast(cfg, "ok", "Navegador abrindo…", "")
+      end
     end
   end
   hand()

@@ -32,6 +32,7 @@ from check_update import check as check_update
 
 STATUS_FILE = "ApexFlow_webui_status.json"
 CMD_FILE = "ApexFlow_webui_cmd.json"
+SERVER_FILE = "ApexFlow_server.json"  # IP/porta p/ o jogo abrir pelo IP (lido pelo app)
 UPDATE_INTERVAL = 1800  # 30 min entre checagens de update no GitHub
 
 
@@ -170,6 +171,15 @@ def main():
     handler = functools.partial(Handler, directory=str(webdir))
 
     url = f"http://localhost:{args.port}/panel.html"
+    # Grava IP/porta p/ o jogo abrir pelo IP (funciona melhor que localhost)
+    try:
+        docs.mkdir(parents=True, exist_ok=True)
+        (docs / SERVER_FILE).write_text(
+            json.dumps({"ip": lan_ip(), "port": args.port,
+                        "url": f"http://{lan_ip()}:{args.port}/panel.html"}),
+            encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[panel] Aviso: não gravei {SERVER_FILE}: {exc}")
     if args.open:
         try:
             import webbrowser
