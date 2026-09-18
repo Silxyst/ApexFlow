@@ -6,6 +6,19 @@ local M = {}
 _G.APEXFLOW_API = _G.APEXFLOW_API or {}
 local APEXFLOW_API = _G.APEXFLOW_API
 
+-- i18n (v0.34.0): L("texto PT") traduz p/ cfg.lang (pt/en/es), fallback PT
+local _langMod
+local L
+do
+  local ok, mod = pcall(require, "src.lang")
+  if ok and mod then
+    _langMod = mod
+    L = function(s) return mod.L(s) end
+  else
+    L = function(s) return s end
+  end
+end
+
 
 local function hash01(s)
   local h = 0
@@ -27,9 +40,9 @@ end
 
 local function helpMarker(text)
   ui.sameLine()
-  ui.textDisabled("(?)")
+  ui.textDisabled(L("(?)"))
   if ui.itemHovered() then
-    ui.setTooltip(text)
+    ui.setTooltip(L(text))
   end
 end
 
@@ -57,7 +70,7 @@ end
 
 local function drawLinkMsg(cfg)
   if cfg and cfg._linkMsg and cfg._linkMsg ~= "" then
-    ui.textDisabled("Não consegui abrir sozinho. Digite no navegador:")
+    ui.textDisabled(L("Não consegui abrir sozinho. Digite no navegador:"))
     ui.text(cfg._linkMsg)
   end
 end
@@ -135,6 +148,7 @@ end
 
 -- Card header: big colored title + dim subtitle (skipped in compact mode)
 local function cardTitle(title, subtitle)
+  title, subtitle = L(title), L(subtitle)
   ui.pushFont(ui.Font.Title)
   if rgbm then ui.textColored(title, C.accent()) else ui.text(title) end
   ui.popFont()
@@ -145,11 +159,12 @@ end
 
 -- Status pill line (colored dot + text)
 local function statusLine(active, activeText, idleText)
+  activeText, idleText = L(activeText), L(idleText)
   if active then
-    if rgbm then ui.textColored("● " .. activeText, C.ok())
-    else ui.text("● " .. activeText) end
+    if rgbm then ui.textColored(L("● ") .. activeText, C.ok())
+    else ui.text(L("● ") .. activeText) end
   else
-    ui.textDisabled("○ " .. idleText)
+    ui.textDisabled(L("○ ") .. idleText)
   end
 end
 
@@ -158,17 +173,18 @@ local function safeTab(label, fn, sim, cfg)
   local ok, err = pcall(fn, sim, cfg)
   if not ok then
     ui.newLine(4)
-    if rgbm then ui.textColored("❌ Erro ao desenhar a aba " .. label, C.danger())
-    else ui.text("Erro ao desenhar a aba " .. label) end
-    ui.textWrapped("Detalhe: " .. tostring(err))
+    if rgbm then ui.textColored(L("❌ Erro ao desenhar a aba ") .. label, C.danger())
+    else ui.text(L("Erro ao desenhar a aba ") .. label) end
+    ui.textWrapped(L("Detalhe: ") .. tostring(err))
     ui.newLine(2)
-    ui.textDisabled("O restante do app continua funcionando. Envie esse texto ao suporte.")
+    ui.textDisabled(L("O restante do app continua funcionando. Envie esse texto ao suporte."))
     ac.log("[ApexFlow UI] tab '" .. tostring(label) .. "' draw failed: " .. tostring(err))
   end
 end
 
 local function sliderRow(label, id, value, minV, maxV, fmt, labelWidth)
   labelWidth = labelWidth or 170
+  label = L(label)
 
   ui.alignTextToFramePadding()
   ui.text(label)
@@ -185,6 +201,7 @@ end
 -- Full-width slider with the label ABOVE (never clipped by the window edge).
 -- help: tooltip text shown on the (?) marker (layman + technical).
 local function sliderBlock(label, id, value, minV, maxV, fmt, help)
+  label = L(label)
   ui.alignTextToFramePadding()
   ui.text(label)
   if help then helpMarker(help) end
@@ -328,8 +345,8 @@ local function computeAggressionStats(sim, cfg)
 end
 
 local function drawDifficultyBoostSection(sim, cfg)
-  ui.text("Difficulty Boost")
-  helpMarker("Stacks on top of AC difficulty.\n\n100% = no change\nHigher = faster AI overall.")
+  ui.text(L("Difficulty Boost"))
+  helpMarker(L("Stacks on top of AC difficulty.\n\n100% = no change\nHigher = faster AI overall."))
 
   cfg.difficultyBoost = cfg.difficultyBoost or 100
 
@@ -344,11 +361,11 @@ local function drawDifficultyBoostSection(sim, cfg)
 end
 
 local function drawAggressionSection(sim, cfg)
-  ui.text("Profile Mix")
-  helpMarker("Adjust Ratio of profile mix.\n\nChill,Balanced,Attack")
+  ui.text(L("Profile Mix"))
+  helpMarker(L("Adjust Ratio of profile mix.\n\nChill,Balanced,Attack"))
 
   local agg = cfg.aggression or 50
-  local newAgg = sliderBlock("Agressividade global", "aggr_mix", agg, 0, 100, "%.0f",
+  local newAgg = sliderBlock(L("Agressividade global"), "aggr_mix", agg, 0, 100, "%.0f",
     "Leigo: 0 = grid calmo, 100 = grid brigando por posição.\nTécnico: define o mix Chill/Normal/Attack distribuído por hash do nome.")
   if newAgg ~= nil then
     newAgg = clamp(newAgg, 0, 100)
@@ -359,29 +376,29 @@ local function drawAggressionSection(sim, cfg)
 
   ui.newLine(1)
   ui.separator()
-  ui.text("Profiles:")
+  ui.text(L("Profiles:"))
 
   if not sim or not sim.carsCount or sim.carsCount <= 0 then
-    ui.textDisabled("Disponível durante a sessão de corrida.")
+    ui.textDisabled(L("Disponível durante a sessão de corrida."))
     return
   end
 
   local ok, stats = pcall(computeAggressionStats, sim, cfg)
   if not ok then
-    ui.text("Error computing stats:")
+    ui.text(L("Error computing stats:"))
     ui.text(tostring(stats))
     return
   end
 
   if stats.total == 0 then
-    ui.text("No AI data yet.")
+    ui.text(L("No AI data yet."))
     return
   end
 
-  ui.text(string.format("Chill:    %d", stats.chill))
-  ui.text(string.format("Normal:   %d", stats.normal))
-  ui.text(string.format("Attack:   %d", stats.attack))
-  ui.text(string.format("Total AI: %d", stats.total))
+  ui.text(string.format(L("Chill:    %d"), stats.chill))
+  ui.text(string.format(L("Normal:   %d"), stats.normal))
+  ui.text(string.format(L("Attack:   %d"), stats.attack))
+  ui.text(string.format(L("Total AI: %d"), stats.total))
   ui.text(string.format(
     "Target mix: %.0f%% / %.0f%% / %.0f%%",
     stats.pChill * 100, stats.pNormal * 100, stats.pAttack * 100
@@ -391,13 +408,13 @@ local function drawAggressionSection(sim, cfg)
 end
 
 local function drawFuelStrategySection(sim, cfg)
-  ui.text("Estratégia de Corrida & Endurance")
-  helpMarker("Configuração de duração da corrida e paradas nos boxes para corridas curtas ou de Endurance (longa duração).")
+  ui.text(L("Estratégia de Corrida & Endurance"))
+  helpMarker(L("Configuração de duração da corrida e paradas nos boxes para corridas curtas ou de Endurance (longa duração)."))
 
   cfg.strategy = cfg.strategy or {}
 
   local enabled = (cfg.strategy.enabled == true)
-  if ui.checkbox("Ativar Estratégia de Combustível / Pit-Stops", enabled) then
+  if ui.checkbox(L("Ativar Estratégia de Combustível / Pit-Stops"), enabled) then
     cfg.strategy.enabled = not enabled
     notifyChange()
   end
@@ -405,62 +422,62 @@ local function drawFuelStrategySection(sim, cfg)
   ui.newLine(2)
 
   -- Endurance Presets
-  ui.textDisabled("Predefinições Rápidas (Endurance & 24 Horas):")
-  if ui.button("Sprint (20v / 1 pit)", vec2(130, 22)) then
+  ui.textDisabled(L("Predefinições Rápidas (Endurance & 24 Horas):"))
+  if ui.button(L("Sprint (20v / 1 pit)"), vec2(130, 22)) then
     cfg.strategy.manualRaceLaps = 20
     cfg.strategy.forcedStops = 1
     notifyChange()
   end
   ui.sameLine()
-  if ui.button("Club (40v / 1 pit)", vec2(130, 22)) then
+  if ui.button(L("Club (40v / 1 pit)"), vec2(130, 22)) then
     cfg.strategy.manualRaceLaps = 40
     cfg.strategy.forcedStops = 1
     notifyChange()
   end
   ui.sameLine()
-  if ui.button("1h (60v / 2 pits)", vec2(130, 22)) then
+  if ui.button(L("1h (60v / 2 pits)"), vec2(130, 22)) then
     cfg.strategy.manualRaceLaps = 60
     cfg.strategy.forcedStops = 2
     notifyChange()
   end
 
-  if ui.button("2.4h (120v / 4 pits)", vec2(130, 22)) then
+  if ui.button(L("2.4h (120v / 4 pits)"), vec2(130, 22)) then
     cfg.strategy.manualRaceLaps = 120
     cfg.strategy.forcedStops = 4
     notifyChange()
   end
   ui.sameLine()
-  if ui.button("4h (180v / 6 pits)", vec2(130, 22)) then
+  if ui.button(L("4h (180v / 6 pits)"), vec2(130, 22)) then
     cfg.strategy.manualRaceLaps = 180
     cfg.strategy.forcedStops = 6
     notifyChange()
   end
   ui.sameLine()
-  if ui.button("6h (250v / 9 pits)", vec2(130, 22)) then
+  if ui.button(L("6h (250v / 9 pits)"), vec2(130, 22)) then
     cfg.strategy.manualRaceLaps = 250
     cfg.strategy.forcedStops = 9
     notifyChange()
   end
 
-  if ui.button("12h Sebring (450v / 15 pits)", vec2(180, 22)) then
+  if ui.button(L("12h Sebring (450v / 15 pits)"), vec2(180, 22)) then
     cfg.strategy.manualRaceLaps = 450
     cfg.strategy.forcedStops = 15
     notifyChange()
   end
   ui.sameLine()
-  if ui.button("24h Le Mans (800v / 28 pits)", vec2(180, 22)) then
+  if ui.button(L("24h Le Mans (800v / 28 pits)"), vec2(180, 22)) then
     cfg.strategy.manualRaceLaps = 800
     cfg.strategy.forcedStops = 28
     notifyChange()
   end
 
-  if ui.button("24h Nordschleife (160v / 18 pits)", vec2(180, 22)) then
+  if ui.button(L("24h Nordschleife (160v / 18 pits)"), vec2(180, 22)) then
     cfg.strategy.manualRaceLaps = 160
     cfg.strategy.forcedStops = 18
     notifyChange()
   end
   ui.sameLine()
-  if ui.button("1000km / 1000 Milhas (600v)", vec2(180, 22)) then
+  if ui.button(L("1000km / 1000 Milhas (600v)"), vec2(180, 22)) then
     cfg.strategy.manualRaceLaps = 600
     cfg.strategy.forcedStops = 22
     notifyChange()
@@ -469,7 +486,7 @@ local function drawFuelStrategySection(sim, cfg)
   ui.newLine(2)
 
   cfg.strategy.manualRaceLaps = cfg.strategy.manualRaceLaps or 20
-  local newLaps = sliderBlock("Duração da corrida (voltas)", "strat_laps", cfg.strategy.manualRaceLaps, 3, 1000, "%.0f",
+  local newLaps = sliderBlock(L("Duração da corrida (voltas)"), "strat_laps", cfg.strategy.manualRaceLaps, 3, 1000, "%.0f",
     "Leigo: quantas voltas a IA deve planejar (combustível + pits).\nTécnico: base do cálculo de stint e janela de pit.")
   if newLaps ~= nil then
     local val = math.floor(clamp(newLaps, 3, 1000) + 0.5)
@@ -480,7 +497,7 @@ local function drawFuelStrategySection(sim, cfg)
   end
 
   cfg.strategy.forcedStops = cfg.strategy.forcedStops or 1
-  local newStops = sliderBlock("Paradas obrigatórias nos boxes", "strat_stops", cfg.strategy.forcedStops, 0, 50, "%.0f",
+  local newStops = sliderBlock(L("Paradas obrigatórias nos boxes"), "strat_stops", cfg.strategy.forcedStops, 0, 50, "%.0f",
     "Leigo: quantas vezes cada IA vai parar para reabastecer.\nTécnico: força o tanque virtual por stint para induzir o pit.")
   if newStops ~= nil then
     local val = math.floor(clamp(newStops, 0, 50) + 0.5)
@@ -493,20 +510,20 @@ local function drawFuelStrategySection(sim, cfg)
   if cfg.strategy.enabled then
     ui.newLine(2)
     ui.separator()
-    ui.text("Troca de Pneus")
-    helpMarker("Se ativado, durante a parada forçada nos boxes, a IA verificará o desgaste dos pneus. Se o estado estiver abaixo do limite configurado, pneus novos serão colocados junto com o reabastecimento.")
+    ui.text(L("Troca de Pneus"))
+    helpMarker(L("Se ativado, durante a parada forçada nos boxes, a IA verificará o desgaste dos pneus. Se o estado estiver abaixo do limite configurado, pneus novos serão colocados junto com o reabastecimento."))
 
     if cfg.strategy.tireChangeEnabled == nil then cfg.strategy.tireChangeEnabled = true end
     if cfg.strategy.tireFreshnessPct == nil then cfg.strategy.tireFreshnessPct = 50 end
 
     local tireEnabled = cfg.strategy.tireChangeEnabled
-    if ui.checkbox("Ativar troca de pneus", tireEnabled) then
+    if ui.checkbox(L("Ativar troca de pneus"), tireEnabled) then
       cfg.strategy.tireChangeEnabled = not tireEnabled
       notifyChange()
     end
 
     if cfg.strategy.tireChangeEnabled then
-      ui.text("Trocar pneus quando estado ≤")
+      ui.text(L("Trocar pneus quando estado ≤"))
       ui.setNextItemWidth(ui.windowWidth() - 40)
 
       local newPct = ui.slider("##tireFreshnessThreshold", cfg.strategy.tireFreshnessPct, 0, 100, "%.0f%%")
@@ -522,13 +539,13 @@ local function drawFuelStrategySection(sim, cfg)
     ui.newLine(4)
     ui.separator()
     if rgbm then
-      ui.textColored("🏁 Monitor de Endurance & Telemetria", rgbm(0.25, 0.75, 1.0, 1.0))
+      ui.textColored(L("🏁 Monitor de Endurance & Telemetria"), rgbm(0.25, 0.75, 1.0, 1.0))
     else
-      ui.text("🏁 Monitor de Endurance & Telemetria")
+      ui.text(L("🏁 Monitor de Endurance & Telemetria"))
     end
 
     if not sim or not sim.isSessionStarted then
-      ui.textDisabled("Telemetria disponível durante a sessão de corrida.")
+      ui.textDisabled(L("Telemetria disponível durante a sessão de corrida."))
     else
       local okCar, playerCar = pcall(ac.getCar, 0)
       if okCar and playerCar and playerCar.fuel then
@@ -536,7 +553,7 @@ local function drawFuelStrategySection(sim, cfg)
         local maxFuel = playerCar.maxFuel or 100
         local fuelPct = (maxFuel > 0) and (curFuel / maxFuel * 100) or 0
 
-        ui.text(string.format("Combustível Carro 0: %.1f L / %.1f L (%.0f%%)", curFuel, maxFuel, fuelPct))
+        ui.text(string.format(L("Combustível Carro 0: %.1f L / %.1f L (%.0f%%)"), curFuel, maxFuel, fuelPct))
 
         if playerCar.wheels and playerCar.wheels[0] and playerCar.wheels[0].tyreWear then
           local w = playerCar.wheels
@@ -545,36 +562,36 @@ local function drawFuelStrategySection(sim, cfg)
           local rl = math.max(0, (1 - (w[2].tyreWear or 0)) * 100)
           local rr = math.max(0, (1 - (w[3].tyreWear or 0)) * 100)
 
-          ui.text("Pneus (Frente): ")
+          ui.text(L("Pneus (Frente): "))
           ui.sameLine()
           if rgbm then
-            ui.textColored(string.format("DE: %.0f%%", fl), fl > 60 and rgbm(0.2, 0.9, 0.3, 1) or rgbm(0.9, 0.3, 0.2, 1))
+            ui.textColored(string.format(L("DE: %.0f%%"), fl), fl > 60 and rgbm(0.2, 0.9, 0.3, 1) or rgbm(0.9, 0.3, 0.2, 1))
             ui.sameLine(0, 15)
-            ui.textColored(string.format("DD: %.0f%%", fr), fr > 60 and rgbm(0.2, 0.9, 0.3, 1) or rgbm(0.9, 0.3, 0.2, 1))
-            ui.text("Pneus (Trás):    ")
+            ui.textColored(string.format(L("DD: %.0f%%"), fr), fr > 60 and rgbm(0.2, 0.9, 0.3, 1) or rgbm(0.9, 0.3, 0.2, 1))
+            ui.text(L("Pneus (Trás):    "))
             ui.sameLine()
-            ui.textColored(string.format("TE: %.0f%%", rl), rl > 60 and rgbm(0.2, 0.9, 0.3, 1) or rgbm(0.9, 0.3, 0.2, 1))
+            ui.textColored(string.format(L("TE: %.0f%%"), rl), rl > 60 and rgbm(0.2, 0.9, 0.3, 1) or rgbm(0.9, 0.3, 0.2, 1))
             ui.sameLine(0, 15)
-            ui.textColored(string.format("TD: %.0f%%", rr), rr > 60 and rgbm(0.2, 0.9, 0.3, 1) or rgbm(0.9, 0.3, 0.2, 1))
+            ui.textColored(string.format(L("TD: %.0f%%"), rr), rr > 60 and rgbm(0.2, 0.9, 0.3, 1) or rgbm(0.9, 0.3, 0.2, 1))
           else
-            ui.text(string.format("DE: %.0f%% | DD: %.0f%% | TE: %.0f%% | TD: %.0f%%", fl, fr, rl, rr))
+            ui.text(string.format(L("DE: %.0f%% | DD: %.0f%% | TE: %.0f%% | TD: %.0f%%"), fl, fr, rl, rr))
           end
         end
       else
-        ui.textDisabled("Telemetria do carro ativo disponível durante a sessão.")
+        ui.textDisabled(L("Telemetria do carro ativo disponível durante a sessão."))
       end
     end
 
     -- v0.10.0: monitor de estratégia das IAs (pit + combustível)
     ui.newLine(4)
     ui.separator()
-    ui.text("🤖 Estratégia das IAs ao vivo")
-    helpMarker("Leigo: mostra quem vai parar e quando.\nTécnico: próximos pitLaps calculados + combustível restante/aprendido.")
+    ui.text(L("🤖 Estratégia das IAs ao vivo"))
+    helpMarker(L("Leigo: mostra quem vai parar e quando.\nTécnico: próximos pitLaps calculados + combustível restante/aprendido."))
     local sState = APEXFLOW_API.getStrategyState and APEXFLOW_API.getStrategyState(cfg) or {}
     if sState.autoLaps then
-      ui.textDisabled(string.format("Voltas da prova (auto): %d", sState.autoLaps))
+      ui.textDisabled(string.format(L("Voltas da prova (auto): %d"), sState.autoLaps))
     else
-      ui.textDisabled(string.format("Voltas da prova (manual): %d", sState.totalLaps or 0))
+      ui.textDisabled(string.format(L("Voltas da prova (manual): %d"), sState.totalLaps or 0))
     end
     if sim and sim.isSessionStarted and sState.cars and #sState.cars > 0 then
       local shown = 0
@@ -584,25 +601,25 @@ local function drawFuelStrategySection(sim, cfg)
         local okN, nm = pcall(ac.getDriverName, c.index)
         if not okN or type(nm) ~= "string" or nm == "" then nm = ("IA " .. tostring(c.index)) end
         if #nm > 16 then nm = nm:sub(1, 15) .. "…" end
-        local pitTxt = c.nextPit and ("pit v" .. tostring(c.nextPit)) or "sem pit"
-        ui.text(string.format("#%-2d %-17s v%-3d ⛽%.1fL %s",
+        local pitTxt = c.nextPit and (L("pit v") .. tostring(c.nextPit)) or L("sem pit")
+        ui.text(string.format(L("#%-2d %-17s v%-3d ⛽%.1fL %s"),
           c.index, nm, c.lap, c.fuel, pitTxt))
       end
     else
-      ui.textDisabled("Dados das IAs aparecem durante a sessão.")
+      ui.textDisabled(L("Dados das IAs aparecem durante a sessão."))
     end
   end
 end
 
 local function drawPaceSection(sim, cfg)
   ui.separator()
-  ui.text("Profile Gap")
-  helpMarker("Adjusts physics ratio of profiles\n0 = Base AC, no gap between Profiles\n100 = Biggest gap between profiles")
+  ui.text(L("Profile Gap"))
+  helpMarker(L("Adjusts physics ratio of profiles\n0 = Base AC, no gap between Profiles\n100 = Biggest gap between profiles"))
 
   cfg.paceEnabled = true
 
   local pace = cfg.paceStrength or 50
-  local newPace = sliderBlock("Força do ritmo ( Pace )", "pace_strength", pace, 0, 100, "%.0f",
+  local newPace = sliderBlock(L("Força do ritmo ( Pace )"), "pace_strength", pace, 0, 100, "%.0f",
     "Leigo: 0 = pelotão colado igual ao jogo base, 100 = diferença máxima entre pilotos.\nTécnico: escala o jitter e o boost de ritmo por perfil.")
   if newPace ~= nil then
     newPace = clamp(newPace, 0, 100)
@@ -618,18 +635,18 @@ end
 -- ==========================================================
 local function drawLowDownforceAISection(sim, cfg)
   ui.separator()
-  ui.text("Low-Downforce")
-  helpMarker("Adds extra straight-line speed for AI by reducing their downforce profile.\n\nBest used on high-speed tracks. Ex. Monza")
+  ui.text(L("Low-Downforce"))
+  helpMarker(L("Adds extra straight-line speed for AI by reducing their downforce profile.\n\nBest used on high-speed tracks. Ex. Monza"))
 
   if cfg.lowDownforceAIEnabled == nil then cfg.lowDownforceAIEnabled = false end
   if cfg.lowDownforceAIStrength == nil then cfg.lowDownforceAIStrength = 35 end
 
   local enabled = (cfg.lowDownforceAIEnabled == true)
-  if ui.checkbox("Enable Low-Downforce AI##lowdf_enable", enabled) then
+  if ui.checkbox(L("Enable Low-Downforce AI##lowdf_enable"), enabled) then
     cfg.lowDownforceAIEnabled = not enabled
   end
 
-  ui.text("Top-Speed Strength")
+  ui.text(L("Top-Speed Strength"))
   ui.setNextItemWidth(ui.windowWidth() - 40)
   local s = ui.slider("##lowdf_strength", cfg.lowDownforceAIStrength, 0, 100, "%.0f")
   if s ~= nil then
@@ -643,11 +660,11 @@ end
 local function drawRacecraftSection(sim, cfg)
   ui.newLine(4)
   ui.separator()
-  ui.text("Racecraft (brigas e ultrapassagens)")
-  helpMarker("Leigo: controla o quanto as IAs brigam por posição em vez de andar em fila.\nTécnico: impaciência atrás (stuckRamp), janela de mergulho (draft commit) e empurrão.")
+  ui.text(L("Racecraft (brigas e ultrapassagens)"))
+  helpMarker(L("Leigo: controla o quanto as IAs brigam por posição em vez de andar em fila.\nTécnico: impaciência atrás (stuckRamp), janela de mergulho (draft commit) e empurrão."))
 
-  ui.textDisabled("Predefinições:")
-  if ui.button("Calmo", vec2(110, 22)) then
+  ui.textDisabled(L("Predefinições:"))
+  if ui.button(L("Calmo"), vec2(110, 22)) then
     cfg.stuckBehindDelay = 1.6
     cfg.draftCommitRampGate = 0.30
     cfg.draftCommitPushBoost = 0.040
@@ -655,7 +672,7 @@ local function drawRacecraftSection(sim, cfg)
     notifyChange()
   end
   ui.sameLine()
-  if ui.button("Equilibrado", vec2(110, 22)) then
+  if ui.button(L("Equilibrado"), vec2(110, 22)) then
     cfg.stuckBehindDelay = 0.8
     cfg.draftCommitRampGate = 0.15
     cfg.draftCommitPushBoost = 0.070
@@ -663,7 +680,7 @@ local function drawRacecraftSection(sim, cfg)
     notifyChange()
   end
   ui.sameLine()
-  if ui.button("Agressivo", vec2(110, 22)) then
+  if ui.button(L("Agressivo"), vec2(110, 22)) then
     cfg.stuckBehindDelay = 0.4
     cfg.draftCommitRampGate = 0.08
     cfg.draftCommitPushBoost = 0.100
@@ -674,7 +691,7 @@ local function drawRacecraftSection(sim, cfg)
   ui.newLine(2)
 
   if cfg.stuckBehindDelay == nil then cfg.stuckBehindDelay = 0.8 end
-  local newDelay = sliderBlock("Tempo colado até atacar (s)", "rc_delay", cfg.stuckBehindDelay, 0.2, 3.0, "%.1f s",
+  local newDelay = sliderBlock(L("Tempo colado até atacar (s)"), "rc_delay", cfg.stuckBehindDelay, 0.2, 3.0, "%.1f s",
     "Leigo: menor = a IA tenta passar mais cedo.\nTécnico: stuckBehindDelay antes da rampa de impaciência.")
   if newDelay ~= nil then
     local val = math.floor(clamp(newDelay * 10, 2, 30) + 0.5) / 10
@@ -682,7 +699,7 @@ local function drawRacecraftSection(sim, cfg)
   end
 
   if cfg.draftCommitRampGate == nil then cfg.draftCommitRampGate = 0.15 end
-  local newGate = sliderBlock("Coragem no mergulho", "rc_gate", cfg.draftCommitRampGate, 0.05, 0.50, "%.2f",
+  local newGate = sliderBlock(L("Coragem no mergulho"), "rc_gate", cfg.draftCommitRampGate, 0.05, 0.50, "%.2f",
     "Leigo: menor = mergulhos mais ousados por dentro.\nTécnico: limiar da rampa p/ estado commit.")
   if newGate ~= nil then
     local val = clamp(newGate, 0.05, 0.50)
@@ -690,7 +707,7 @@ local function drawRacecraftSection(sim, cfg)
   end
 
   if cfg.draftCommitPushBoost == nil then cfg.draftCommitPushBoost = 0.070 end
-  local newPush = sliderBlock("Empurrão na briga", "rc_push", cfg.draftCommitPushBoost, 0, 0.12, "%.3f",
+  local newPush = sliderBlock(L("Empurrão na briga"), "rc_push", cfg.draftCommitPushBoost, 0, 0.12, "%.3f",
     "Leigo: maior = lado a lado mais intenso sem bater.\nTécnico: boost de throttle durante commit.")
   if newPush ~= nil then
     local val = clamp(newPush, 0, 0.12)
@@ -698,7 +715,7 @@ local function drawRacecraftSection(sim, cfg)
   end
 
   if cfg.tigerChancePerLap == nil then cfg.tigerChancePerLap = 0.07 end
-  local newTiger = sliderBlock("Chance de volta voadora (%/volta)", "rc_tiger", (cfg.tigerChancePerLap or 0.07) * 100, 0, 20, "%.0f%%",
+  local newTiger = sliderBlock(L("Chance de volta voadora (%/volta)"), "rc_tiger", (cfg.tigerChancePerLap or 0.07) * 100, 0, 20, "%.0f%%",
     "Leigo: volta mágica aleatória que embaralha o grid.\nTécnico: tigerChancePerLap × 100.")
   if newTiger ~= nil then
     local val = clamp(newTiger, 0, 20) / 100
@@ -712,20 +729,20 @@ end
 local function drawLearningModuleSection(sim, cfg)
   ui.newLine(4)
   ui.separator()
-  ui.text("Learning Module")
-  helpMarker("Enable/disable ApexFlow's adaptive corner memory.\n\nON = hard events update track memory and learned danger/caps are applied.\nOFF = no new learning and learned danger/caps are ignored, while the rest of ApexFlow still runs.")
+  ui.text(L("Learning Module"))
+  helpMarker(L("Enable/disable ApexFlow's adaptive corner memory.\n\nON = hard events update track memory and learned danger/caps are applied.\nOFF = no new learning and learned danger/caps are ignored, while the rest of ApexFlow still runs."))
 
   if cfg.learningEnabled == nil then
     cfg.learningEnabled = true
   end
 
   local enabled = (cfg.learningEnabled ~= false)
-  if ui.checkbox("Enable learning module##rf_learning_enable", enabled) then
+  if ui.checkbox(L("Enable learning module##rf_learning_enable"), enabled) then
     cfg.learningEnabled = not enabled
   end
 
   if not cfg.learningEnabled then
-    ui.textDisabled("Learning is OFF: existing memory is preserved, but not applied or updated.")
+    ui.textDisabled(L("Learning is OFF: existing memory is preserved, but not applied or updated."))
   end
 
   ui.newLine(4)
@@ -739,15 +756,15 @@ local function drawLearningModuleSection(sim, cfg)
   if not trackId and sim then trackId = sim.trackName or nil end
 
   local clearLabel = trackId
-    and string.format("Clear Memory: %s", trackId)
-    or  "Clear Memory (this track)"
+    and string.format(L("Clear Memory: %s"), trackId)
+    or  L("Clear Memory (this track)")
 
   if ui.button(clearLabel .. "##rf_clear_track") then
     cfg._confirmClearTrack = true
     cfg._confirmClearAll = false
   end
   ui.sameLine(0, 8)
-  if ui.button("Clear All Tracks##rf_clear_all") then
+  if ui.button(L("Clear All Tracks##rf_clear_all")) then
     cfg._confirmClearAll = true
     cfg._confirmClearTrack = false
   end
@@ -755,9 +772,9 @@ local function drawLearningModuleSection(sim, cfg)
   -- Track clear confirmation
   if cfg._confirmClearTrack then
     ui.newLine(2)
-    ui.text("Clear this track's learned memory?")
+    ui.text(L("Clear this track's learned memory?"))
     ui.sameLine(0, 8)
-    if ui.button("Yes##rf_clear_track_yes") then
+    if ui.button(L("Yes##rf_clear_track_yes")) then
       local mem = APEXFLOW_API and APEXFLOW_API.getMemory and APEXFLOW_API.getMemory()
       if mem and mem.tracks and trackId and mem.tracks[trackId] then
         local count = 0
@@ -771,15 +788,15 @@ local function drawLearningModuleSection(sim, cfg)
           APEXFLOW_API._memoryDirty = false
           if APEXFLOW_API.saveMemory then pcall(APEXFLOW_API.saveMemory) end
         end
-        cfg._clearMsg = string.format("Cleared %d corners for %s.", count, tostring(trackId))
+        cfg._clearMsg = string.format(L("Cleared %d corners for %s."), count, tostring(trackId))
         ac.log(string.format("[ApexFlow] Cleared and saved memory for: %s (%d corners)", tostring(trackId), count))
       else
-        cfg._clearMsg = string.format("Nothing to clear for %s.", tostring(trackId or "unknown"))
+        cfg._clearMsg = string.format(L("Nothing to clear for %s."), tostring(trackId or "unknown"))
       end
       cfg._confirmClearTrack = false
     end
     ui.sameLine(0, 8)
-    if ui.button("Cancel##rf_clear_track_no") then
+    if ui.button(L("Cancel##rf_clear_track_no")) then
       cfg._confirmClearTrack = false
     end
   end
@@ -787,9 +804,9 @@ local function drawLearningModuleSection(sim, cfg)
   -- All tracks clear confirmation
   if cfg._confirmClearAll then
     ui.newLine(2)
-    ui.text("Clear ALL track memory? Cannot be undone.")
+    ui.text(L("Clear ALL track memory? Cannot be undone."))
     ui.sameLine(0, 8)
-    if ui.button("Yes, clear all##rf_clear_all_yes") then
+    if ui.button(L("Yes, clear all##rf_clear_all_yes")) then
       local mem = APEXFLOW_API and APEXFLOW_API.getMemory and APEXFLOW_API.getMemory()
       if mem and mem.tracks then
         local trackCount, cornerCount = 0, 0
@@ -805,15 +822,15 @@ local function drawLearningModuleSection(sim, cfg)
           APEXFLOW_API._memoryDirty = false
           if APEXFLOW_API.saveMemory then pcall(APEXFLOW_API.saveMemory) end
         end
-        cfg._clearMsg = string.format("Cleared %d tracks, %d corners total.", trackCount, cornerCount)
+        cfg._clearMsg = string.format(L("Cleared %d tracks, %d corners total."), trackCount, cornerCount)
         ac.log(string.format("[ApexFlow] Cleared ALL memory: %d tracks, %d corners.", trackCount, cornerCount))
       else
-        cfg._clearMsg = "Nothing to clear."
+        cfg._clearMsg = L("Nothing to clear.")
       end
       cfg._confirmClearAll = false
     end
     ui.sameLine(0, 8)
-    if ui.button("Cancel##rf_clear_all_no") then
+    if ui.button(L("Cancel##rf_clear_all_no")) then
       cfg._confirmClearAll = false
     end
   end
@@ -831,12 +848,12 @@ end
 local function drawPhysicsIntensitySection(sim, cfg)
   ui.newLine(4)
   ui.separator()
-  ui.text("Physics Intensity")
-  helpMarker("Slider adjusts physics ratio.\n\n0 = Base AC AI\n100 = Full ApexFlow physics")
+  ui.text(L("Physics Intensity"))
+  helpMarker(L("Slider adjusts physics ratio.\n\n0 = Base AC AI\n100 = Full ApexFlow physics"))
 
   cfg.physicsPush = cfg.physicsPush or {}
   local intensity = cfg.physicsPush.intensity or 50
-  local newIntensity = sliderBlock("Intensidade da física", "phys_intensity", intensity, 0, 100, "%.0f",
+  local newIntensity = sliderBlock(L("Intensidade da física"), "phys_intensity", intensity, 0, 100, "%.0f",
     "Leigo: 0 = IA igual ao jogo base, 100 = física ApexFlow total (freadas e tração moldadas).\nTécnico: interpola brakeHint/throttle/topSpeed aplicados por frame.")
   if newIntensity ~= nil then
     newIntensity = clamp(newIntensity, 0, 100)
@@ -849,14 +866,14 @@ end
 local function drawRollingStartSection(sim, cfg)
   ui.newLine(4)
   ui.separator()
-  ui.text("Largada em Movimento Realista (Rolling Start)")
-  helpMarker("Formação 2x2 lado a lado na volta de apresentação, com velocidade controlada e relargada realista na reta principal ao receber a bandeira verde.")
+  ui.text(L("Largada em Movimento Realista (Rolling Start)"))
+  helpMarker(L("Formação 2x2 lado a lado na volta de apresentação, com velocidade controlada e relargada realista na reta principal ao receber a bandeira verde."))
 
   cfg.rollingStart = cfg.rollingStart or {}
   local rs = cfg.rollingStart
   local enabledRS = (rs.enabled == true)
 
-  if ui.checkbox("Ativar Largada em Movimento", enabledRS) then
+  if ui.checkbox(L("Ativar Largada em Movimento"), enabledRS) then
     rs.enabled = not enabledRS
     notifyChange()
   end
@@ -869,17 +886,17 @@ local function drawRollingStartSection(sim, cfg)
     local dirState = director and director.getState and director.getState()
     if dirState and dirState.hasSafetyCar then
       if rgbm then
-        ui.textColored("🟢 Pace Car Detectado: Toyota ACTC (dj_safety_car) na liderança!", rgbm(0.2, 0.9, 0.4, 1.0))
+        ui.textColored(L("🟢 Pace Car Detectado: Toyota ACTC (dj_safety_car) na liderança!"), rgbm(0.2, 0.9, 0.4, 1.0))
       else
-        ui.text("🟢 Pace Car Detectado: dj_safety_car")
+        ui.text(L("🟢 Pace Car Detectado: dj_safety_car"))
       end
     else
-      ui.textDisabled("⚪ Formação liderada pelo Pole Position (ou adicione o dj_safety_car no grid).")
+      ui.textDisabled(L("⚪ Formação liderada pelo Pole Position (ou adicione o dj_safety_car no grid)."))
     end
 
     ui.newLine(2)
-    ui.textDisabled("Predefinições Reais de Largada:")
-    if ui.button("GT3 / WEC (2x2 - 85 km/h / 94%)", vec2(210, 22)) then
+    ui.textDisabled(L("Predefinições Reais de Largada:"))
+    if ui.button(L("GT3 / WEC (2x2 - 85 km/h / 94%)"), vec2(210, 22)) then
       rs.limitSpeed = 85
       rs.formationGap = 4.2
       rs.maxOffset = 0.45
@@ -887,7 +904,7 @@ local function drawRollingStartSection(sim, cfg)
       notifyChange()
     end
     ui.sameLine()
-    if ui.button("IMSA / Indy (2x2 - 95 km/h / 96%)", vec2(210, 22)) then
+    if ui.button(L("IMSA / Indy (2x2 - 95 km/h / 96%)"), vec2(210, 22)) then
       rs.limitSpeed = 95
       rs.formationGap = 3.8
       rs.maxOffset = 0.50
@@ -895,7 +912,7 @@ local function drawRollingStartSection(sim, cfg)
       notifyChange()
     end
     ui.sameLine()
-    if ui.button("Chuva / Fila Única (70 km/h / 90%)", vec2(210, 22)) then
+    if ui.button(L("Chuva / Fila Única (70 km/h / 90%)"), vec2(210, 22)) then
       rs.limitSpeed = 70
       rs.formationGap = 5.5
       rs.maxOffset = 0.20
@@ -909,32 +926,32 @@ local function drawRollingStartSection(sim, cfg)
     rs.limitSpeed = rs.limitSpeed or 85
     local newLS = sliderRow("Velocidade Limite (km/h)", "rs_limitSpeed", rs.limitSpeed, 60, 120, "%.0f km/h", LABEL_W)
     ui.sameLine(0, 6)
-    helpMarker("Velocidade limite durante a volta de formação.")
+    helpMarker(L("Velocidade limite durante a volta de formação."))
     if newLS ~= nil then rs.limitSpeed = clamp(newLS, 60, 120) end
 
     rs.formationGap = rs.formationGap or 4.2
     local newFG = sliderRow("Espaço entre Carros (m)", "rs_formationGap", rs.formationGap, 3.0, 10, "%.1f m", LABEL_W)
     ui.sameLine(0, 6)
-    helpMarker("Espaço para-choque a para-choque. 3.8 a 4.5m é o padrão das categorias reais.")
+    helpMarker(L("Espaço para-choque a para-choque. 3.8 a 4.5m é o padrão das categorias reais."))
     if newFG ~= nil then rs.formationGap = clamp(newFG, 3.0, 10) end
 
     rs.maxOffset = rs.maxOffset or 0.45
     local newMO = sliderRow("Afastamento Lateral (2x2)", "rs_maxOffset", rs.maxOffset, 0.20, 0.80, "%.2f", LABEL_W)
     ui.sameLine(0, 6)
-    helpMarker("Distância de separação entre as duas filas (esquerda e direita).")
+    helpMarker(L("Distância de separação entre as duas filas (esquerda e direita)."))
     if newMO ~= nil then rs.maxOffset = clamp(newMO, 0.20, 0.80) end
 
     rs.releaseAtPct = rs.releaseAtPct or 94
     local newRA = sliderRow("Ponto de Largada Verde (%)", "rs_releaseAtPct", rs.releaseAtPct, 20, 98, "%.0f%% da pista", LABEL_W)
     ui.sameLine(0, 6)
-    helpMarker("Ponto em que a bandeira verde é acionada. 92% a 96% corresponde à entrada da reta principal.")
+    helpMarker(L("Ponto em que a bandeira verde é acionada. 92% a 96% corresponde à entrada da reta principal."))
     if newRA ~= nil then rs.releaseAtPct = clamp(newRA, 20, 98) end
 
     ui.unindent(12)
   end
 
   if rs.enabled and not (physics and physics.setAISplineOffset and physics.setAITopSpeed and physics.setAIThrottleLimit) then
-    ui.textDisabled("⚠ Rolling Start pode não funcionar: funções de física ausentes nesta build do CSP.")
+    ui.textDisabled(L("⚠ Rolling Start pode não funcionar: funções de física ausentes nesta build do CSP."))
   end
 end
 
@@ -961,19 +978,19 @@ end
 -------------------------------------------------------
 local function drawMultiClassTab(sim, cfg, aiCtl)
   ui.header("Multi Class")
-  helpMarker("Enables multiclass logic so AI recognize class differences and race accordingly.")
+  helpMarker(L("Enables multiclass logic so AI recognize class differences and race accordingly."))
 
   cfg.multiclassEnabled = (cfg.multiclassEnabled == true)
   local enabled = cfg.multiclassEnabled
-  if ui.checkbox("Enable multiclass", enabled) then
+  if ui.checkbox(L("Enable multiclass"), enabled) then
     cfg.multiclassEnabled = not enabled
   end
 
-  ui.textDisabled("Manual class assignment for this session. Class 1 = fastest.")
+  ui.textDisabled(L("Manual class assignment for this session. Class 1 = fastest."))
   ui.newLine(4)
 
   if not cfg.multiclassEnabled then
-    ui.textDisabled("Multiclass is OFF. Class assignments + class-based AI are not applied.")
+    ui.textDisabled(L("Multiclass is OFF. Class assignments + class-based AI are not applied."))
     ui.newLine(6)
   end
 
@@ -1004,8 +1021,8 @@ local function drawMultiClassTab(sim, cfg, aiCtl)
   end
 
   if #rows == 0 then
-    ui.textDisabled("No AI car data found yet (data may still be loading).")
-    if aiCtl and aiCtl.multiclassClassifyNow and ui.button("Force Scan AI Drivers", vec2(180, 24)) then
+    ui.textDisabled(L("No AI car data found yet (data may still be loading)."))
+    if aiCtl and aiCtl.multiclassClassifyNow and ui.button(L("Force Scan AI Drivers"), vec2(180, 24)) then
       aiCtl.multiclassClassifyNow(sim, cfg)
     end
     return
@@ -1060,11 +1077,11 @@ local function drawMultiClassTab(sim, cfg, aiCtl)
   local newK = ui.slider("##Classes", cfg.multiclassClassCount, 1, 5, "%.0f")
   if newK then cfg.multiclassClassCount = math.floor(newK + 0.5) end
   ui.sameLine()
-  ui.text("Total Classes")
+  ui.text(L("Total Classes"))
 
   ui.sameLine(0, 20)
 
-  if ui.button("Auto-fill (even split fastest→slowest)", vec2(260, 24)) then
+  if ui.button(L("Auto-fill (even split fastest→slowest)"), vec2(260, 24)) then
     for i, r in ipairs(rows) do
       local target = math.min(k, math.floor((i - 1) / (math.max(1, #rows / k))) + 1)
       moveToClassTop(target, r.index)
@@ -1090,7 +1107,7 @@ local function drawMultiClassTab(sim, cfg, aiCtl)
       end
     end
 
-    ui.text(string.format("Class %d%s [%d cars]", currentClass, label, classCount))
+    ui.text(string.format(L("Class %d%s [%d cars]"), currentClass, label, classCount))
     ui.separator()
 
     local rendered = 0
@@ -1101,7 +1118,7 @@ local function drawMultiClassTab(sim, cfg, aiCtl)
         rendered = rendered + 1
         ui.pushID(idx)
 
-        if ui.button("▲", vec2(22, 22)) then
+        if ui.button(L("▲"), vec2(22, 22)) then
           local newClass = math.max(1, currentClass - 1)
           moveToClassTop(newClass, idx)
           ui.popID()
@@ -1110,7 +1127,7 @@ local function drawMultiClassTab(sim, cfg, aiCtl)
 
         ui.sameLine(0, 2)
 
-        if ui.button("▼", vec2(22, 22)) then
+        if ui.button(L("▼"), vec2(22, 22)) then
           local newClass = math.min(k, currentClass + 1)
           moveToClassTop(newClass, idx)
           ui.popID()
@@ -1119,11 +1136,11 @@ local function drawMultiClassTab(sim, cfg, aiCtl)
 
         ui.sameLine(0, 10)
 
-        ui.text(r.name or "AI Driver")
+        ui.text(r.name or L("AI Driver"))
         ui.sameLine()
 
-        local stats = string.format("(%s p2w | %s km/h)",
-          r.p2w and string.format("%.3f", r.p2w) or "---",
+        local stats = string.format(L("(%s p2w | %s km/h)"),
+          r.p2w and string.format(L("%.3f"), r.p2w) or "---",
           r.topSpeedKmh and tostring(r.topSpeedKmh) or "---"
         )
         ui.textDisabled(stats)
@@ -1133,7 +1150,7 @@ local function drawMultiClassTab(sim, cfg, aiCtl)
     end
 
     if rendered == 0 then
-      ui.textDisabled("Empty")
+      ui.textDisabled(L("Empty"))
     end
 
     ui.newLine(10)
@@ -1148,8 +1165,8 @@ end
 local function drawGitHubUpdateSection(sim, cfg)
   cfg.githubUpdate = cfg.githubUpdate or {}
 
-  ui.text("GitHub Update Checker")
-  helpMarker("Verifica releases no GitHub via API (requer CSP com ac.webRequest).")
+  ui.text(L("GitHub Update Checker"))
+  helpMarker(L("Verifica releases no GitHub via API (requer CSP com ac.webRequest)."))
 
   local gState = APEXFLOW_API.githubGetState and APEXFLOW_API.githubGetState() or {}
 
@@ -1157,15 +1174,15 @@ local function drawGitHubUpdateSection(sim, cfg)
   local hasHttp = (web ~= nil and type(web.get) == "function") or ac.webRequest ~= nil
   if not hasHttp and not gState.latestVersion then
     ui.newLine(2)
-    if rgbm then ui.textColored("ℹ Verificação automática indisponível", C.accent())
-    else ui.text("Verificação automática indisponível") end
-    ui.textWrapped("Esta build do CSP não expõe HTTP para o Lua. A verificação volta sozinha ao atualizar o CSP.")
+    if rgbm then ui.textColored(L("ℹ Verificação automática indisponível"), C.accent())
+    else ui.text(L("Verificação automática indisponível")) end
+    ui.textWrapped(L("Esta build do CSP não expõe HTTP para o Lua. A verificação volta sozinha ao atualizar o CSP."))
     ui.newLine(2)
-    ui.text("Repositório: " .. (cfg.githubUpdate.repo or "Silxyst/ApexFlow"))
-    ui.text("Versão instalada: v" .. (SCRIPT_VERSION or _G.APEXFLOW_VERSION or "?"))
+    ui.text(L("Repositório: ") .. (cfg.githubUpdate.repo or "Silxyst/ApexFlow"))
+    ui.text(L("Versão instalada: v") .. (SCRIPT_VERSION or _G.APEXFLOW_VERSION or "?"))
     ui.newLine(2)
-    ui.textWrapped("Para atualizar: baixe a última release e substitua a pasta apps/lua/ApexFlow.")
-    if ui.button("🌐 Abrir página de Releases", vec2(230, 30)) then
+    ui.textWrapped(L("Para atualizar: baixe a última release e substitua a pasta apps/lua/ApexFlow."))
+    if ui.button(L("🌐 Abrir página de Releases"), vec2(230, 30)) then
       cfg._linkMsg = nil
       openLink(cfg, "https://github.com/" .. (cfg.githubUpdate.repo or "Silxyst/ApexFlow") .. "/releases")
     end
@@ -1177,30 +1194,30 @@ local function drawGitHubUpdateSection(sim, cfg)
   ui.newLine(2)
   if gState.checking then
     if rgbm then
-      ui.textColored("🔄 Verificando atualizações...", rgbm(1.0, 0.8, 0.2, 1))
+      ui.textColored(L("🔄 Verificando atualizações..."), rgbm(1.0, 0.8, 0.2, 1))
     else
-      ui.text("Verificando atualizações...")
+      ui.text(L("Verificando atualizações..."))
     end
   elseif gState.error then
     if rgbm then
-      ui.textColored("❌ Erro: " .. gState.error, rgbm(1.0, 0.3, 0.3, 1))
+      ui.textColored(L("❌ Erro: ") .. gState.error, rgbm(1.0, 0.3, 0.3, 1))
     else
-      ui.text("Erro: " .. gState.error)
+      ui.text(L("Erro: ") .. gState.error)
     end
   elseif gState.hasUpdate then
     if rgbm then
-      ui.textColored(string.format("🎉 Atualização disponível: v%s → v%s", gState.currentVersion or "?", gState.latestVersion or "?"), rgbm(0.3, 1.0, 0.3, 1))
+      ui.textColored(string.format(L("🎉 Atualização disponível: v%s → v%s"), gState.currentVersion or "?", gState.latestVersion or "?"), rgbm(0.3, 1.0, 0.3, 1))
     else
-      ui.text(string.format("Atualização disponível: v%s → v%s", gState.currentVersion or "?", gState.latestVersion or "?"))
+      ui.text(string.format(L("Atualização disponível: v%s → v%s"), gState.currentVersion or "?", gState.latestVersion or "?"))
     end
   elseif gState.latestVersion then
     if rgbm then
-      ui.textColored("✓ Versão atualizada (v" .. (gState.latestVersion or "?") .. ")", rgbm(0.3, 1.0, 0.3, 1))
+      ui.textColored(L("✓ Versão atualizada (v") .. (gState.latestVersion or "?") .. ")", rgbm(0.3, 1.0, 0.3, 1))
     else
-      ui.text("Versão atualizada (v" .. (gState.latestVersion or "?") .. ")")
+      ui.text(L("Versão atualizada (v") .. (gState.latestVersion or "?") .. ")")
     end
   else
-    ui.textDisabled("Nenhuma verificação realizada ainda.")
+    ui.textDisabled(L("Nenhuma verificação realizada ainda."))
   end
 
   ui.newLine(3)
@@ -1208,7 +1225,7 @@ local function drawGitHubUpdateSection(sim, cfg)
 
   -- Config
   local ghEnabled = (cfg.githubUpdate.enabled == true)
-  if ui.checkbox("Verificação Automática", ghEnabled) then
+  if ui.checkbox(L("Verificação Automática"), ghEnabled) then
     cfg.githubUpdate.enabled = not ghEnabled
     notifyChange()
   end
@@ -1217,10 +1234,10 @@ local function drawGitHubUpdateSection(sim, cfg)
     ui.indent(12)
 
     cfg.githubUpdate.repo = cfg.githubUpdate.repo or "Silxyst/ApexFlow"
-    ui.text("Repositório: " .. cfg.githubUpdate.repo)
+    ui.text(L("Repositório: ") .. cfg.githubUpdate.repo)
 
     cfg.githubUpdate.checkIntervalHours = cfg.githubUpdate.checkIntervalHours or 24
-    local newInterval = sliderBlock("Intervalo entre verificações (horas)", "gh_interval", cfg.githubUpdate.checkIntervalHours, 1, 168, "%.0f h",
+    local newInterval = sliderBlock(L("Intervalo entre verificações (horas)"), "gh_interval", cfg.githubUpdate.checkIntervalHours, 1, 168, "%.0f h",
       "Leigo: de quanto em quanto tempo o app checa atualização sozinho.\nTécnico: throttle do ac.webRequest (evita rate-limit da API).")
     if newInterval ~= nil then
       local val = math.floor(clamp(newInterval, 1, 168) + 0.5)
@@ -1228,7 +1245,7 @@ local function drawGitHubUpdateSection(sim, cfg)
     end
 
     cfg.githubUpdate.notifyOnStartup = (cfg.githubUpdate.notifyOnStartup ~= false)
-    if ui.checkbox("Verificar na inicialização", cfg.githubUpdate.notifyOnStartup) then
+    if ui.checkbox(L("Verificar na inicialização"), cfg.githubUpdate.notifyOnStartup) then
       cfg.githubUpdate.notifyOnStartup = not cfg.githubUpdate.notifyOnStartup
       notifyChange()
     end
@@ -1240,13 +1257,13 @@ local function drawGitHubUpdateSection(sim, cfg)
   ui.separator()
 
   -- Manual check button
-  if ui.button("🔍 Verificar Agora", vec2(180, 30)) then
+  if ui.button(L("🔍 Verificar Agora"), vec2(180, 30)) then
     if APEXFLOW_API.githubCheckUpdates then
       APEXFLOW_API.githubCheckUpdates(cfg, true)
     end
   end
   ui.sameLine()
-  if gState.htmlUrl and gState.htmlUrl ~= "" and ui.button("🌐 Abrir Release", vec2(180, 30)) then
+  if gState.htmlUrl and gState.htmlUrl ~= "" and ui.button(L("🌐 Abrir Release"), vec2(180, 30)) then
     if APEXFLOW_API.githubGetState then
       local state = APEXFLOW_API.githubGetState()
       if state.htmlUrl then
@@ -1262,14 +1279,14 @@ local function drawGitHubUpdateSection(sim, cfg)
   if gState.changelog and gState.changelog ~= "" then
     ui.newLine(4)
     ui.separator()
-    ui.text("Changelog da v" .. (gState.latestVersion or "latest") .. ":")
+    ui.text(L("Changelog da v") .. (gState.latestVersion or "latest") .. ":")
     ui.separator()
     ui.textWrapped(gState.changelog)
   end
 
   if gState.publishedAt and gState.publishedAt ~= "" then
     ui.newLine(2)
-    ui.textDisabled("Publicado em: " .. gState.publishedAt)
+    ui.textDisabled(L("Publicado em: ") .. gState.publishedAt)
   end
 end
 
@@ -1287,14 +1304,14 @@ end
 -- ==========================================================
 local function drawAppearanceSection(sim, cfg)
   cfg.ui = cfg.ui or {}
-  ui.text("🎨 Aparência")
-  helpMarker("Leigo: mude a cor de destaque e a transparência do fundo.\nTécnico: cor de destaque (accent) e alfa do WindowBg/ChildBg.")
+  ui.text(L("🎨 Aparência"))
+  helpMarker(L("Leigo: mude a cor de destaque e a transparência do fundo.\nTécnico: cor de destaque (accent) e alfa do WindowBg/ChildBg."))
 
   -- Accent swatches (wrapped in rows of 4 to never clip)
   cfg.ui.accent = cfg.ui.accent or "cyan"
   for idx, key in ipairs(ACCENT_ORDER) do
     local a = ACCENTS[key]
-    local label = (cfg.ui.accent == key and "● " or "○ ") .. a[4]
+    local label = (cfg.ui.accent == key and "● " or "○ ") .. L(a[4])
     if ui.button(label .. "##accent_" .. key, vec2(140, 24)) then
       cfg.ui.accent = key
       notifyChange()
@@ -1304,7 +1321,7 @@ local function drawAppearanceSection(sim, cfg)
   ui.newLine(2)
 
   cfg.ui.bgAlpha = tonumber(cfg.ui.bgAlpha) or 1.0
-  local newA = sliderBlock("Transparência do fundo", "ui_bgalpha", cfg.ui.bgAlpha, 0.4, 1.0, "%.2f",
+  local newA = sliderBlock(L("Transparência do fundo"), "ui_bgalpha", cfg.ui.bgAlpha, 0.4, 1.0, "%.2f",
     "Leigo: 1.0 = fundo sólido, 0.4 = bem transparente.\nTécnico: multiplica o alfa de WindowBg/ChildBg.")
   if newA ~= nil then
     local val = clamp(newA, 0.4, 1.0)
@@ -1315,7 +1332,7 @@ local function drawAppearanceSection(sim, cfg)
   end
 
   cfg.ui.corner = tonumber(cfg.ui.corner) or 6
-  local newC = sliderBlock("Arredondamento dos cantos", "ui_corner", cfg.ui.corner, 0, 12, "%.0f",
+  local newC = sliderBlock(L("Arredondamento dos cantos"), "ui_corner", cfg.ui.corner, 0, 12, "%.0f",
     "Leigo: 0 = cantos retos, 12 = bem arredondado.\nTécnico: FrameRounding/GrabRounding e WindowRounding +4.")
   if newC ~= nil then
     local val = math.floor(clamp(newC, 0, 12) + 0.5)
@@ -1326,60 +1343,76 @@ local function drawAppearanceSection(sim, cfg)
   end
 
   cfg.ui.compactHeaders = (cfg.ui.compactHeaders == true)
-  if ui.checkbox("Cabeçalhos compactos (sem subtítulo)", cfg.ui.compactHeaders) then
+  if ui.checkbox(L("Cabeçalhos compactos (sem subtítulo)"), cfg.ui.compactHeaders) then
     cfg.ui.compactHeaders = not cfg.ui.compactHeaders
     notifyChange()
   end
-  helpMarker("Leigo: esconde as linhas de explicação das abas, deixa tudo menor.\nTécnico: pula o subtitle em cardTitle().")
+  helpMarker(L("Leigo: esconde as linhas de explicação das abas, deixa tudo menor.\nTécnico: pula o subtitle em cardTitle()."))
+
+  -- v0.34.0 i18n: seletor de idioma (cfg.lang = pt|en|es)
+  ui.newLine(2)
+  ui.text(L("Idioma"))
+  local curLang = (cfg and cfg.lang) or "pt"
+  local langs = { { id = "pt", label = "Português" }, { id = "en", label = "English" }, { id = "es", label = "Español" } }
+  for i, lg in ipairs(langs) do
+    local lab = ((curLang == lg.id) and "● " or "○ ") .. lg.label
+    if ui.button(lab .. "##lang_" .. lg.id, vec2(140, 24)) then
+      cfg.lang = lg.id
+      if _langMod then _langMod.setLang(lg.id) end
+      notifyChange()
+    end
+    if i % 3 ~= 0 then ui.sameLine(0, 6) end
+  end
+  ui.newLine(2)
 end
 
 local function drawAboutSection(sim, cfg)
-  ui.text("ApexFlow v" .. (SCRIPT_VERSION or _G.APEXFLOW_VERSION or "?"))
-  ui.textDisabled("Independent race suite for Assetto Corsa — offline AI, strategy & race control.")
+  ui.text(L("ApexFlow v") .. (SCRIPT_VERSION or _G.APEXFLOW_VERSION or "?"))
+  ui.textDisabled(L("Independent race suite for Assetto Corsa — offline AI, strategy & race control."))
 
-  ui.textWrapped("ApexFlow enhances offline single-player by giving AI personality, racecraft and memory. Every driver has a class and learns corners; the field spreads naturally with hunt, hot laps and clean-air logic.")
-
-  ui.newLine(6)
-  ui.text("The Core")
-  ui.separator()
-  ui.newLine(2)
-  ui.textWrapped("Every AI driver is assigned a class (Chill, Normal, or Attack) which shapes how they brake, commit to passes, and handle pressure. Pace varies naturally between drivers, spreading the field instead of locking it into a train. Features like hot lap bursts, hunt mode after being passed, and clean air boosts make races feel alive rather than scripted.")
+  ui.textWrapped(L("ApexFlow enhances offline single-player by giving AI personality, racecraft and memory. Every driver has a class and learns corners; the field spreads naturally with hunt, hot laps and clean-air logic."))
 
   ui.newLine(6)
-  ui.text("Learning Module")
+  ui.text(L("The Core"))
   ui.separator()
   ui.newLine(2)
-  ui.textWrapped("ApexFlow watches every car, every frame. When a car overshoots, spins, or runs off track, it logs a hard event for that corner. Danger builds, braking starts earlier, and speed is capped. As drivers clean up their runs, confidence returns and restrictions ease. Memory persists between sessions, so each track evolves over time. Use the Clear buttons to reset a track or wipe everything if needed.")
+  ui.textWrapped(L("Every AI driver is assigned a class (Chill, Normal, or Attack) which shapes how they brake, commit to passes, and handle pressure. Pace varies naturally between drivers, spreading the field instead of locking it into a train. Features like hot lap bursts, hunt mode after being passed, and clean air boosts make races feel alive rather than scripted."))
 
   ui.newLine(6)
-  ui.text("Multiclass")
+  ui.text(L("Learning Module"))
   ui.separator()
   ui.newLine(2)
-  ui.textWrapped("Assign cars to classes in the Multi Class tab (Class 1 = fastest). Faster classes will push through traffic, while slower classes yield naturally. Use Auto-fill to split the grid by performance, or assign classes manually.")
+  ui.textWrapped(L("ApexFlow watches every car, every frame. When a car overshoots, spins, or runs off track, it logs a hard event for that corner. Danger builds, braking starts earlier, and speed is capped. As drivers clean up their runs, confidence returns and restrictions ease. Memory persists between sessions, so each track evolves over time. Use the Clear buttons to reset a track or wipe everything if needed."))
 
   ui.newLine(6)
-  ui.text("Rolling Start")
+  ui.text(L("Multiclass"))
   ui.separator()
   ui.newLine(2)
-  ui.textWrapped("Realistic formation lap with 2x2 grid, pace car speed control, and green flag release on the main straight. Supports dj_safety_car or pole-sitter led formations.")
+  ui.textWrapped(L("Assign cars to classes in the Multi Class tab (Class 1 = fastest). Faster classes will push through traffic, while slower classes yield naturally. Use Auto-fill to split the grid by performance, or assign classes manually."))
 
   ui.newLine(6)
-  ui.text("Fuel Strategy")
+  ui.text(L("Rolling Start"))
   ui.separator()
   ui.newLine(2)
-  ui.textWrapped("Endurance-style fuel forcing for AI. Set race length and mandatory stops; AI will pit naturally when fuel runs low. Tire change on pit stop based on wear threshold.")
+  ui.textWrapped(L("Realistic formation lap with 2x2 grid, pace car speed control, and green flag release on the main straight. Supports dj_safety_car or pole-sitter led formations."))
 
   ui.newLine(6)
-  ui.text("Gaps & Penalty Severity (v0.25.0+)")
+  ui.text(L("Fuel Strategy"))
   ui.separator()
   ui.newLine(2)
-  ui.textWrapped("Live gaps to the car behind and sector deltas to P1, plus a penalty-severity counter (PP) for regulatory awareness. AC-native race control handles flags and limits.")
+  ui.textWrapped(L("Endurance-style fuel forcing for AI. Set race length and mandatory stops; AI will pit naturally when fuel runs low. Tire change on pit stop based on wear threshold."))
 
   ui.newLine(6)
-  ui.text("Race Events HUD")
+  ui.text(L("Gaps & Penalty Severity (v0.25.0+)"))
   ui.separator()
   ui.newLine(2)
-  ui.textWrapped("Overlay window with live gaps, PP and strategy. Enable it in Content Manager → Apps → ApexFlow Events. Fully customizable in the HUD tab (gaps/PP only, AC-native flags).")
+  ui.textWrapped(L("Live gaps to the car behind and sector deltas to P1, plus a penalty-severity counter (PP) for regulatory awareness. AC-native race control handles flags and limits."))
+
+  ui.newLine(6)
+  ui.text(L("Race Events HUD"))
+  ui.separator()
+  ui.newLine(2)
+  ui.textWrapped(L("Overlay window with live gaps, PP and strategy. Enable it in Content Manager → Apps → ApexFlow Events. Fully customizable in the HUD tab (gaps/PP only, AC-native flags)."))
 
   ui.newLine(8)
 end
@@ -1404,52 +1437,52 @@ local function drawHudEventsSettings(sim, cfg)
   if h.showGapBehind == nil then h.showGapBehind = true end
   if h.showDeltaLive == nil then h.showDeltaLive = true end
 
-  ui.text("Race Events HUD — Personalização")
-  helpMarker("Leigo: escolha o que aparece no overlay ApexFlow Events (gaps/PP).\nTécnico: cada seção lê o estado do seu módulo; desligar esconde só o visual.")
+  ui.text(L("Race Events HUD — Personalização"))
+  helpMarker(L("Leigo: escolha o que aparece no overlay ApexFlow Events (gaps/PP).\nTécnico: cada seção lê o estado do seu módulo; desligar esconde só o visual."))
 
   ui.newLine(2)
-  ui.textDisabled("Marque o que quer ver no overlay:")
-  if ui.checkbox("Estratégia (próximo pit / combustível)", h.showStrategy) then
+  ui.textDisabled(L("Marque o que quer ver no overlay:"))
+  if ui.checkbox(L("Estratégia (próximo pit / combustível)"), h.showStrategy) then
     h.showStrategy = not h.showStrategy; notifyChange()
   end
-  if ui.checkbox("Posição / volta / velocidade", h.showPosition) then
+  if ui.checkbox(L("Posição / volta / velocidade"), h.showPosition) then
     h.showPosition = not h.showPosition; notifyChange()
   end
-  if ui.checkbox("Sessão (pista / tempo restante)", h.showSession) then
+  if ui.checkbox(L("Sessão (pista / tempo restante)"), h.showSession) then
     h.showSession = not h.showSession; notifyChange()
   end
-  if ui.checkbox("Gaps (atrás / setor) — PP", h.showGapBehind) then
+  if ui.checkbox(L("Gaps (atrás / setor) — PP"), h.showGapBehind) then
     h.showGapBehind = not h.showGapBehind; notifyChange()
   end
-  if ui.checkbox("Learning (pistas memorizadas)", h.showLearning) then
+  if ui.checkbox(L("Learning (pistas memorizadas)"), h.showLearning) then
     h.showLearning = not h.showLearning; notifyChange()
   end
-  if ui.checkbox("Extras (preset · update · detalhes)", h.showExtras) then
+  if ui.checkbox(L("Extras (preset · update · detalhes)"), h.showExtras) then
     h.showExtras = not h.showExtras; notifyChange()
   end
-  helpMarker("Leigo: preset atual, aviso de update, marcha/pneus/paradas da IA.\nTécnico: lê githubGetState e strategy.getState (gaps/PP).")
+  helpMarker(L("Leigo: preset atual, aviso de update, marcha/pneus/paradas da IA.\nTécnico: lê githubGetState e strategy.getState (gaps/PP)."))
 
   ui.newLine(2)
   ui.separator()
-  ui.text("Estilo")
-  if ui.checkbox("Modo compacto (menos espaçamento)", h.compact) then
+  ui.text(L("Estilo"))
+  if ui.checkbox(L("Modo compacto (menos espaçamento)"), h.compact) then
     h.compact = not h.compact; notifyChange()
   end
-  helpMarker("Leigo: deixa o HUD menor e mais denso.\nTécnico: pula separadores e textos secundários.")
-  if ui.checkbox("Barras de progresso", h.progressBars) then
+  helpMarker(L("Leigo: deixa o HUD menor e mais denso.\nTécnico: pula separadores e textos secundários."))
+  if ui.checkbox(L("Barras de progresso"), h.progressBars) then
     h.progressBars = not h.progressBars; notifyChange()
   end
-  if ui.checkbox("Piscar alertas críticos", h.blink) then
+  if ui.checkbox(L("Piscar alertas críticos"), h.blink) then
     h.blink = not h.blink; notifyChange()
   end
   if h.hideInPits == nil then h.hideInPits = true end
-  if ui.checkbox("Esconder parado no box (+10s)", h.hideInPits) then
+  if ui.checkbox(L("Esconder parado no box (+10s)"), h.hideInPits) then
     h.hideInPits = not h.hideInPits; notifyChange()
   end
-  helpMarker("Leigo: no box parado o painel dorme sozinho e volta na pista.\nTécnico: gate por isInPitlane/isInPit + speed < 5 por 10s.")
+  helpMarker(L("Leigo: no box parado o painel dorme sozinho e volta na pista.\nTécnico: gate por isInPitlane/isInPit + speed < 5 por 10s."))
 
   ui.newLine(2)
-  local newScale = sliderBlock("Escala do HUD", "hud_scale", h.scale, 0.7, 1.5, "%.2f",
+  local newScale = sliderBlock(L("Escala do HUD"), "hud_scale", h.scale, 0.7, 1.5, "%.2f",
     "Leigo: aumenta/diminui o tamanho do texto do overlay.\nTécnico: fator aplicado ao HUD, não à janela.")
   if newScale ~= nil then
     local v = clamp(newScale, 0.7, 1.5)
@@ -1457,15 +1490,15 @@ local function drawHudEventsSettings(sim, cfg)
   end
 
   ui.newLine(2)
-  if ui.button("📺 Abrir ApexFlow Events", vec2(220, 28)) then
+  if ui.button(L("📺 Abrir ApexFlow Events"), vec2(220, 28)) then
     if ac.setWindowOpen then pcall(ac.setWindowOpen, "events", true) end
   end
   ui.sameLine()
-  if ui.button("👁 Testar HUD", vec2(150, 28)) then
+  if ui.button(L("👁 Testar HUD"), vec2(150, 28)) then
     if APEXFLOW_API.hudPreviewStart then APEXFLOW_API.hudPreviewStart(10) end
   end
   ui.sameLine()
-  helpMarker("Abre a janela overlay. O botão 👁 injeta 10s de FCY + punição fake (com tag PREVIEW) p/ ver o layout sem correr.")
+  helpMarker(L("Abre a janela overlay. O botão 👁 injeta 10s de FCY + punição fake (com tag PREVIEW) p/ ver o layout sem correr."))
 end-- ==========================================================
 -- v0.19.0: BROADCAST SKIN — mesma engine ImGui, cara de TV.
 -- Faixas coloridas full-width (beginChild + ChildBg, padrão provado),
@@ -1495,7 +1528,7 @@ end
 -- ---------------- toasts ----------------
 local function toast(cfg, kind, title, msg)
   cfg._toasts = cfg._toasts or {}
-  table.insert(cfg._toasts, { kind = kind or "info", title = title or "", msg = msg or "", t0 = animT() })
+  table.insert(cfg._toasts, { kind = kind or "info", title = L(title) or "", msg = L(msg) or "", t0 = animT() })
   if #cfg._toasts > 4 then table.remove(cfg._toasts, 1) end
 end
 local function drawToasts(cfg)
@@ -1565,7 +1598,7 @@ local function animBar(frac, label)
   if ui.progressBar then ok = pcall(ui.progressBar, frac, vec2(-1, 12)) end
   if not ok then
     local n = math.floor(frac * 18 + 0.5)
-    ui.textDisabled("[" .. string.rep("█", n) .. string.rep("░", 18 - n) .. "] " .. (label or ""))
+    ui.textDisabled(L("[") .. string.rep("█", n) .. string.rep("░", 18 - n) .. "] " .. (label or ""))
   elseif label then
     ui.textDisabled(label)
   end
@@ -1612,6 +1645,7 @@ end
 -- Título com Segoe UI Bold quando existir (pcall, como o Dream faz);
 -- senão cai para a fonte Title. Nunca quebra.
 local function titleText(txt, color)
+  txt = L(txt)
   if ui.pushDWriteFont and ui.popDWriteFont then
     local ok = pcall(ui.pushDWriteFont, "Segoe UI;Weight=Bold")
     if ok then
@@ -1643,6 +1677,7 @@ local function contentWidth()
 end
 
 local function pillToggle(id, label, val, summary)
+  label, summary = L(label), L(summary)
   local w = 84
   if val and rgbm then
     ui.pushStyleColor(ui.StyleColor.Button, rgbm(0.12, 0.45, 0.24, 1.00))
@@ -1653,7 +1688,7 @@ local function pillToggle(id, label, val, summary)
   ui.text(label)
   if summary and summary ~= "" then
     ui.newLine(1)
-    ui.textDisabled("      " .. summary)
+    ui.textDisabled(L("      ") .. summary)
   end
   if clicked then return not val end
   return val
@@ -1663,10 +1698,11 @@ end
 -- opts = { status="" } (modo Leigo/Técnico removido na v0.23.0: tudo visível)
 local function view(cfg, id, num, title, summary, opts, fn, sim)
   opts = opts or {}
+  title, summary = L(title), L(summary)
   local st = ensureUiState(cfg)
   if st[id] == nil then st[id] = true end
   local isOpen = st[id]
-  if rgbm then ui.textColored("▌", C.accent()) else ui.text("|") end
+  if rgbm then ui.textColored(L("▌"), C.accent()) else ui.text("|") end
   ui.sameLine(0, 4)
   ui.setNextItemWidth(math.max(200, ui.windowWidth() - 30))
   local head = (isOpen and "∨  " or "›  ") .. num .. " · " .. title
@@ -1677,7 +1713,7 @@ local function view(cfg, id, num, title, summary, opts, fn, sim)
     isOpen = not isOpen
   end
   hand()
-  if summary and summary ~= "" then ui.textDisabled("      " .. summary) end
+  if summary and summary ~= "" then ui.textDisabled(L("      ") .. summary) end
   if isOpen then
     ui.indent(8)
     safeTab(title, fn, sim, cfg)
@@ -1703,7 +1739,7 @@ end
 
 -- Faixa de estado global — limpa: sempre verde (caution/penalty removidos, AC nativo)
 local function drawStateBand(sim, cfg)
-  local r, g, b, txt = 0.10, 0.38, 0.20, "🟢 PISTA VERDE"
+  local r, g, b, txt = 0.10, 0.38, 0.20, L("🟢 PISTA VERDE")
   band("##rf_stateband", r, g, b, 40, function()
     ui.pushFont(ui.Font.Title)
     if rgbm then ui.textColored(txt, rgbm(1, 1, 1, 1)) else ui.text(txt) end
@@ -1725,14 +1761,14 @@ local function drawCommandBar(sim, cfg)
   if ui.inputText then
     ui.setNextItemWidth(math.max(120, ui.windowWidth() - 140))
     local q = cfg._search or ""
-    local newQ = ui.inputText("⌨ filtrar…##cmd_search", q)
+    local newQ = ui.inputText(L("⌨ filtrar…##cmd_search"), q)
     if newQ ~= nil and newQ ~= q then cfg._search = newQ end
     ui.sameLine(0, 8)
   end
-  ui.textDisabled("Filtre por nome: “pit”, “gaps”, “PP”…" .. ((cfg._search or "") ~= "" and " · filtro ativo" or ""))
+  ui.textDisabled(L("Filtre por nome: “pit”, “gaps”, “PP”…") .. ((cfg._search or "") ~= "" and " · filtro ativo" or ""))
   if (cfg._search or "") ~= "" then
     ui.sameLine(0, 8)
-    if ui.button("X##cmd_clear", vec2(28, 22)) then cfg._search = "" end
+    if ui.button(L("X##cmd_clear"), vec2(28, 22)) then cfg._search = "" end
   end
 end
 
@@ -1761,16 +1797,16 @@ local function drawLogoHeader()
     end
   end
   if shown then ui.sameLine(0, 12) end
-  titleText("APEXFLOW", C.accent())
+  titleText(L("APEXFLOW"), C.accent())
   ui.sameLine(0, 10)
-  ui.textDisabled("v" .. (SCRIPT_VERSION or "?"))
+  ui.textDisabled(L("v") .. (SCRIPT_VERSION or "?"))
   ui.newLine(1)
-  ui.textDisabled(" central de IA, estratégia e direção de prova ")
+  ui.textDisabled(L(" central de IA, estratégia e direção de prova "))
 end
 
 -- Tab-strip superior estilo Dream (pills + micro-label + badge).
 local function drawTabStrip(cfg, badges)
-  ui.textDisabled("SEÇÕES")
+  ui.textDisabled(L("SEÇÕES"))
   local avail = contentWidth()
   local bw = math.max(120, (avail - 4 * 6) / 5)
   for i, cat in ipairs(NAV_RAIL) do
@@ -1784,7 +1820,7 @@ local function drawTabStrip(cfg, badges)
       end
     end
     local dot = (badges and badges[cat.id]) and " •" or ""
-    if ui.button(cat.icon .. " " .. cat.label .. dot .. "##tab_" .. cat.id, vec2(bw, 34)) then
+    if ui.button(cat.icon .. " " .. L(cat.label) .. dot .. "##tab_" .. cat.id, vec2(bw, 34)) then
       if cfg.uiNav ~= cat.id then cfg.uiNav = cat.id trackNav(cfg, cat.id) end
     end
     hand()
@@ -1792,10 +1828,10 @@ local function drawTabStrip(cfg, badges)
   end
   for _, cat in ipairs(NAV_RAIL) do
     if cfg.uiNav == cat.id then
-      if rgbm then ui.textColored("━━━ " .. cat.label, C.accent())
-      else ui.text(cat.label) end
+      if rgbm then ui.textColored(L("━━━ ") .. L(cat.label), C.accent())
+      else ui.text(L(cat.label)) end
       ui.sameLine(0, 8)
-      ui.textDisabled(cat.desc)
+      ui.textDisabled(L(cat.desc))
       break
     end
   end
@@ -1822,17 +1858,17 @@ end
 local function drawStatusBar(sim, cfg)
   local live = sim and sim.isSessionStarted
   local parts = {}
-  parts[#parts + 1] = live and "● LIVE" or "○ box"
+  parts[#parts + 1] = live and L("● LIVE") or L("○ box")
   -- gaps e PP (5) no lugar de warnings/caution
   local gb = APEXFLOW_API.getGapBehindState and APEXFLOW_API.getGapBehindState() or {}
   local ps = APEXFLOW_API.getPenaltySeverityState and APEXFLOW_API.getPenaltySeverityState() or {}
   if (gb.gapBehindM or 0) > 1 then
-    parts[#parts + 1] = string.format("🔙 %.0fm", gb.gapBehindM or 0)
+    parts[#parts + 1] = string.format(L("🔙 %.0fm"), gb.gapBehindM or 0)
   end
   if (ps.totalPP or 0) > 0 then
-    parts[#parts + 1] = string.format("⚖ PP:%d", ps.totalPP or 0)
+    parts[#parts + 1] = string.format(L("⚖ PP:%d"), ps.totalPP or 0)
   end
-  parts[#parts + 1] = "💾 auto"
+  parts[#parts + 1] = L("💾 auto")
   parts[#parts + 1] = "v" .. (SCRIPT_VERSION or "?")
   local line = table.concat(parts, "   ")
   if live and rgbm then ui.textColored(line, C.ok()) else ui.textDisabled(line) end
@@ -1851,7 +1887,7 @@ local function drawPresetList(cfg)
   local presets = APEXFLOW_API.getCategoryPresets and APEXFLOW_API.getCategoryPresets() or {}
   if not next(presets) then return end
   if not matchesSearch(cfg, "preset gt3 f1 tcr categoria corrida") then return end
-  ui.textDisabled("PRESET")
+  ui.textDisabled(L("PRESET"))
   local cur = cfg.categoryPreset or "custom"
   local first = true
   for _, row in ipairs(PRESET_ROWS) do
@@ -1864,8 +1900,8 @@ local function drawPresetList(cfg)
       if ui.button((isCur and "● " or "") .. row.key:upper() .. "##p_" .. row.key, vec2(92, 28)) then
         if APEXFLOW_API.applyCategoryPreset then APEXFLOW_API.applyCategoryPreset(row.key) end
         notifyChange()
-        if ac.setMessage then pcall(ac.setMessage, "PRESET", pr.label .. " aplicado") end
-        toast(cfg, "ok", "Preset", pr.label .. " aplicado")
+        if ac.setMessage then pcall(ac.setMessage, "PRESET", pr.label .. L(" aplicado")) end
+        toast(cfg, "ok", L("Preset"), pr.label .. L(" aplicado"))
         trackSection(cfg, "preset_" .. row.key)
       end
       hand()
@@ -1873,21 +1909,21 @@ local function drawPresetList(cfg)
     end
   end
   ui.sameLine(0, 6)
-  if ui.button("Custom##p_custom", vec2(92, 28)) then
+  if ui.button(L("Custom##p_custom"), vec2(92, 28)) then
     cfg.categoryPreset = "custom"
     notifyChange()
   end
   hand()
   for _, row in ipairs(PRESET_ROWS) do
-    if cur == row.key then ui.textDisabled(row.desc) break end
+    if cur == row.key then ui.textDisabled(L(row.desc)) break end
   end
-  if cur == "custom" then ui.textDisabled("Ajustes manuais (sem preset)") end
+  if cur == "custom" then ui.textDisabled(L("Ajustes manuais (sem preset)")) end
 end
 
 -- ---------------- inspetores ----------------
 local function heroNumbers(sim, cfg)
   if not (sim and sim.isSessionStarted) then
-    ui.textDisabled("Sem sessão — números vivos aparecem em pista " .. animDots())
+    ui.textDisabled(L("Sem sessão — números vivos aparecem em pista ") .. animDots())
     return
   end
   local ok, pcar = pcall(ac.getCar, 0)
@@ -1895,7 +1931,7 @@ local function heroNumbers(sim, cfg)
   local fuel = tonumber(pcar.fuel) or 0
   band("##hero_num", 0.08, 0.13, 0.22, 54, function()
     ui.pushFont(ui.Font.Title)
-    local txt = string.format("P%d   ·   V%d   ·   %d km/h   ·   %.1fL",
+    local txt = string.format(L("P%d   ·   V%d   ·   %d km/h   ·   %.1fL"),
       pcar.racePosition or 0, (pcar.lapCount or 0) + 1, math.floor(pcar.speedKmh or 0), fuel)
     if rgbm then ui.textColored(txt, rgbm(1, 1, 1, 1)) else ui.text(txt) end
     ui.popFont()
@@ -1912,24 +1948,24 @@ local function drawDashInspector(sim, cfg)
   local sg = APEXFLOW_API.getSectorGapsState and APEXFLOW_API.getSectorGapsState() or {}
   local ps = APEXFLOW_API.getPenaltySeverityState and APEXFLOW_API.getPenaltySeverityState() or {}
   if (gb.gapBehindM or 0) > 1 then
-    ui.textDisabled(string.format("🔙 Atrás: %.0fm (P%d)", gb.gapBehindM or 0, gb.carBehindPos or 0))
+    ui.textDisabled(string.format(L("🔙 Atrás: %.0fm (P%d)"), gb.gapBehindM or 0, gb.carBehindPos or 0))
   else
-    ui.textDisabled("🔙 sem carro atrás")
+    ui.textDisabled(L("🔙 sem carro atrás"))
   end
   if (sg.gapSectorS or 0) > 0.05 then
-    ui.textDisabled(string.format("⏱ Setor %d: +%.2fs p/ P1", sg.currentSector or 0, sg.gapSectorS or 0))
+    ui.textDisabled(string.format(L("⏱ Setor %d: +%.2fs p/ P1"), sg.currentSector or 0, sg.gapSectorS or 0))
   end
   if (ps.totalPP or 0) > 0 then
-    ui.textDisabled(string.format("⚖ PP: %d (L%d %s)", ps.totalPP or 0, ps.level or 0, tostring(ps.lastReason or "")))
+    ui.textDisabled(string.format(L("⚖ PP: %d (L%d %s)"), ps.totalPP or 0, ps.level or 0, tostring(ps.lastReason or "")))
   else
-    ui.textDisabled("⚖ PP: limpo")
+    ui.textDisabled(L("⚖ PP: limpo"))
   end
-  ui.textDisabled("🟢 pista verde — AC nativo")
+  ui.textDisabled(L("🟢 pista verde — AC nativo"))
   if sim and sim.isSessionStarted and stt and stt.cars then
     for _, c in ipairs(stt.cars) do
       if c.index == 0 then
-        local pit = c.nextPit and ("pit v" .. tostring(c.nextPit)) or "sem pit"
-        ui.textDisabled(string.format("⛽ %.1fL  ·  %s", tonumber(c.fuel) or 0, pit))
+        local pit = c.nextPit and (L("pit v") .. tostring(c.nextPit)) or L("sem pit")
+        ui.textDisabled(string.format(L("⛽ %.1fL  ·  %s"), tonumber(c.fuel) or 0, pit))
         break
       end
     end
@@ -1945,12 +1981,12 @@ local function drawDashInspector(sim, cfg)
     local info = sessName
     if trackName ~= "" then info = info .. "  ·  " .. trackName end
     if sim.sessionTimeLeft and sim.sessionTimeLeft > 0 then
-      info = info .. string.format("  ·  %02d:%02d",
+      info = info .. string.format(L("  ·  %02d:%02d"),
         math.floor(sim.sessionTimeLeft / 60000), math.floor((sim.sessionTimeLeft % 60000) / 1000))
     end
     if info ~= "" then ui.textDisabled(info) end
   end
-  ui.textDisabled(string.format("🧠 %d pista(s)", memCount))
+  ui.textDisabled(string.format(L("🧠 %d pista(s)"), memCount))
   ui.newLine(2)
   ui.separator()
   ui.newLine(2)
@@ -1958,7 +1994,7 @@ local function drawDashInspector(sim, cfg)
 end
 
 local function drawAiInspector(sim, cfg)
-  ui.textDisabled("Dê personalidade à IA. Padrões servem p/ quase tudo.")
+  ui.textDisabled(L("Dê personalidade à IA. Padrões servem p/ quase tudo."))
   ui.newLine(4)
   if matchesSearch(cfg, "agressividade perfis calmo briga") then
     view(cfg, "ai_profiles", "01", "Quanto o grid briga",
@@ -2000,11 +2036,11 @@ local function drawAiInspector(sim, cfg)
 end
 
 local function drawRaceInspector(sim, cfg)
-  ui.textDisabled("Antes de largar: duração, paradas e formação.")
+  ui.textDisabled(L("Antes de largar: duração, paradas e formação."))
   ui.newLine(4)
   if matchesSearch(cfg, "combustivel pit pneu volta endurance") then
-    local st = "manual"
-    if cfg.strategy and cfg.strategy.enabled then st = tostring(cfg.strategy.manualRaceLaps or 20) .. "v/" .. tostring(cfg.strategy.forcedStops or 1) .. " pits" end
+    local st = L("manual")
+    if cfg.strategy and cfg.strategy.enabled then st = tostring(cfg.strategy.manualRaceLaps or 20) .. L("v/") .. tostring(cfg.strategy.forcedStops or 1) .. L(" pits") end
     view(cfg, "race_fuel", "01", "Combustível e pits",
       "Diga as voltas; a IA calcula paradas e pneus sozinha.",
       { status = st },
@@ -2013,7 +2049,7 @@ local function drawRaceInspector(sim, cfg)
   if matchesSearch(cfg, "largada movimento fila formacao") then
     view(cfg, "race_rolling", "02", "Largada em movimento",
       "Volta de apresentação em fila antes da verde. Vem desligado.",
-      { status = (cfg.rollingStart and cfg.rollingStart.enabled) and "armado" or "off" },
+      { status = (cfg.rollingStart and cfg.rollingStart.enabled) and L("armado") or L("off") },
       function(s, c) drawRollingStartSection(s, c) end, sim)
   end
 end
@@ -2024,7 +2060,7 @@ end
 
 -- v0.29.0 limpo: Regulation/HUD — só gaps/PP (voice/telemetria removidos 3,4,6)
 local function drawHudInspector(sim, cfg)
-  ui.textDisabled("O que aparece correndo.")
+  ui.textDisabled(L("O que aparece correndo."))
   ui.newLine(4)
   if matchesSearch(cfg, "painel hud overlay mostrar tela") then
     view(cfg, "hud_events", "01", "Painel na tela",
@@ -2036,7 +2072,7 @@ local function drawHudInspector(sim, cfg)
 end
 
 local function drawSysInspector(sim, cfg)
-  ui.textDisabled("Visual, updates e bastidores. Mexa uma vez e esqueça.")
+  ui.textDisabled(L("Visual, updates e bastidores. Mexa uma vez e esqueça."))
   ui.newLine(4)
   if matchesSearch(cfg, "aparencia tema cor transparencia") then
     view(cfg, "sys_theme", "01", "Visual",
@@ -2048,7 +2084,7 @@ local function drawSysInspector(sim, cfg)
     local gs = APEXFLOW_API.githubGetState and APEXFLOW_API.githubGetState() or {}
     view(cfg, "sys_gh", "02", "Atualizações",
       "Ver se saiu versão nova.",
-      { status = gs.hasUpdate and "nova!" or "" },
+      { status = gs.hasUpdate and L("nova!") or "" },
       function(s, c) drawGitHubUpdateSection(s, c) end, sim)
   end
   -- v0.33.0: Painel WEB removido (era sys_web 03) — use Apps → ApexFlow Panel
@@ -2065,6 +2101,7 @@ end
 -- ---------------- moldura principal ----------------
 function M.draw(sim, cfg)
   cfg.ui = cfg.ui or {}
+  if _langMod then _langMod.setLang((cfg and cfg.lang) or "pt") end
   local acc = cfg.ui.accent
   local accOk = false
   for _, k in ipairs(ACCENT_ORDER) do if k == acc then accOk = true break end end
@@ -2100,23 +2137,20 @@ function M.draw(sim, cfg)
   if nav == "dash" then
     safeTab("Início", drawDashInspector, sim, cfg)
   elseif nav == "ai" then
-    if flash and rgbm then ui.textColored("🤖 Pilotos", C.accent()) end
+    if flash and rgbm then ui.textColored(L("🤖 Pilotos"), C.accent()) end
     safeTab("Pilotos", drawAiInspector, sim, cfg)
   elseif nav == "race" then
-    if flash and rgbm then ui.textColored("🏁 Corrida", C.accent()) end
+    if flash and rgbm then ui.textColored(L("🏁 Corrida"), C.accent()) end
     safeTab("Corrida", drawRaceInspector, sim, cfg)
   elseif nav == "hud" then
-    if flash and rgbm then ui.textColored("📡 Tela & Voz", C.accent()) end
+    if flash and rgbm then ui.textColored(L("📡 Tela & Voz"), C.accent()) end
     safeTab("Tela & Voz", drawHudInspector, sim, cfg)
   elseif nav == "sys" then
-    if flash and rgbm then ui.textColored("⚙️ Ajustes", C.accent()) end
+    if flash and rgbm then ui.textColored(L("⚙️ Ajustes"), C.accent()) end
     safeTab("Sistema", drawSysInspector, sim, cfg)
   else
-    -- compat: old saves with "safety" nav -> redirect to Regulation window
-    if nav == "safety" then
-      cfg.uiNav = "dash"
-      if ac.setWindowOpen then pcall(ac.setWindowOpen, "regulation", true) end
-    end
+    -- compat: old saves with "safety" nav -> dash (Regulation window removida)
+    if nav == "safety" then cfg.uiNav = "dash" end
     cfg.uiNav = cfg.uiNav or "dash"
     if cfg.uiNav == "dash" then safeTab("Início", drawDashInspector, sim, cfg)
     elseif cfg.uiNav == "ai" then safeTab("Pilotos", drawAiInspector, sim, cfg)
@@ -2129,31 +2163,31 @@ function M.draw(sim, cfg)
   ui.newLine(4)
   ui.separator()
   ui.newLine(2)
-  if ui.button("💾 Salvar", vec2(110, 26)) then
+  if ui.button(L("💾 Salvar"), vec2(110, 26)) then
     if APEXFLOW_API.saveConfig then
       APEXFLOW_API.saveConfig()
       cfg._savedFeedback = 180
-      toast(cfg, "ok", "Salvo", "")
+      toast(cfg, "ok", L("Salvo"), "")
     end
   end
   ui.sameLine(0, 8)
-  if ui.button("🔄 Padrões", vec2(110, 26)) then
+  if ui.button(L("🔄 Padrões"), vec2(110, 26)) then
     cfg._confirmReset = true
   end
   hand()
   ui.sameLine(0, 8)
-  if ui.button("📊 Painel", vec2(100, 26)) then
+  if ui.button(L("📊 Painel"), vec2(100, 26)) then
     if ac.setWindowOpen then pcall(ac.setWindowOpen, "events", true) end
   end
   if (cfg._savedFeedback or 0) > 0 then
     cfg._savedFeedback = cfg._savedFeedback - 1
     ui.sameLine(0, 8)
-    if rgbm then ui.textColored("✓ " .. animDots(), rgbm(0.2, 0.9, 0.4, animPulse(4, 0.6, 1.0)))
-    else ui.text("✓") end
+    if rgbm then ui.textColored(L("✓ ") .. animDots(), rgbm(0.2, 0.9, 0.4, animPulse(4, 0.6, 1.0)))
+    else ui.text(L("✓")) end
   elseif (cfg._resetFeedback or 0) > 0 then
     cfg._resetFeedback = cfg._resetFeedback - 1
     ui.sameLine(0, 8)
-    ui.textDisabled("✓ padrões")
+    ui.textDisabled(L("✓ padrões"))
   end
 
   -- Modal de confirmação estilo Dream (passo explícito, sem desfazer)
@@ -2161,17 +2195,17 @@ function M.draw(sim, cfg)
     ui.newLine(4)
     ui.separator()
     ui.newLine(2)
-    titleText("⚠️ Voltar aos padrões?", C.warn())
-    ui.textDisabled("Apaga TODOS os ajustes (perfis, limites, voz, tema). Sem desfazer.")
+    titleText(L("⚠️ Voltar aos padrões?"), C.warn())
+    ui.textDisabled(L("Apaga TODOS os ajustes (perfis, limites, voz, tema). Sem desfazer."))
     ui.newLine(2)
-    if ui.button("Sim, restaurar##cf_yes", vec2(170, 30)) then
+    if ui.button(L("Sim, restaurar##cf_yes"), vec2(170, 30)) then
       if APEXFLOW_API.resetToDefaults then APEXFLOW_API.resetToDefaults() end
       cfg._confirmReset = false
       cfg._resetFeedback = 180
-      toast(cfg, "warn", "Padrões de volta", "")
+      toast(cfg, "warn", L("Padrões de volta"), "")
     end
     ui.sameLine(0, 8)
-    if ui.button("Cancelar##cf_no", vec2(130, 30)) then cfg._confirmReset = false end
+    if ui.button(L("Cancelar##cf_no"), vec2(130, 30)) then cfg._confirmReset = false end
   end
 
   ui.newLine(2)

@@ -14,7 +14,7 @@
   <a href="https://github.com/Silxyst/ApexFlow/releases/latest">
     <img src="https://img.shields.io/github/v/release/Silxyst/ApexFlow?style=for-the-badge&label=DOWNLOAD&color=ff6a15&logo=github" alt="Latest Release"/>
   </a>
-  <img src="https://img.shields.io/badge/Version-v0.33.1-ff6a15?style=for-the-badge&label=App" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v0.34.0-ff6a15?style=for-the-badge&label=App" alt="Version"/>
   <img src="https://img.shields.io/badge/CSP-0.3.0-00d4ff?style=for-the-badge" alt="CSP"/>
   <img src="https://img.shields.io/badge/Platform-Windows-0078d6?style=for-the-badge&logo=windows" alt="Platform"/>
   <a href="https://github.com/Silxyst/ApexFlow/blob/main/LICENSE">
@@ -24,11 +24,11 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Apps-2-22c55e?style=flat-square" alt="Apps"/>
-  <img src="https://img.shields.io/badge/Modules-9-22c55e?style=flat-square" alt="Modules"/>
+  <img src="https://img.shields.io/badge/Modules-10-22c55e?style=flat-square" alt="Modules"/>
   <img src="https://img.shields.io/badge/Offline-100%25-22c55e?style=flat-square" alt="Offline"/>
   <img src="https://img.shields.io/badge/Errors-0-22c55e?style=flat-square" alt="Errors"/>
   <img src="https://img.shields.io/badge/Rain-Supported-00d4ff?style=flat-square" alt="Rain"/>
-  <img src="https://img.shields.io/badge/Language-EN-ff6a15?style=flat-square" alt="Language"/>
+  <img src="https://img.shields.io/badge/Language-PT--EN--ES-ff6a15?style=flat-square" alt="Language"/>
 </p>
 
 <p align="center">
@@ -142,6 +142,7 @@ _G.APEXFLOW_API.getStrategyState(cfg)    -- {nextPit, stopsLeft, fuelPerLap}
 
 ## 🗺️ Roadmap
 
+- [x] `v0.34.0` i18n PT/EN/ES (UI+HUD, language selector, ES 88% + PT fallback)
 - [x] `v0.33.1` Panel window removed too — back to Principal + Events
 - [x] `v0.33.0` WEB removed (panel_server, panel.html, webui)
 - [x] `v0.32.2` GitHub auto-update on new CSP + repo migration
@@ -159,6 +160,6 @@ _G.APEXFLOW_API.getStrategyState(cfg)    -- {nextPit, stopsLeft, fuelPerLap}
 MIT — **Silxyst**. Free for personal and commercial use, see [LICENSE](LICENSE).
 
 <p align="center">
-  <sub>ApexFlow v0.33.1 — 2 apps • 9 modules • CSP 0.3.0 • zero errors • no WEB</sub><br/>
+  <sub>ApexFlow v0.34.0 — 2 apps • 10 modules • CSP 0.3.0 • zero errors • PT/EN/ES</sub><br/>
   <sub>Built with ❤️ for the Assetto Corsa community</sub>
 </p>

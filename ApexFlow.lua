@@ -1,10 +1,10 @@
--- ApexFlow — Independent race suite for Assetto Corsa (v0.33.1)
+-- ApexFlow — Independent race suite for Assetto Corsa (v0.34.0)
 SCRIPT_NAME = "ApexFlow"
-SCRIPT_VERSION = "0.33.1"
+SCRIPT_VERSION = "0.34.0"
 
 _G.APEXFLOW_API = _G.APEXFLOW_API or {}
 local APEXFLOW_API = _G.APEXFLOW_API
-_G.APEXFLOW_VERSION = "0.33.1"
+_G.APEXFLOW_VERSION = "0.34.0"
 
 local function clamp(v,a,b) if v<a then return a end if v>b then return b end return v end
 local function lerp(a,b,t) return a + (b-a)*t end
@@ -31,6 +31,8 @@ local strategy     = safeRequire("src.race_strategy")
 local gap_behind   = safeRequire("src.gap_behind")
 local sector_gaps  = safeRequire("src.sector_gaps")
 local penalty_sev  = safeRequire("src.penalty_severity")
+local lang_mod     = safeRequire("src.lang") -- v0.34.0 i18n
+local L = (lang_mod and lang_mod.L) and function(s) return lang_mod.L(s) end or function(s) return s end
 -- REMOVIDOS 3,4,6: caution/safety/realpenalty/tracklimits/voice/sound/box
 -- NOTE v0.5.0+: src/vsc + src/github_update modules are DEPRECATED and no
 -- longer required. GitHub check lives in this file (single source of truth)
@@ -107,6 +109,8 @@ local APEXFLOW_CFG = {
   },
 
   categoryPreset = "custom",
+
+  lang = "pt", -- v0.34.0: pt|en|es (UI + HUD)
 
   pitSpeedReal = { enabled = true },
   telemetryCSV = { enabled = false, maxLaps = 500 },
@@ -347,7 +351,7 @@ local function maybeTriggerFailures(dt, sim, cfg)
           if ac.requestPitStop then pcall(ac.requestPitStop, i) end
           ac.log(string.format("[ApexFlow] AI #%d mechanical: extra pit", i))
         end
-        if ac.setMessage then pcall(ac.setMessage, "RACE CONTROL", string.format("AI #%d — mechanical issue", i)) end
+        if ac.setMessage then pcall(ac.setMessage, "RACE CONTROL", string.format(L("AI #%d — mechanical issue"), i)) end
       end
     end
   end
@@ -664,6 +668,7 @@ APEXFLOW_API.resetToDefaults = function()
       APEXFLOW_CFG.failures.minLap = 3
     end
     APEXFLOW_CFG.categoryPreset = "custom"
+    APEXFLOW_CFG.lang = "pt"
     saveConfigToFile()
     return true
   end
@@ -943,6 +948,7 @@ function script.update(dt)
   if sim.isOnlineRace then return end
   if not sim.isSessionStarted then return end
   if not APEXFLOW_CFG.enabled then return end
+  if lang_mod then lang_mod.setLang(APEXFLOW_CFG.lang or "pt") end
 
   -- NOTE v0.5.0: VSC system removed (was here).
   -- NOTE v0.33.0: Web UI removed (panel is the in-game Panel window).
@@ -1100,11 +1106,11 @@ local function drawFallbackIfMissingModules()
   ui.textAligned("ApexFlow", vec2(0.5, 0.5), vec2(ui.availableSpaceX(), 34))
   ui.popFont()
   ui.newLine(4)
-  ui.textWrapped("ApexFlow modules failed to load. Check custom_shaders_patch.log for require() errors.")
+  ui.textWrapped(L("ApexFlow modules failed to load. Check custom_shaders_patch.log for require() errors."))
   ui.newLine(4)
   ui.separator()
-  ui.text("Module status: (v0.33.0 sem WEB)")
-  local names = {"src.ui", "src.ai_controller", "src.rolling_start", "src.race_strategy", "src.gap_behind", "src.sector_gaps", "src.penalty_severity"}
+  ui.text(L("Module status:"))
+  local names = {"src.ui", "src.ai_controller", "src.rolling_start", "src.race_strategy", "src.gap_behind", "src.sector_gaps", "src.penalty_severity", "src.lang"}
   for _, n in ipairs(names) do
     ui.text((modStatus[n] == "OK" and "✓ " or "✗ ") .. n .. ": " .. tostring(modStatus[n] or "not attempted"))
   end
@@ -1134,7 +1140,7 @@ function script.windowSetup()
 end
 
 function script.windowMainSettings()
-  if ui.checkbox("Show window in setup", ac.isWindowOpen("main_setup")) then
+  if ui.checkbox(L("Show window in setup"), ac.isWindowOpen("main_setup")) then
     ac.setWindowOpen("main_setup", not ac.isWindowOpen("main_setup"))
   end
 end
@@ -1158,7 +1164,7 @@ local function hudBar(frac, hudCfg)
     pcall(ui.progressBar, frac, vec2(-1, 10))
   else
     local n = math.floor(frac * 20 + 0.5)
-    ui.textDisabled("[" .. string.rep("█", n) .. string.rep("░", 20 - n) .. "]")
+    ui.textDisabled(L("[") .. string.rep("█", n) .. string.rep("░", 20 - n) .. "]")
   end
 end
 
@@ -1187,6 +1193,7 @@ end
 local function drawRaceEventsBody()
   -- v0.24.0: par-a-par com o app — faixa + herói + pips + IA + jogo +
   -- estratégia estendida + preset/voz/update + ⚙ p/ abrir o app.
+  if lang_mod then lang_mod.setLang((APEXFLOW_CFG and APEXFLOW_CFG.lang) or "pt") end
   local okS, sim = pcall(ac.getSim)
   if not okS then sim = nil end
   local inSession = sim and sim.isSessionStarted
@@ -1212,7 +1219,7 @@ local function drawRaceEventsBody()
         and (tonumber(pcar0.speedKmh) or 99) < 5 then
       if not pitHideSince then pitHideSince = os.clock() end
       if (os.clock() or 0) - (pitHideSince or 0) > 10 then
-        ui.textDisabled("🅿 no box — HUD pausado (volte à pista p/ reativar)")
+        ui.textDisabled(L("🅿 no box — HUD pausado (volte à pista p/ reativar)"))
         return
       end
     else
@@ -1224,7 +1231,7 @@ local function drawRaceEventsBody()
 
   -- v0.29.0 limpo: sem caution/tracklimits/voice preview — só gaps/PP (AC nativo assume)
   -- ===== 1. FAIXA DE BANDEIRA (sempre verde — AC nativo) =====
-  if green then ui.textColored("🟢  PISTA VERDE", green) else ui.text("PISTA VERDE") end
+  if green then ui.textColored(L("🟢  PISTA VERDE"), green) else ui.text("PISTA VERDE") end
   if not compact then ui.separator() end
 
   -- ===== 2. HERÓI: posição / volta / velocidade / marcha / pneus =====
@@ -1245,7 +1252,7 @@ local function drawRaceEventsBody()
         if cc then heroCol = rgbm(cc[1], cc[2], cc[3], 1.0) end
       end
       ui.pushFont(ui.Font.Title)
-      local heroTxt = string.format("P%d   ·   V%d   ·   %d km/h   ·   M%d", pos, lap + 1, spd, gear)
+      local heroTxt = string.format(L("P%d   ·   V%d   ·   %d km/h   ·   M%d"), pos, lap + 1, spd, gear)
       if heroCol then ui.textColored(heroTxt, heroCol) else ui.text(heroTxt) end
       ui.popFont()
       if not compact then
@@ -1253,7 +1260,7 @@ local function drawRaceEventsBody()
         local maxF = pcar.maxFuel or 100
         local pct = maxF > 0 and (fuel / maxF * 100) or 0
         animBarPlaceholder(fuel, maxF)
-        ui.textDisabled(string.format("⛽ %.1f L (%d%%)", fuel, math.floor(pct)))
+        ui.textDisabled(string.format(L("⛽ %.1f L (%d%%)"), fuel, math.floor(pct)))
         -- Desgaste dos 4 pneus (leitura guardada, 0 = sem dado)
         local okW, wear = pcall(function()
           local w = pcar.wheels
@@ -1266,7 +1273,7 @@ local function drawRaceEventsBody()
           return out
         end)
         if okW and wear then
-          ui.textDisabled(string.format("🛞 %d%% %d%% · %d%% %d%%", wear[1], wear[2], wear[3], wear[4]))
+          ui.textDisabled(string.format(L("🛞 %d%% %d%% · %d%% %d%%"), wear[1], wear[2], wear[3], wear[4]))
         end
         -- Sug2: gap p/ o P1 via splines (1 linha que muda a pilotagem)
         do
@@ -1274,7 +1281,7 @@ local function drawRaceEventsBody()
           local myLap = tonumber(pcar.lapCount) or 0
           local myPos = tonumber(pcar.racePosition) or 0
           if myPos == 1 then
-            ui.textDisabled("📏 VOCÊ LIDERA")
+            ui.textDisabled(L("📏 VOCÊ LIDERA"))
           elseif mySp and sim and sim.carsCount then
             local lead = nil
             for i = 0, sim.carsCount - 1 do
@@ -1285,12 +1292,12 @@ local function drawRaceEventsBody()
               local frac = ((tonumber(lead.splinePosition) or 0) - mySp) % 1
               local lapD = (tonumber(lead.lapCount) or 0) - myLap
               if lapD > 0 then
-                ui.textDisabled(string.format("📏 P1 +%d volta(s)", lapD))
+                ui.textDisabled(string.format(L("📏 P1 +%d volta(s)"), lapD))
               elseif frac <= 0.5 then
                 local tlen = tonumber(sim.trackLengthM) or 0
                 if tlen > 0 then
                   local m = math.floor(frac * tlen + 0.5)
-                  if m > 1 then ui.textDisabled(string.format("📏 +%dm p/ P1", m)) end
+                  if m > 1 then ui.textDisabled(string.format(L("📏 +%dm p/ P1"), m)) end
                 end
               end
             end
@@ -1299,7 +1306,7 @@ local function drawRaceEventsBody()
       end
     end
   elseif not inSession then
-    ui.textDisabled("Sem sessão — o placar acende em pista " .. (hudCfg.blink ~= false and (" " .. (math.floor((os.clock() or 0) * 2) % 2 == 0 and "●" or "○")) or ""))
+    ui.textDisabled(L("Sem sessão — o placar acende em pista ") .. (hudCfg.blink ~= false and (" " .. (math.floor((os.clock() or 0) * 2) % 2 == 0 and "●" or "○")) or ""))
   end
   if not compact then ui.separator() end
 
@@ -1323,21 +1330,21 @@ local function drawRaceEventsBody()
     -- Sug1: autonomia real medida (não só "volta X")
     if perLap and perLap > 0 and fuelNow and fuelNow > 0 then
       local lapsLeft = math.floor(fuelNow / perLap)
-      if lapsLeft <= 0 then ui.textDisabled("⛽ box AGORA (tanque no fim)")
-      else ui.textDisabled(string.format("⛽ box em ~%dv (%.1f L/volta)", lapsLeft, perLap)) end
+      if lapsLeft <= 0 then ui.textDisabled(L("⛽ box AGORA (tanque no fim)"))
+      else ui.textDisabled(string.format(L("⛽ box em ~%dv (%.1f L/volta)"), lapsLeft, perLap)) end
     end
     local totalTxt = ""
-    if st.autoLaps then totalTxt = string.format("de %dv (auto)", st.autoLaps)
-    elseif st.totalLaps then totalTxt = string.format("de %dv", st.totalLaps) end
+    if st.autoLaps then totalTxt = string.format(L("de %dv (auto)"), st.autoLaps)
+    elseif st.totalLaps then totalTxt = string.format(L("de %dv"), st.totalLaps) end
     if nextPit then
-      ui.textDisabled(string.format("⛽ Pit: volta %d%s%s", nextPit,
+      ui.textDisabled(string.format(L("⛽ Pit: volta %d%s%s"), nextPit,
         totalTxt ~= "" and (" " .. totalTxt) or "",
-        (stopsLeft and stopsLeft > 0) and string.format(" · faltam %d", stopsLeft) or ""))
+        (stopsLeft and stopsLeft > 0) and string.format(L(" · faltam %d"), stopsLeft) or ""))
     else
-      ui.textDisabled("⛽ Sem pit agendado" .. (totalTxt ~= "" and (" · " .. totalTxt) or ""))
+      ui.textDisabled(L("⛽ Sem pit agendado") .. (totalTxt ~= "" and (" · " .. totalTxt) or ""))
     end
     if not compact and myLap > 0 then
-      ui.textDisabled(string.format("🏁 Você na volta %d", myLap + 1))
+      ui.textDisabled(string.format(L("🏁 Você na volta %d"), myLap + 1))
     end
     if not compact then ui.separator() end
   end
@@ -1349,15 +1356,15 @@ local function drawRaceEventsBody()
     local ps = (api.getPenaltySeverityState and api.getPenaltySeverityState()) or {}
     local any = false
     if (gb.gapBehindM or 0) > 1 then
-      ui.textDisabled(string.format("🔙 Atrás: %.0fm (P%d)", gb.gapBehindM or 0, gb.carBehindPos or 0))
+      ui.textDisabled(string.format(L("🔙 Atrás: %.0fm (P%d)"), gb.gapBehindM or 0, gb.carBehindPos or 0))
       any = true
     end
     if (sg.gapSectorS or 0) > 0.05 then
-      ui.textDisabled(string.format("⏱ Setor %d: +%.2fs p/ P1", sg.currentSector or 0, sg.gapSectorS or 0))
+      ui.textDisabled(string.format(L("⏱ Setor %d: +%.2fs p/ P1"), sg.currentSector or 0, sg.gapSectorS or 0))
       any = true
     end
     if (ps.totalPP or 0) > 0 then
-      ui.textDisabled(string.format("⚖ PP: %d (L%d %s)", ps.totalPP or 0, ps.level or 0, tostring(ps.lastReason or "")))
+      ui.textDisabled(string.format(L("⚖ PP: %d (L%d %s)"), ps.totalPP or 0, ps.level or 0, tostring(ps.lastReason or "")))
       any = true
     end
     if any then ui.separator() end
@@ -1378,13 +1385,13 @@ local function drawRaceEventsBody()
     local line = sessName
     if track ~= "" then line = line .. (line ~= "" and " • " or "") .. track end
     if sim and tonumber(sim.carsCount) and sim.carsCount > 0 then
-      line = line .. (line ~= "" and " • " or "") .. string.format("%d carros", sim.carsCount)
+      line = line .. (line ~= "" and " • " or "") .. string.format(L("%d carros"), sim.carsCount)
     end
     if line ~= "" then ui.textDisabled(line) end
     if sim and sim.sessionTimeLeft and sim.sessionTimeLeft > 0 then
       local mins = math.floor(sim.sessionTimeLeft / 60000)
       local secs = math.floor((sim.sessionTimeLeft % 60000) / 1000)
-      ui.textDisabled(string.format("⏱ %02d:%02d", mins, secs))
+      ui.textDisabled(string.format(L("⏱ %02d:%02d"), mins, secs))
     end
     ui.separator()
   end
@@ -1437,18 +1444,18 @@ local function drawRaceEventsBody()
     if mem and mem.tracks then
       local cnt = 0
       for _ in pairs(mem.tracks) do cnt = cnt + 1 end
-      ui.textDisabled(string.format("📚 %d pista(s)", cnt))
+      ui.textDisabled(string.format(L("📚 %d pista(s)"), cnt))
     else
-      ui.textDisabled("📚 sem dados")
+      ui.textDisabled(L("📚 sem dados"))
     end
   end
 
   -- ===== Rodapé: versão + LIVE + atalho p/ o app =====
   if not compact then
     local v = _G.APEXFLOW_VERSION or SCRIPT_VERSION or "?"
-    ui.textDisabled("ApexFlow v" .. tostring(v) .. (previewOn and " • 👁 PREVIEW" or "") .. (inSession and " • LIVE" or ""))
+    ui.textDisabled(L("ApexFlow v") .. tostring(v) .. (previewOn and L(" • 👁 PREVIEW") or "") .. (inSession and L(" • LIVE") or ""))
     ui.sameLine(0, 8)
-    if ui.button("⚙ App##hud_open_app", vec2(70, 22)) then
+    if ui.button(L("⚙ App##hud_open_app"), vec2(70, 22)) then
       if ac.setWindowOpen then pcall(ac.setWindowOpen, "main", true) end
     end
   end
@@ -1457,10 +1464,10 @@ end
 function script.windowRaceEvents()
   -- push/pop always paired; only the data body is protected.
   ui.pushFont(ui.Font.Title)
-  ui.text("RACE EVENTS")
+  ui.text(L("RACE EVENTS"))
   ui.popFont()
   local ok = pcall(drawRaceEventsBody)
   if not ok then
-    ui.textDisabled("Events HUD unavailable.")
+    ui.textDisabled(L("Events HUD unavailable."))
   end
 end
