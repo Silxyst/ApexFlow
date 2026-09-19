@@ -72,14 +72,14 @@
 **Requirements:** `Assetto Corsa` + `Custom Shaders Patch 0.3.0+` + `Content Manager` + offline session.
 
 ```bash
-1. Download ApexFlow_v0.33.0.zip from https://github.com/Silxyst/ApexFlow/releases/latest
+1. Download ApexFlow_v0.34.0.zip from https://github.com/Silxyst/ApexFlow/releases/latest
 2. Extract into Assetto Corsa/apps/lua/  (creates/updates the ApexFlow/ folder)
 3. Content Manager → Apps → enable ApexFlow + ApexFlow Events
 4. In AC → Apps sidebar → ApexFlow
 ```
 
 <details>
-<summary><strong>📁 Package contents (v0.33.0)</strong></summary>
+<summary><strong>📁 Package contents (v0.34.0)</strong></summary>
 
 ```
 ApexFlow/
